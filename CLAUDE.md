@@ -14,28 +14,10 @@ Alpaca is a lightweight wrapper around `llama-server` (from llama.cpp) for macOS
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|------------|
-| CLI / Daemon | Go 1.23+, kong (CLI framework) |
-| GUI | SwiftUI (Swift 6.0+, macOS menu bar app) |
-| Communication | Unix socket with JSON protocol |
-| Task Runner | Task (Taskfile.yml) |
-
-## Project Structure
-
-```
-alpaca/
-├── cmd/alpaca/          # CLI entry point
-├── internal/            # Private Go packages
-│   ├── daemon/          # Daemon logic, Unix socket server
-│   ├── client/          # Daemon client for CLI
-│   ├── preset/          # Preset YAML loading
-│   ├── llama/           # llama-server process management
-│   ├── pull/            # HuggingFace download
-│   └── protocol/        # JSON protocol definitions
-├── gui/Alpaca/          # SwiftUI menu bar app
-└── docs/design/         # Design documents
-```
+- CLI / Daemon: Go 1.23+, kong (CLI framework)
+- GUI: SwiftUI (Swift 6.0+, macOS menu bar app)
+- Communication: Unix socket with JSON protocol
+- Task Runner: Task (Taskfile.yml)
 
 ## Common Commands
 
@@ -51,13 +33,11 @@ task gui:open   # Open Xcode project
 
 Detailed specifications are in `docs/design/`. **Read before implementing:**
 
-| File | Content |
-|------|---------|
-| `architecture.md` | Component architecture, daemon lifecycle |
-| `cli.md` | CLI command reference |
-| `gui.md` | GUI layouts and states |
-| `preset-format.md` | Preset YAML schema |
-| `mvp.md` | MVP scope definition |
+- `architecture.md` - Component architecture, daemon lifecycle
+- `cli.md` - CLI command reference
+- `gui.md` - GUI layouts and states
+- `preset-format.md` - Preset YAML schema
+- `mvp.md` - MVP scope definition
 
 ## Daemon Protocol
 
