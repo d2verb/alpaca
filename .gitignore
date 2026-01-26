@@ -24,9 +24,9 @@ coverage.out
 
 # Xcode
 gui/Alpaca/build/
-gui/Alpaca/*.xcuserdata
-gui/Alpaca/*.xcworkspace/xcuserdata/
 gui/Alpaca/DerivedData/
+*.xcuserstate
+xcuserdata/
 
 # Go
 vendor/
