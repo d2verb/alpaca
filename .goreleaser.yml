@@ -1,0 +1,52 @@
+version: 2
+
+project_name: alpaca
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: alpaca
+    main: ./cmd/alpaca
+    binary: alpaca
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+
+archives:
+  - id: alpaca
+    builds:
+      - alpaca
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+
+brews:
+  - name: alpaca
+    repository:
+      owner: d2verb
+      name: homebrew-tap
+    homepage: https://github.com/d2verb/alpaca
+    description: Lightweight llama-server wrapper for macOS
+    license: MIT
+    install: |
+      bin.install "alpaca"

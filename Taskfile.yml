@@ -1,0 +1,102 @@
+version: '3'
+
+vars:
+  BINARY_NAME: alpaca
+  BUILD_DIR: ./build
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  # Development
+  build:
+    desc: Build the CLI binary
+    cmds:
+      - go build -o {{.BUILD_DIR}}/{{.BINARY_NAME}} ./cmd/alpaca
+
+  run:
+    desc: Run the CLI (pass args after --)
+    cmds:
+      - go run ./cmd/alpaca {{.CLI_ARGS}}
+
+  # Testing
+  test:
+    desc: Run tests with coverage
+    cmds:
+      - go test -race -coverprofile=coverage.out -covermode=atomic ./...
+      - go tool cover -func=coverage.out
+
+  test:coverage:
+    desc: Check if coverage meets minimum threshold (80%)
+    cmds:
+      - |
+        COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print substr($3, 1, length($3)-1)}')
+        echo "Coverage: ${COVERAGE}%"
+        if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+          echo "Coverage is below 80%"
+          exit 1
+        fi
+
+  test:watch:
+    desc: Run tests in watch mode
+    cmds:
+      - go install github.com/mitranim/gow@latest
+      - gow test ./...
+
+  # Code Quality
+  lint:
+    desc: Run linter
+    cmds:
+      - golangci-lint run ./...
+
+  fmt:
+    desc: Format code
+    cmds:
+      - goimports -w .
+
+  check:
+    desc: Run all checks (fmt, lint, test)
+    cmds:
+      - task: fmt
+      - task: lint
+      - task: test
+
+  # Cleanup
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf {{.BUILD_DIR}}
+      - rm -f coverage.out
+
+  # Dependencies
+  deps:
+    desc: Download dependencies
+    cmds:
+      - go mod download
+
+  deps:tidy:
+    desc: Tidy dependencies
+    cmds:
+      - go mod tidy
+
+  # Tools
+  tools:
+    desc: Install development tools
+    cmds:
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - go install golang.org/x/tools/cmd/goimports@latest
+      - go install github.com/matryer/moq@latest
+
+  # GUI (macOS)
+  gui:build:
+    desc: Build the GUI app
+    dir: gui/Alpaca
+    cmds:
+      - xcodebuild -scheme Alpaca -configuration Release build
+
+  gui:open:
+    desc: Open GUI project in Xcode
+    cmds:
+      - open gui/Alpaca/Alpaca.xcodeproj
