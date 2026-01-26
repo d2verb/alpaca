@@ -22,3 +22,4 @@ This is a **thin wrapper** around llama-server. Do not over-engineer.
 - Keep files under 500 lines
 - One main type/responsibility per file
 - Extract utilities when a file grows too large
+- No deep nesting (~2 is recommended, 3 is acceptable, rejects 4~)
