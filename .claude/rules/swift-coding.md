@@ -6,81 +6,87 @@ paths: "gui/**/*"
 
 ## Concurrency (Swift 6)
 
-Use async/await and Actor for concurrency:
-
+Use Actor for shared state, MainActor for UI:
 ```swift
-// CORRECT: Actor for shared state
+// Shared state
 actor DaemonClient {
     private var connection: Connection?
-
-    func connect() async throws {
-        // ...
-    }
+    func connect() async throws { ... }
 }
 
-// CORRECT: MainActor for UI state
+// UI state
 @MainActor
-class MenuBarViewModel: ObservableObject {
-    @Published var status: DaemonStatus = .disconnected
+final class ViewModel: ObservableObject {
+    @Published private(set) var status: Status = .idle
 }
-```
-
-## Naming
-
-Follow Swift API Design Guidelines:
-
-- Methods read as grammatical phrases
-- Factory methods begin with "make"
-- Boolean properties read as assertions (`isEmpty`, `canExecute`)
-
-```swift
-// CORRECT
-func makeConnection(to socket: URL) -> Connection
-var isRunning: Bool
-func loadPreset(named name: String) async throws
-
-// WRONG
-func connection(socket: URL) -> Connection
-var running: Bool
-func load(name: String) async throws
 ```
 
 ## Error Handling
 
-Use typed throws (Swift 6) when possible:
-
+Define descriptive error types:
 ```swift
-enum DaemonError: Error {
+enum DaemonError: Error, LocalizedError {
     case notRunning
     case connectionFailed(underlying: Error)
-    case invalidResponse
+    case invalidResponse(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .notRunning: "Daemon is not running"
+        case .connectionFailed(let err): "Connection failed: \(err.localizedDescription)"
+        case .invalidResponse(let msg): "Invalid response: \(msg)"
+        }
+    }
 }
 
-func connect() async throws(DaemonError) {
+func connect() async throws {
+    guard isDaemonRunning else { throw DaemonError.notRunning }
     // ...
 }
 ```
 
-## SwiftUI View Structure
+## Optionals
 
-Keep views small and focused:
-
+Prefer guard-let over force unwrap:
 ```swift
-// CORRECT: Extracted subview
-struct StatusRow: View {
-    let status: DaemonStatus
+// WRONG
+let name = preset.name!
 
+// CORRECT
+guard let name = preset.name else { throw PresetError.missingName }
+let name = preset.name ?? "Untitled"
+```
+
+## Naming
+```swift
+// Methods as grammatical phrases
+func makeConnection(to socket: URL) -> Connection
+func remove(_ entry: Entry)
+
+// Booleans as assertions
+var isEmpty: Bool
+var canExecute: Bool
+```
+
+## SwiftUI State
+```swift
+@StateObject private var vm = ViewModel()  // View owns it
+@ObservedObject var vm: ViewModel          // Passed from parent
+@State private var isEnabled = false       // Simple value types
+```
+
+## SwiftUI Views
+
+Keep body under 50 lines. Extract subviews:
+```swift
+struct RaceRow: View {
+    let race: Race
     var body: some View {
         HStack {
-            StatusIndicator(status: status)
-            Text(status.displayName)
+            Text(race.name)
+            Spacer()
+            StatusBadge(status: race.status)
         }
     }
 }
 ```
-
-## State Management
-
-- Use `@StateObject` for owned objects
-- Use `@ObservedObject` for passed objects
-- Keep business logic in ViewModels, not Views

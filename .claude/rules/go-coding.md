@@ -4,40 +4,52 @@ paths: "**/*.go"
 
 # Go Coding Rules
 
-## Error Handling (REQUIRED)
+## Error Handling
 
-ALWAYS wrap errors with context:
-
+Wrap errors with context using `%w`:
 ```go
-// WRONG: Bare error return
-func loadPreset(name string) (*Preset, error) {
-    data, err := os.ReadFile(path)
-    if err != nil {
-        return nil, err
-    }
-}
+// WRONG
+return nil, err
 
-// CORRECT: Wrapped with context
-func loadPreset(name string) (*Preset, error) {
-    data, err := os.ReadFile(path)
-    if err != nil {
-        return nil, fmt.Errorf("load preset %s: %w", name, err)
-    }
-}
+// CORRECT
+return nil, fmt.Errorf("load preset %s: %w", name, err)
 ```
 
 ## Context Propagation
 
-ALWAYS pass context.Context as first parameter:
-
+ALWAYS pass `context.Context` as first parameter:
 ```go
-func (d *Daemon) RunModel(ctx context.Context, preset string) error {
-    // ...
+// CORRECT
+func (s *Service) Fetch(ctx context.Context, id string) (*Data, error)
+
+// WRONG: context.Background() in library code
+func (s *Service) Fetch(id string) (*Data, error) {
+    return s.client.Get(context.Background(), id)
 }
 ```
 
 ## Naming
+```go
+// Packages: short, singular, lowercase
+package race     // not "races" or "raceUtils"
 
-- Package names: singular, short (`preset` not `presets`)
-- Variables: short in small scopes (`p` for preset in a loop)
-- Exported: descriptive (`LoadPreset` not `Load`)
+// Exported: descriptive, don't stutter
+race.ID          // not race.RaceID
+
+// Acronyms: consistent case
+userID, apiClient, HTTPServer
+```
+
+## Interface Design
+
+Accept interfaces, return structs. Define at consumer side:
+```go
+// CORRECT: Easy to test
+type raceGetter interface {
+    Get(ctx context.Context, id string) (*Race, error)
+}
+type Service struct { races raceGetter }
+
+// WRONG: Hard to test
+type Service struct { races *PostgresRepository }
+```
