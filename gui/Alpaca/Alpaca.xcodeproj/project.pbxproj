@@ -12,8 +12,7 @@
 		B100000300000000000000AA /* Preset.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000300000000000000AA /* Preset.swift */; };
 		B100000400000000000000AA /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000400000000000000AA /* AppViewModel.swift */; };
 		B100000500000000000000AA /* DaemonClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000500000000000000AA /* DaemonClient.swift */; };
-		B100000600000000000000AA /* StatusMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000600000000000000AA /* StatusMenuView.swift */; };
-		B100000700000000000000AA /* PresetMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000700000000000000AA /* PresetMenuView.swift */; };
+		B100000600000000000000AA /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000600000000000000AA /* AppDelegate.swift */; };
 		B100000800000000000000AA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C100000800000000000000AA /* Assets.xcassets */; };
 		B100000900000000000000AA /* AlpacaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000900000000000000AA /* AlpacaTests.swift */; };
 /* End PBXBuildFile section */
@@ -35,8 +34,7 @@
 		C100000300000000000000AA /* Preset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preset.swift; sourceTree = "<group>"; };
 		C100000400000000000000AA /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
 		C100000500000000000000AA /* DaemonClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonClient.swift; sourceTree = "<group>"; };
-		C100000600000000000000AA /* StatusMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusMenuView.swift; sourceTree = "<group>"; };
-		C100000700000000000000AA /* PresetMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetMenuView.swift; sourceTree = "<group>"; };
+		C100000600000000000000AA /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		C100000800000000000000AA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C100000810000000000000AA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F100000200000000000000AA /* AlpacaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AlpacaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -83,9 +81,9 @@
 			isa = PBXGroup;
 			children = (
 				C100000100000000000000AA /* AlpacaApp.swift */,
+				C100000600000000000000AA /* AppDelegate.swift */,
 				H100000500000000000000AA /* Models */,
 				H100000600000000000000AA /* ViewModels */,
-				H100000700000000000000AA /* Views */,
 				H100000800000000000000AA /* Services */,
 				C100000800000000000000AA /* Assets.xcassets */,
 				C100000810000000000000AA /* Info.plist */,
@@ -108,15 +106,6 @@
 				C100000400000000000000AA /* AppViewModel.swift */,
 			);
 			path = ViewModels;
-			sourceTree = "<group>";
-		};
-		H100000700000000000000AA /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				C100000600000000000000AA /* StatusMenuView.swift */,
-				C100000700000000000000AA /* PresetMenuView.swift */,
-			);
-			path = Views;
 			sourceTree = "<group>";
 		};
 		H100000800000000000000AA /* Services */ = {
@@ -231,8 +220,7 @@
 				B100000300000000000000AA /* Preset.swift in Sources */,
 				B100000400000000000000AA /* AppViewModel.swift in Sources */,
 				B100000500000000000000AA /* DaemonClient.swift in Sources */,
-				B100000600000000000000AA /* StatusMenuView.swift in Sources */,
-				B100000700000000000000AA /* PresetMenuView.swift in Sources */,
+				B100000600000000000000AA /* AppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
