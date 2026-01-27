@@ -6,8 +6,6 @@ paths: "**/*.go"
 
 ## Coverage
 
-Minimum **80%** test coverage.
-
 ```bash
 task test           # Run tests with coverage
 task test:coverage  # Check coverage threshold

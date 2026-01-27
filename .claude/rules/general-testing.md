@@ -1,5 +1,7 @@
 # General Testing Rules
 
+Minimum **80%** test coverage.
+
 ## What to Test
 
 - Business logic

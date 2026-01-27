@@ -71,6 +71,7 @@ Commands: `status`, `run`, `kill`, `list_presets`
 - Keep it simple (thin wrapper)
 - Use system-installed llama-server
 - Rely on llama-server's /health for health checks
+- Write tests before implementing new features (TDD approach)
 
 **Do Not:**
 - Add llama.cpp version management
