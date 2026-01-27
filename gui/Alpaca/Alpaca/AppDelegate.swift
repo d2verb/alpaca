@@ -5,7 +5,7 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var menu: NSMenu!
-    private let viewModel = AppViewModel(client: MockDaemonClient())
+    private let viewModel = AppViewModel(client: DaemonClient())
 
     // Menu items that need dynamic updates
     private var statusMenuItem: NSMenuItem!

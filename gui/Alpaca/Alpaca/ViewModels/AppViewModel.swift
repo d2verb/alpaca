@@ -26,6 +26,9 @@ final class AppViewModel {
         do {
             state = try await client.getStatus()
             errorMessage = nil
+        } catch DaemonError.notRunning {
+            state = .notRunning
+            errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
         }
