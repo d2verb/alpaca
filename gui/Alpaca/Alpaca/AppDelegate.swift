@@ -10,14 +10,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // Menu items that need dynamic updates
     private var statusMenuItem: NSMenuItem!
     private var errorMenuItem: NSMenuItem!
-    private var copyCommandItem: NSMenuItem!
     private var actionSeparator: NSMenuItem!
     private var loadModelItem: NSMenuItem!
     private var stopItem: NSMenuItem!
     private var cancelItem: NSMenuItem!
-
-    // For cancelling pending copy feedback reset
-    private var copyCommandResetWorkItem: DispatchWorkItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
@@ -48,13 +44,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         errorMenuItem = NSMenuItem()
         errorMenuItem.isHidden = true
         menu.addItem(errorMenuItem)
-
-        // Copy command item (shown in notRunning state)
-        copyCommandItem = NSMenuItem(title: "Copy \"alpaca start\"", action: #selector(copyStartCommand), keyEquivalent: "")
-        copyCommandItem.target = self
-        copyCommandItem.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil)
-        copyCommandItem.isHidden = true
-        menu.addItem(copyCommandItem)
 
         // Separator before actions
         actionSeparator = NSMenuItem.separator()
@@ -101,26 +90,61 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         Task {
             await viewModel.refreshStatus()
             await viewModel.loadPresets()
+            await viewModel.loadModels()
             updateMenu()
         }
     }
 
     private func createPresetsSubmenu() -> NSMenu {
         let submenu = NSMenu()
-        for preset in viewModel.presets {
-            let item = NSMenuItem(title: preset.name, action: #selector(selectPreset(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = preset.name
-            if viewModel.state.currentPreset == preset.name {
-                item.state = .on
+
+        // Downloaded Models section
+        if !viewModel.models.isEmpty {
+            let modelsHeader = NSMenuItem(title: "Downloaded Models", action: nil, keyEquivalent: "")
+            modelsHeader.isEnabled = false
+            submenu.addItem(modelsHeader)
+
+            for model in viewModel.models {
+                let item = NSMenuItem(title: model.displayName, action: #selector(selectModel(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = model.identifier
+                item.toolTip = "\(model.identifier) (\(model.sizeString))"
+                if viewModel.state.currentPreset == model.identifier {
+                    item.state = .on
+                }
+                submenu.addItem(item)
             }
-            submenu.addItem(item)
         }
-        if viewModel.presets.isEmpty {
-            let emptyItem = NSMenuItem(title: "No presets available", action: nil, keyEquivalent: "")
+
+        // Separator between models and presets
+        if !viewModel.models.isEmpty && !viewModel.presets.isEmpty {
+            submenu.addItem(NSMenuItem.separator())
+        }
+
+        // Presets section
+        if !viewModel.presets.isEmpty {
+            let presetsHeader = NSMenuItem(title: "Presets", action: nil, keyEquivalent: "")
+            presetsHeader.isEnabled = false
+            submenu.addItem(presetsHeader)
+
+            for preset in viewModel.presets {
+                let item = NSMenuItem(title: preset.name, action: #selector(selectModel(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = preset.name
+                if viewModel.state.currentPreset == preset.name {
+                    item.state = .on
+                }
+                submenu.addItem(item)
+            }
+        }
+
+        // Show message if both are empty
+        if viewModel.models.isEmpty && viewModel.presets.isEmpty {
+            let emptyItem = NSMenuItem(title: "No models or presets available", action: nil, keyEquivalent: "")
             emptyItem.isEnabled = false
             submenu.addItem(emptyItem)
         }
+
         return submenu
     }
 
@@ -148,14 +172,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Show/hide items based on state
         switch viewModel.state {
         case .notRunning:
-            copyCommandItem.isHidden = false
             loadModelItem.isHidden = true
             stopItem.isHidden = true
             cancelItem.isHidden = true
-            actionSeparator.isHidden = false
+            actionSeparator.isHidden = true
 
         case .idle:
-            copyCommandItem.isHidden = true
             loadModelItem.isHidden = false
             loadModelItem.title = "Load Model..."
             loadModelItem.image = NSImage(systemSymbolName: "play.fill", accessibilityDescription: nil)
@@ -164,14 +186,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             actionSeparator.isHidden = false
 
         case .loading:
-            copyCommandItem.isHidden = true
             loadModelItem.isHidden = true
             stopItem.isHidden = true
             cancelItem.isHidden = false
             actionSeparator.isHidden = false
 
         case .running:
-            copyCommandItem.isHidden = true
             loadModelItem.isHidden = false
             loadModelItem.title = "Switch Model..."
             loadModelItem.image = NSImage(systemSymbolName: "play.fill", accessibilityDescription: nil)
@@ -184,11 +204,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func createStatusAttributedString() -> NSAttributedString {
         let result = NSMutableAttributedString()
 
+        // Paragraph style to prevent automatic indentation on subsequent lines
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.headIndent = 0
+        paragraphStyle.firstLineHeadIndent = 0
+
         // Status indicator and text
         let (indicator, color) = statusIndicator()
         let indicatorAttr = NSAttributedString(
             string: "\(indicator) ",
-            attributes: [.foregroundColor: color]
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 13),
+                .foregroundColor: color,
+                .paragraphStyle: paragraphStyle
+            ]
         )
         result.append(indicatorAttr)
 
@@ -196,7 +225,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             string: viewModel.state.statusText,
             attributes: [
                 .font: NSFont.boldSystemFont(ofSize: 13),
-                .foregroundColor: NSColor.labelColor
+                .foregroundColor: NSColor.labelColor,
+                .paragraphStyle: paragraphStyle
             ]
         )
         result.append(statusText)
@@ -204,38 +234,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Additional info based on state
         switch viewModel.state {
         case .notRunning:
-            result.append(NSAttributedString(string: "\n"))
-            let commandAttr = NSAttributedString(
-                string: "$ alpaca start",
-                attributes: [
-                    .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular),
-                    .foregroundColor: NSColor.secondaryLabelColor
-                ]
-            )
-            result.append(commandAttr)
+            break
 
         case .idle:
             // Add spacing using a small font line
             result.append(NSAttributedString(
                 string: "\n \n",
-                attributes: [.font: NSFont.systemFont(ofSize: 4)]
+                attributes: [.font: NSFont.systemFont(ofSize: 4), .paragraphStyle: paragraphStyle]
             ))
             let subtitleAttr = NSAttributedString(
                 string: "No model loaded",
                 attributes: [
                     .font: NSFont.systemFont(ofSize: 11),
-                    .foregroundColor: NSColor.secondaryLabelColor
+                    .foregroundColor: NSColor.secondaryLabelColor,
+                    .paragraphStyle: paragraphStyle
                 ]
             )
             result.append(subtitleAttr)
 
         case .loading(let preset):
-            result.append(NSAttributedString(string: "\n"))
+            result.append(NSAttributedString(string: "\n", attributes: [.paragraphStyle: paragraphStyle]))
             let subtitleAttr = NSAttributedString(
                 string: preset,
                 attributes: [
                     .font: NSFont.systemFont(ofSize: 11),
-                    .foregroundColor: NSColor.secondaryLabelColor
+                    .foregroundColor: NSColor.secondaryLabelColor,
+                    .paragraphStyle: paragraphStyle
                 ]
             )
             result.append(subtitleAttr)
@@ -244,22 +268,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // Add spacing using a small font line
             result.append(NSAttributedString(
                 string: "\n \n",
-                attributes: [.font: NSFont.systemFont(ofSize: 4)]
+                attributes: [.font: NSFont.systemFont(ofSize: 4), .paragraphStyle: paragraphStyle]
             ))
             let presetAttr = NSAttributedString(
                 string: preset,
                 attributes: [
                     .font: NSFont.systemFont(ofSize: 11),
-                    .foregroundColor: NSColor.labelColor
+                    .foregroundColor: NSColor.labelColor,
+                    .paragraphStyle: paragraphStyle
                 ]
             )
             result.append(presetAttr)
-            result.append(NSAttributedString(string: "\n"))
+            result.append(NSAttributedString(string: "\n", attributes: [.paragraphStyle: paragraphStyle]))
             let endpointAttr = NSAttributedString(
                 string: endpoint,
                 attributes: [
                     .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .regular),
-                    .foregroundColor: NSColor.labelColor
+                    .foregroundColor: NSColor.labelColor,
+                    .paragraphStyle: paragraphStyle
                 ]
             )
             result.append(endpointAttr)
@@ -281,10 +307,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    @objc private func selectPreset(_ sender: NSMenuItem) {
-        guard let presetName = sender.representedObject as? String else { return }
+    @objc private func selectModel(_ sender: NSMenuItem) {
+        guard let identifier = sender.representedObject as? String else { return }
         Task {
-            await viewModel.loadModel(preset: presetName)
+            await viewModel.loadModel(identifier: identifier)
             updateMenu()
         }
     }
@@ -298,22 +324,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func statusItemClicked() {
         // No-op: status item is display-only but needs action to avoid gray styling
-    }
-
-    @objc private func copyStartCommand() {
-        viewModel.copyStartCommand()
-
-        // Cancel any pending reset from previous clicks
-        copyCommandResetWorkItem?.cancel()
-
-        // Show "Copied!" feedback
-        copyCommandItem.title = "Copied!"
-
-        // Schedule reset after delay
-        let workItem = DispatchWorkItem { [weak self] in
-            self?.copyCommandItem.title = "Copy \"alpaca start\""
-        }
-        copyCommandResetWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: workItem)
     }
 }

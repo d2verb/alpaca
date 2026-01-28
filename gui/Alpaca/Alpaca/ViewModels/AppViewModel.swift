@@ -7,6 +7,7 @@ import SwiftUI
 final class AppViewModel {
     private(set) var state: DaemonState = .idle
     private(set) var presets: [Preset] = []
+    private(set) var models: [Model] = []
     private(set) var errorMessage: String?
 
     private let client: DaemonClientProtocol
@@ -19,6 +20,7 @@ final class AppViewModel {
     func initialize() async {
         await refreshStatus()
         await loadPresets()
+        await loadModels()
     }
 
     /// Refresh the current daemon status.
@@ -43,11 +45,20 @@ final class AppViewModel {
         }
     }
 
-    /// Load a model with the specified preset.
-    func loadModel(preset: String) async {
-        state = .loading(preset: preset)
+    /// Load the list of downloaded models.
+    func loadModels() async {
         do {
-            try await client.loadModel(preset: preset)
+            models = try await client.listModels()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Load a model with the specified identifier (preset name or repo:quant).
+    func loadModel(identifier: String) async {
+        state = .loading(preset: identifier)
+        do {
+            try await client.loadModel(identifier: identifier)
             await refreshStatus()
         } catch {
             errorMessage = error.localizedDescription
@@ -63,12 +74,5 @@ final class AppViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
-    }
-
-    /// Copy the daemon start command to clipboard.
-    func copyStartCommand() {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString("alpaca start", forType: .string)
     }
 }

@@ -10,6 +10,7 @@
 		B100000100000000000000AA /* AlpacaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000100000000000000AA /* AlpacaApp.swift */; };
 		B100000200000000000000AA /* DaemonState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000200000000000000AA /* DaemonState.swift */; };
 		B100000300000000000000AA /* Preset.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000300000000000000AA /* Preset.swift */; };
+		B100000700000000000000AA /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000700000000000000AA /* Model.swift */; };
 		B100000400000000000000AA /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000400000000000000AA /* AppViewModel.swift */; };
 		B100000500000000000000AA /* DaemonClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000500000000000000AA /* DaemonClient.swift */; };
 		B100000600000000000000AA /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000600000000000000AA /* AppDelegate.swift */; };
@@ -31,6 +32,7 @@
 		C100000100000000000000AA /* AlpacaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlpacaApp.swift; sourceTree = "<group>"; };
 		C100000200000000000000AA /* DaemonState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonState.swift; sourceTree = "<group>"; };
 		C100000300000000000000AA /* Preset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preset.swift; sourceTree = "<group>"; };
+		C100000700000000000000AA /* Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
 		C100000400000000000000AA /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
 		C100000500000000000000AA /* DaemonClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonClient.swift; sourceTree = "<group>"; };
 		C100000600000000000000AA /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -103,6 +105,7 @@
 			isa = PBXGroup;
 			children = (
 				C100000200000000000000AA /* DaemonState.swift */,
+				C100000700000000000000AA /* Model.swift */,
 				C100000300000000000000AA /* Preset.swift */,
 			);
 			path = Models;
@@ -217,6 +220,7 @@
 			files = (
 				B100000100000000000000AA /* AlpacaApp.swift in Sources */,
 				B100000200000000000000AA /* DaemonState.swift in Sources */,
+				B100000700000000000000AA /* Model.swift in Sources */,
 				B100000300000000000000AA /* Preset.swift in Sources */,
 				B100000400000000000000AA /* AppViewModel.swift in Sources */,
 				B100000500000000000000AA /* DaemonClient.swift in Sources */,

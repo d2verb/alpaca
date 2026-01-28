@@ -76,6 +76,31 @@ func (d *Daemon) ListPresets() ([]string, error) {
 	return d.presetLoader.List()
 }
 
+// ModelInfo represents information about a downloaded model.
+type ModelInfo struct {
+	Repo  string `json:"repo"`
+	Quant string `json:"quant"`
+	Size  int64  `json:"size"`
+}
+
+// ListModels returns all downloaded models.
+func (d *Daemon) ListModels(ctx context.Context) ([]ModelInfo, error) {
+	entries, err := d.modelManager.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	models := []ModelInfo{}
+	for _, e := range entries {
+		models = append(models, ModelInfo{
+			Repo:  e.Repo,
+			Quant: e.Quant,
+			Size:  e.Size,
+		})
+	}
+	return models, nil
+}
+
 // createPresetFromHF creates a preset from HuggingFace format (repo:quant).
 func (d *Daemon) createPresetFromHF(ctx context.Context, repo, quant string) (*preset.Preset, error) {
 	// Get model file path from metadata

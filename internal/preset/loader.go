@@ -55,7 +55,7 @@ func (l *Loader) List() ([]string, error) {
 		return nil, fmt.Errorf("list presets: %w", err)
 	}
 
-	var names []string
+	names := []string{}
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue

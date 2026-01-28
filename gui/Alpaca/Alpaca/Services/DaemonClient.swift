@@ -3,9 +3,10 @@ import Foundation
 /// Protocol for communicating with the Alpaca daemon.
 protocol DaemonClientProtocol: Sendable {
     func getStatus() async throws -> DaemonState
-    func loadModel(preset: String) async throws
+    func loadModel(identifier: String) async throws
     func stopModel() async throws
     func listPresets() async throws -> [Preset]
+    func listModels() async throws -> [Model]
 }
 
 /// Errors that can occur during daemon communication.
@@ -38,15 +39,19 @@ actor MockDaemonClient: DaemonClientProtocol {
         Preset(name: "deepseek-coder-6.7b"),
         Preset(name: "llama3-8b-q4"),
     ]
+    private let mockModels: [Model] = [
+        Model(repo: "TheBloke/CodeLlama-7B-GGUF", quant: "Q4_K_M", size: 4_370_000_000),
+        Model(repo: "TheBloke/Mistral-7B-GGUF", quant: "Q5_K_M", size: 5_130_000_000),
+    ]
 
     func getStatus() async throws -> DaemonState {
         return mockState
     }
 
-    func loadModel(preset: String) async throws {
-        mockState = .loading(preset: preset)
+    func loadModel(identifier: String) async throws {
+        mockState = .loading(preset: identifier)
         try await Task.sleep(for: .seconds(2))
-        mockState = .running(preset: preset, endpoint: "localhost:8080")
+        mockState = .running(preset: identifier, endpoint: "localhost:8080")
     }
 
     func stopModel() async throws {
@@ -55,6 +60,10 @@ actor MockDaemonClient: DaemonClientProtocol {
 
     func listPresets() async throws -> [Preset] {
         return mockPresets
+    }
+
+    func listModels() async throws -> [Model] {
+        return mockModels
     }
 }
 
@@ -147,8 +156,8 @@ final class DaemonClient: DaemonClientProtocol, Sendable {
         }
     }
 
-    func loadModel(preset: String) async throws {
-        let response = try await sendRequest(Request(command: "run", args: ["preset": preset]))
+    func loadModel(identifier: String) async throws {
+        let response = try await sendRequest(Request(command: "load", args: ["identifier": identifier]))
 
         if response.status != "ok" {
             throw DaemonError.protocolError(response.error ?? "Failed to load model")
@@ -185,6 +194,37 @@ final class DaemonClient: DaemonClientProtocol, Sendable {
         return presetNames.compactMap { name in
             guard let nameString = name as? String else { return nil }
             return Preset(name: nameString)
+        }
+    }
+
+    func listModels() async throws -> [Model] {
+        let response: Response
+        do {
+            response = try await sendRequest(Request(command: "list_models"))
+        } catch DaemonError.notRunning {
+            return []
+        }
+
+        guard response.status == "ok", let data = response.data else {
+            if let error = response.error {
+                throw DaemonError.protocolError(error)
+            }
+            throw DaemonError.invalidResponse("Missing data in list_models response")
+        }
+
+        guard let modelList = data["models"]?.value as? [Any] else {
+            // Return empty array if no models key (might be null)
+            return []
+        }
+
+        return modelList.compactMap { item in
+            guard let dict = item as? [String: Any],
+                  let repo = dict["repo"] as? String,
+                  let quant = dict["quant"] as? String else {
+                return nil
+            }
+            let size = (dict["size"] as? Int64) ?? (dict["size"] as? Int).map(Int64.init) ?? 0
+            return Model(repo: repo, quant: quant, size: size)
         }
     }
 

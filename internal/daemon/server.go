@@ -94,6 +94,8 @@ func (s *Server) handleRequest(ctx context.Context, req *protocol.Request) *prot
 		return s.handleKill(ctx)
 	case protocol.CmdListPresets:
 		return s.handleListPresets()
+	case protocol.CmdListModels:
+		return s.handleListModels(ctx)
 	default:
 		return protocol.NewErrorResponse("unknown command")
 	}
@@ -145,6 +147,27 @@ func (s *Server) handleListPresets() *protocol.Response {
 	}
 	return protocol.NewOKResponse(map[string]any{
 		"presets": presets,
+	})
+}
+
+func (s *Server) handleListModels(ctx context.Context) *protocol.Response {
+	models, err := s.daemon.ListModels(ctx)
+	if err != nil {
+		return protocol.NewErrorResponse(err.Error())
+	}
+
+	// Convert to map format for JSON
+	modelList := []map[string]any{}
+	for _, m := range models {
+		modelList = append(modelList, map[string]any{
+			"repo":  m.Repo,
+			"quant": m.Quant,
+			"size":  m.Size,
+		})
+	}
+
+	return protocol.NewOKResponse(map[string]any{
+		"models": modelList,
 	})
 }
 

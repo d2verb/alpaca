@@ -22,6 +22,7 @@ const (
 	CmdLoad        = "load"   // Alias for run
 	CmdUnload      = "unload" // Alias for kill
 	CmdListPresets = "list_presets"
+	CmdListModels  = "list_models"
 )
 
 // Status values

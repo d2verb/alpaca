@@ -7,14 +7,16 @@ import Testing
 actor TestDaemonClient: DaemonClientProtocol {
     var statusToReturn: DaemonState = .idle
     var presetsToReturn: [Preset] = []
+    var modelsToReturn: [Model] = []
     var errorToThrow: Error?
     var loadModelCalled = false
     var stopModelCalled = false
-    var lastLoadedPreset: String?
+    var lastLoadedIdentifier: String?
 
-    func configure(status: DaemonState = .idle, presets: [Preset] = [], error: Error? = nil) {
+    func configure(status: DaemonState = .idle, presets: [Preset] = [], models: [Model] = [], error: Error? = nil) {
         statusToReturn = status
         presetsToReturn = presets
+        modelsToReturn = models
         errorToThrow = error
     }
 
@@ -25,9 +27,9 @@ actor TestDaemonClient: DaemonClientProtocol {
         return statusToReturn
     }
 
-    func loadModel(preset: String) async throws {
+    func loadModel(identifier: String) async throws {
         loadModelCalled = true
-        lastLoadedPreset = preset
+        lastLoadedIdentifier = identifier
         if let error = errorToThrow {
             throw error
         }
@@ -45,6 +47,13 @@ actor TestDaemonClient: DaemonClientProtocol {
             throw error
         }
         return presetsToReturn
+    }
+
+    func listModels() async throws -> [Model] {
+        if let error = errorToThrow {
+            throw error
+        }
+        return modelsToReturn
     }
 }
 
@@ -200,12 +209,12 @@ struct AppViewModelTests {
         await client.configure(status: .running(preset: "new-model", endpoint: "localhost:8080"))
         let viewModel = AppViewModel(client: client)
 
-        await viewModel.loadModel(preset: "new-model")
+        await viewModel.loadModel(identifier: "new-model")
 
         let loadModelCalled = await client.loadModelCalled
-        let lastPreset = await client.lastLoadedPreset
+        let lastIdentifier = await client.lastLoadedIdentifier
         #expect(loadModelCalled)
-        #expect(lastPreset == "new-model")
+        #expect(lastIdentifier == "new-model")
         #expect(viewModel.state == .running(preset: "new-model", endpoint: "localhost:8080"))
     }
 
