@@ -47,9 +47,9 @@ func (s *stubModelManager) GetFilePath(ctx context.Context, repo, quant string) 
 func TestResolveHFPresetSuccess(t *testing.T) {
 	models := &stubModelManager{filePath: "/path/to/model.gguf"}
 	cfg := &config.Config{
-		DefaultHost:     "127.0.0.1",
-		DefaultPort:     8080,
-		DefaultCtxSize:  4096,
+		DefaultHost:      "127.0.0.1",
+		DefaultPort:      8080,
+		DefaultCtxSize:   4096,
 		DefaultGPULayers: -1,
 	}
 
