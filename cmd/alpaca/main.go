@@ -16,6 +16,7 @@ type CLI struct {
 	Status  StatusCmd  `cmd:"" help:"Show current status"`
 	Load    LoadCmd    `cmd:"" help:"Load a model (preset or HuggingFace format)"`
 	Unload  UnloadCmd  `cmd:"" help:"Stop the currently running model"`
+	Logs    LogsCmd    `cmd:"" help:"Show logs (daemon or server)"`
 	Preset  PresetCmd  `cmd:"" help:"Manage presets"`
 	Model   ModelCmd   `cmd:"" help:"Manage models"`
 	Version VersionCmd `cmd:"" help:"Show version"`
