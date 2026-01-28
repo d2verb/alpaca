@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var menu: NSMenu!
     private let viewModel = AppViewModel(client: DaemonClient())
@@ -90,7 +90,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let quitItem = NSMenuItem(title: "Quit Alpaca", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quitItem)
 
+        menu.delegate = self
         statusItem.menu = menu
+    }
+
+    // MARK: - NSMenuDelegate
+
+    func menuWillOpen(_ menu: NSMenu) {
+        updateMenu()
+        Task {
+            await viewModel.refreshStatus()
+            await viewModel.loadPresets()
+            updateMenu()
+        }
     }
 
     private func createPresetsSubmenu() -> NSMenu {
