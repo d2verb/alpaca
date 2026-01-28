@@ -45,25 +45,37 @@ CLI/GUI communicate with daemon via Unix socket (`~/.alpaca/alpaca.sock`).
 
 ```json
 // Request
-{"command": "run", "args": {"preset": "codellama-7b"}}
+{"command": "load", "args": {"identifier": "codellama-7b"}}
 
 // Response
 {"status": "ok", "data": {"endpoint": "http://localhost:8080"}}
 ```
 
-Commands: `status`, `run`, `kill`, `list_presets`
+Commands: `status`, `load`, `unload`, `list_presets`, `list_models`
 
-## Key Behaviors
+## Model Management
 
 **Model Switching:**
 1. Send SIGTERM to current llama-server
 2. Wait for graceful shutdown (max 10s, then SIGKILL)
-3. Start llama-server with new preset
+3. Start llama-server with new model/preset
 4. Wait for /health to report ready
 
 **Preset Loading:**
 - Presets are YAML files in `~/.alpaca/presets/`
 - `extra_args` field passes arbitrary flags to llama-server
+
+**HuggingFace Models:**
+- Format: `org/repo:quant` (e.g., `TheBloke/CodeLlama-7B-GGUF:Q4_K_M`)
+- Downloaded to `~/.alpaca/models/<org>/<repo>/`
+- Metadata stored in `.metadata.json` (repo, quant, filename, size)
+- Auto-pull on `load` if not already downloaded
+
+## Logging
+
+- Daemon log: `~/.alpaca/logs/daemon.log` (structured logging with slog)
+- llama-server output: `~/.alpaca/logs/llama.log`
+- Both use log rotation (50MB max, 3 backups, 7 days retention, compressed)
 
 ## Scope Boundaries
 

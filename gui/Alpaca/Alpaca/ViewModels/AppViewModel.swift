@@ -12,7 +12,7 @@ final class AppViewModel {
 
     private let client: DaemonClientProtocol
 
-    init(client: DaemonClientProtocol = MockDaemonClient()) {
+    init(client: DaemonClientProtocol) {
         self.client = client
     }
 

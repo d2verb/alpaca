@@ -14,11 +14,13 @@ All Alpaca data is stored under `~/.alpaca/`:
 │   ├── mistral-7b.yaml
 │   └── ...
 ├── models/              # Downloaded models
+│   ├── .metadata.json   # Model download metadata
 │   ├── codellama-7b-Q4_K_M.gguf
 │   ├── mistral-7b-instruct-v0.2.Q4_K_M.gguf
 │   └── ...
-└── logs/                # Log files (optional)
-    └── alpacad.log
+└── logs/                # Log files (created automatically)
+    ├── daemon.log       # Daemon process logs
+    └── llama.log        # llama-server output logs
 ```
 
 ## Files
@@ -67,13 +69,20 @@ Default location for downloaded models.
 
 - `alpaca pull` downloads models here
 - Presets can reference models here or anywhere else on the filesystem
+- `.metadata.json`: Tracks downloaded models (repo, quant, filename, size, download date)
 
-### logs/ (optional)
+### logs/
 
-Log files for debugging.
+Log files for debugging. Created automatically when daemon starts.
 
-- `alpacad.log`: Daemon logs
-- Rotation policy: TBD
+- `daemon.log`: Daemon process logs (startup, shutdown, errors)
+- `llama.log`: llama-server stdout/stderr output
+
+**Rotation Policy:**
+- Max size: 50MB per file
+- Max backups: 3 old files kept
+- Max age: 7 days
+- Compression: Enabled (old logs are gzipped)
 
 ## Model Storage
 
@@ -104,14 +113,21 @@ model: ~/Downloads/some-model.gguf
 
 ## Initialization
 
-On first run, Alpaca creates the directory structure:
+On first run, Alpaca creates the directory structure automatically:
 
 ```
 $ alpaca start
 Creating ~/.alpaca/
 Creating ~/.alpaca/presets/
 Creating ~/.alpaca/models/
+Creating ~/.alpaca/logs/
 Starting daemon...
 ```
 
-If directories already exist, they are left untouched.
+**Created directories:**
+- `~/.alpaca/` (home directory)
+- `~/.alpaca/presets/` (preset definitions)
+- `~/.alpaca/models/` (downloaded models)
+- `~/.alpaca/logs/` (daemon and llama-server logs)
+
+All directories are created with `0755` permissions. If directories already exist, they are left untouched.

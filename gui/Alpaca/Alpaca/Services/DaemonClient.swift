@@ -1,114 +1,14 @@
 import Foundation
 
-/// Protocol for communicating with the Alpaca daemon.
-protocol DaemonClientProtocol: Sendable {
-    func getStatus() async throws -> DaemonState
-    func loadModel(identifier: String) async throws
-    func stopModel() async throws
-    func listPresets() async throws -> [Preset]
-    func listModels() async throws -> [Model]
-}
+// MARK: - Request Type
 
-/// Errors that can occur during daemon communication.
-enum DaemonError: Error, LocalizedError {
-    case notRunning
-    case connectionFailed(underlying: Error)
-    case invalidResponse(String)
-    case protocolError(String)
-
-    var errorDescription: String? {
-        switch self {
-        case .notRunning:
-            return "Daemon is not running"
-        case .connectionFailed(let err):
-            return "Connection failed: \(err.localizedDescription)"
-        case .invalidResponse(let msg):
-            return "Invalid response: \(msg)"
-        case .protocolError(let msg):
-            return msg
-        }
-    }
-}
-
-/// Mock implementation of DaemonClient for UI development.
-actor MockDaemonClient: DaemonClientProtocol {
-    private var mockState: DaemonState = .idle
-    private let mockPresets: [Preset] = [
-        Preset(name: "codellama-7b-q4"),
-        Preset(name: "mistral-7b-q4"),
-        Preset(name: "deepseek-coder-6.7b"),
-        Preset(name: "llama3-8b-q4"),
-    ]
-    private let mockModels: [Model] = [
-        Model(repo: "TheBloke/CodeLlama-7B-GGUF", quant: "Q4_K_M", size: 4_370_000_000),
-        Model(repo: "TheBloke/Mistral-7B-GGUF", quant: "Q5_K_M", size: 5_130_000_000),
-    ]
-
-    func getStatus() async throws -> DaemonState {
-        return mockState
-    }
-
-    func loadModel(identifier: String) async throws {
-        mockState = .loading(preset: identifier)
-        try await Task.sleep(for: .seconds(2))
-        mockState = .running(preset: identifier, endpoint: "localhost:8080")
-    }
-
-    func stopModel() async throws {
-        mockState = .idle
-    }
-
-    func listPresets() async throws -> [Preset] {
-        return mockPresets
-    }
-
-    func listModels() async throws -> [Model] {
-        return mockModels
-    }
-}
-
-// MARK: - Protocol Types
-
-private struct Request: Encodable {
+private struct Request: Encodable, Sendable {
     let command: String
     let args: [String: String]?
 
     init(command: String, args: [String: String]? = nil) {
         self.command = command
         self.args = args
-    }
-}
-
-private struct Response: Decodable {
-    let status: String
-    let data: [String: AnyCodable]?
-    let error: String?
-}
-
-/// Type-erased Codable wrapper for heterogeneous JSON values.
-private struct AnyCodable: Decodable {
-    let value: Any
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-
-        if container.decodeNil() {
-            value = NSNull()
-        } else if let bool = try? container.decode(Bool.self) {
-            value = bool
-        } else if let int = try? container.decode(Int.self) {
-            value = int
-        } else if let double = try? container.decode(Double.self) {
-            value = double
-        } else if let string = try? container.decode(String.self) {
-            value = string
-        } else if let array = try? container.decode([AnyCodable].self) {
-            value = array.map { $0.value }
-        } else if let dict = try? container.decode([String: AnyCodable].self) {
-            value = dict.mapValues { $0.value }
-        } else {
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unsupported type")
-        }
     }
 }
 
@@ -123,7 +23,7 @@ final class DaemonClient: DaemonClientProtocol, Sendable {
     }
 
     func getStatus() async throws -> DaemonState {
-        let response: Response
+        let response: StatusResponse
         do {
             response = try await sendRequest(Request(command: "status"))
         } catch DaemonError.notRunning {
@@ -137,27 +37,23 @@ final class DaemonClient: DaemonClientProtocol, Sendable {
             throw DaemonError.invalidResponse("Missing data in status response")
         }
 
-        guard let stateString = data["state"]?.value as? String else {
-            throw DaemonError.invalidResponse("Missing state in status response")
-        }
-
-        switch stateString {
+        switch data.state {
         case "idle":
             return .idle
         case "loading":
-            let preset = data["preset"]?.value as? String ?? "unknown"
+            let preset = data.preset ?? "unknown"
             return .loading(preset: preset)
         case "running":
-            let preset = data["preset"]?.value as? String ?? "unknown"
-            let endpoint = data["endpoint"]?.value as? String ?? "unknown"
+            let preset = data.preset ?? "unknown"
+            let endpoint = data.endpoint ?? "unknown"
             return .running(preset: preset, endpoint: endpoint)
         default:
-            throw DaemonError.invalidResponse("Unknown state: \(stateString)")
+            throw DaemonError.invalidResponse("Unknown state: \(data.state)")
         }
     }
 
     func loadModel(identifier: String) async throws {
-        let response = try await sendRequest(Request(command: "load", args: ["identifier": identifier]))
+        let response: GenericResponse = try await sendRequest(Request(command: "load", args: ["identifier": identifier]))
 
         if response.status != "ok" {
             throw DaemonError.protocolError(response.error ?? "Failed to load model")
@@ -165,7 +61,7 @@ final class DaemonClient: DaemonClientProtocol, Sendable {
     }
 
     func stopModel() async throws {
-        let response = try await sendRequest(Request(command: "kill"))
+        let response: GenericResponse = try await sendRequest(Request(command: "unload"))
 
         if response.status != "ok" {
             throw DaemonError.protocolError(response.error ?? "Failed to stop model")
@@ -173,7 +69,7 @@ final class DaemonClient: DaemonClientProtocol, Sendable {
     }
 
     func listPresets() async throws -> [Preset] {
-        let response: Response
+        let response: PresetsResponse
         do {
             response = try await sendRequest(Request(command: "list_presets"))
         } catch DaemonError.notRunning {
@@ -187,18 +83,11 @@ final class DaemonClient: DaemonClientProtocol, Sendable {
             throw DaemonError.invalidResponse("Missing data in list_presets response")
         }
 
-        guard let presetNames = data["presets"]?.value as? [Any] else {
-            throw DaemonError.invalidResponse("Missing presets in response")
-        }
-
-        return presetNames.compactMap { name in
-            guard let nameString = name as? String else { return nil }
-            return Preset(name: nameString)
-        }
+        return data.presets.map { Preset(name: $0) }
     }
 
     func listModels() async throws -> [Model] {
-        let response: Response
+        let response: ModelsResponse
         do {
             response = try await sendRequest(Request(command: "list_models"))
         } catch DaemonError.notRunning {
@@ -212,29 +101,19 @@ final class DaemonClient: DaemonClientProtocol, Sendable {
             throw DaemonError.invalidResponse("Missing data in list_models response")
         }
 
-        guard let modelList = data["models"]?.value as? [Any] else {
-            // Return empty array if no models key (might be null)
-            return []
-        }
-
-        return modelList.compactMap { item in
-            guard let dict = item as? [String: Any],
-                  let repo = dict["repo"] as? String,
-                  let quant = dict["quant"] as? String else {
-                return nil
-            }
-            let size = (dict["size"] as? Int64) ?? (dict["size"] as? Int).map(Int64.init) ?? 0
-            return Model(repo: repo, quant: quant, size: size)
+        return data.models.map { modelData in
+            Model(repo: modelData.repo, quant: modelData.quant, size: modelData.size)
         }
     }
 
     // MARK: - Private
 
-    private func sendRequest(_ request: Request) async throws -> Response {
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global().async { [socketPath] in
+    private func sendRequest<T: Decodable & Sendable>(_ request: Request) async throws -> T {
+        let socketPath = self.socketPath
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global().async {
                 do {
-                    let response = try Self.sendRequestSync(to: socketPath, request: request)
+                    let response: T = try Self.sendRequestSync(to: socketPath, request: request)
                     continuation.resume(returning: response)
                 } catch {
                     continuation.resume(throwing: error)
@@ -247,6 +126,14 @@ final class DaemonClient: DaemonClientProtocol, Sendable {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else {
             throw DaemonError.notRunning
+        }
+
+        // Set receive timeout to prevent infinite blocking
+        var timeout = timeval(tv_sec: 10, tv_usec: 0)
+        let timeoutResult = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+        guard timeoutResult == 0 else {
+            close(fd)
+            throw DaemonError.connectionFailed(underlying: NSError(domain: "DaemonClient", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to set socket timeout"]))
         }
 
         var addr = sockaddr_un()
@@ -280,7 +167,7 @@ final class DaemonClient: DaemonClientProtocol, Sendable {
         return fd
     }
 
-    private static func sendRequestSync(to socketPath: String, request: Request) throws -> Response {
+    private static func sendRequestSync<T: Decodable & Sendable>(to socketPath: String, request: Request) throws -> T {
         let fd = try connectToSocket(at: socketPath)
         defer { close(fd) }
 
@@ -303,7 +190,16 @@ final class DaemonClient: DaemonClientProtocol, Sendable {
 
         while true {
             let bytesRead = Darwin.read(fd, &buffer, buffer.count)
-            if bytesRead <= 0 {
+            if bytesRead < 0 {
+                // Check if timeout occurred
+                let error = errno
+                if error == EAGAIN || error == EWOULDBLOCK {
+                    throw DaemonError.connectionFailed(underlying: NSError(domain: "DaemonClient", code: Int(error), userInfo: [NSLocalizedDescriptionKey: "Socket read timeout"]))
+                }
+                throw DaemonError.connectionFailed(underlying: NSError(domain: "DaemonClient", code: Int(error), userInfo: [NSLocalizedDescriptionKey: "Socket read error"]))
+            }
+            if bytesRead == 0 {
+                // Connection closed by daemon
                 break
             }
             responseData.append(contentsOf: buffer.prefix(bytesRead))
@@ -321,7 +217,7 @@ final class DaemonClient: DaemonClientProtocol, Sendable {
         // Decode response
         let decoder = JSONDecoder()
         do {
-            return try decoder.decode(Response.self, from: responseData)
+            return try decoder.decode(T.self, from: responseData)
         } catch {
             throw DaemonError.invalidResponse("Failed to decode response: \(error.localizedDescription)")
         }

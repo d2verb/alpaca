@@ -10,10 +10,22 @@ import (
 
 	"github.com/d2verb/alpaca/internal/config"
 	"github.com/d2verb/alpaca/internal/llama"
-	"github.com/d2verb/alpaca/internal/model"
+	"github.com/d2verb/alpaca/internal/metadata"
 	"github.com/d2verb/alpaca/internal/preset"
 	"github.com/d2verb/alpaca/internal/pull"
 )
+
+// presetLoader loads and lists presets.
+type presetLoader interface {
+	Load(name string) (*preset.Preset, error)
+	List() ([]string, error)
+}
+
+// modelManager manages downloaded models.
+type modelManager interface {
+	List(ctx context.Context) ([]metadata.ModelEntry, error)
+	GetFilePath(ctx context.Context, repo, quant string) (string, error)
+}
 
 // State represents the daemon state.
 type State string
@@ -31,8 +43,8 @@ type Daemon struct {
 	preset  *preset.Preset
 	process *llama.Process
 
-	presetLoader   *preset.Loader
-	modelManager   *model.Manager
+	presets        presetLoader
+	models         modelManager
 	userConfig     *config.Config
 	config         *Config
 	llamaLogWriter io.Writer
@@ -46,11 +58,11 @@ type Config struct {
 }
 
 // New creates a new daemon instance.
-func New(cfg *Config, presetLoader *preset.Loader, modelManager *model.Manager, userConfig *config.Config) *Daemon {
+func New(cfg *Config, presets presetLoader, models modelManager, userConfig *config.Config) *Daemon {
 	return &Daemon{
 		state:          StateIdle,
-		presetLoader:   presetLoader,
-		modelManager:   modelManager,
+		presets:        presets,
+		models:         models,
 		userConfig:     userConfig,
 		config:         cfg,
 		llamaLogWriter: cfg.LlamaLogWriter,
@@ -73,7 +85,7 @@ func (d *Daemon) CurrentPreset() *preset.Preset {
 
 // ListPresets returns all available preset names.
 func (d *Daemon) ListPresets() ([]string, error) {
-	return d.presetLoader.List()
+	return d.presets.List()
 }
 
 // ModelInfo represents information about a downloaded model.
@@ -85,7 +97,7 @@ type ModelInfo struct {
 
 // ListModels returns all downloaded models.
 func (d *Daemon) ListModels(ctx context.Context) ([]ModelInfo, error) {
-	entries, err := d.modelManager.List(ctx)
+	entries, err := d.models.List(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -101,10 +113,10 @@ func (d *Daemon) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	return models, nil
 }
 
-// createPresetFromHF creates a preset from HuggingFace format (repo:quant).
-func (d *Daemon) createPresetFromHF(ctx context.Context, repo, quant string) (*preset.Preset, error) {
+// resolveHFPreset creates a preset from HuggingFace format (repo:quant).
+func resolveHFPreset(ctx context.Context, models modelManager, cfg *config.Config, repo, quant string) (*preset.Preset, error) {
 	// Get model file path from metadata
-	modelPath, err := d.modelManager.GetFilePath(ctx, repo, quant)
+	modelPath, err := models.GetFilePath(ctx, repo, quant)
 	if err != nil {
 		return nil, err
 	}
@@ -113,10 +125,10 @@ func (d *Daemon) createPresetFromHF(ctx context.Context, repo, quant string) (*p
 	return &preset.Preset{
 		Name:        fmt.Sprintf("%s:%s", repo, quant),
 		Model:       modelPath,
-		Host:        d.userConfig.DefaultHost,
-		Port:        d.userConfig.DefaultPort,
-		ContextSize: d.userConfig.DefaultCtxSize,
-		GPULayers:   d.userConfig.DefaultGPULayers,
+		Host:        cfg.DefaultHost,
+		Port:        cfg.DefaultPort,
+		ContextSize: cfg.DefaultCtxSize,
+		GPULayers:   cfg.DefaultGPULayers,
 	}, nil
 }
 
@@ -142,10 +154,10 @@ func (d *Daemon) Run(ctx context.Context, identifier string) error {
 		if parseErr != nil {
 			return parseErr
 		}
-		p, err = d.createPresetFromHF(ctx, repo, quant)
+		p, err = resolveHFPreset(ctx, d.models, d.userConfig, repo, quant)
 	} else {
 		// Preset name
-		p, err = d.presetLoader.Load(identifier)
+		p, err = d.presets.Load(identifier)
 	}
 
 	if err != nil {

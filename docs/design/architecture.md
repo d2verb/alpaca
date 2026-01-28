@@ -6,29 +6,37 @@ Alpaca consists of three main components:
 
 ```
 ┌─────────────────────────────────────┐
-│            alpaca (Go)              │
-│  ┌─────────┐  ┌─────────────────┐   │
-│  │   CLI   │  │     Daemon      │   │
-│  │         │  │    (alpacad)    │   │
-│  └────┬────┘  └────────┬────────┘   │
-│       │                │            │
-│       └───────┬────────┘            │
-│               │                     │
-└───────────────┼─────────────────────┘
-                │ Unix socket
-                │ (~/.alpaca/alpaca.sock)
-                │
-┌───────────────┼─────────────────────┐
-│               ▼                     │
-│        GUI (SwiftUI)                │
-│     macOS Menu Bar App              │
+│         alpaca (Go binary)          │
+│                                     │
+│  CLI Commands:                      │
+│  - alpaca start [--foreground]      │
+│  - alpaca stop                      │
+│  - alpaca status                    │
+│  - alpaca load <model>              │
+│  - alpaca unload                    │
+│                                     │
+│  When started:                      │
+│  ┌─────────────────────────────┐   │
+│  │  Daemon (background mode)   │   │
+│  │  - Listens on Unix socket   │   │
+│  │  - Manages llama-server     │   │
+│  │  - Handles IPC requests     │   │
+│  └──────────────┬──────────────┘   │
+└─────────────────┼───────────────────┘
+                  │ Unix socket
+                  │ (~/.alpaca/alpaca.sock)
+                  │
+┌─────────────────┼───────────────────┐
+│                 ▼                   │
+│          GUI (SwiftUI)              │
+│       macOS Menu Bar App            │
 └─────────────────────────────────────┘
-                │
-                │ Process management
-                ▼
-        ┌───────────────┐
-        │ llama-server  │
-        └───────────────┘
+                  │
+                  │ Process management
+                  ▼
+          ┌───────────────┐
+          │ llama-server  │
+          └───────────────┘
 ```
 
 ## Components
@@ -38,20 +46,26 @@ Alpaca consists of three main components:
 Command-line interface written in Go. Communicates with the daemon via Unix socket.
 
 Primary interface for:
-- Starting/stopping the daemon
-- Managing presets (create, edit, list, delete)
-- Downloading models (`alpaca pull`)
-- Loading/unloading models
+- Starting/stopping the daemon (`alpaca start`, `alpaca stop`)
+- Managing presets (list, delete)
+- Downloading models (`alpaca model pull`)
+- Loading/unloading models (`alpaca load`, `alpaca unload`)
+- Viewing status (`alpaca status`)
 
-### Daemon (alpacad)
+### Daemon
 
-Background process written in Go. Manages llama-server lifecycle.
+Background process written in Go. Started via `alpaca start`, runs as a daemon by default.
 
 Responsibilities:
 - Maintain llama-server process
 - Handle model switching (graceful shutdown → restart)
 - Serve status information to CLI and GUI
 - Listen on Unix socket for commands
+- Manage logging (daemon.log, llama.log)
+
+The daemon can run in two modes:
+- **Background mode** (default): Detaches from terminal, writes logs to files
+- **Foreground mode** (`--foreground` flag): Runs in current terminal, useful for debugging
 
 ### GUI (macOS Menu Bar App)
 
@@ -77,28 +91,84 @@ Note: The actual bottleneck is llama-server inference time (hundreds of ms to se
 
 ### Protocol
 
-TBD: JSON-based request/response protocol over Unix socket.
+JSON-based request/response protocol over Unix socket. Messages are newline-delimited.
+
+**Request Format:**
+```json
+{
+  "command": "load",
+  "args": {
+    "identifier": "codellama-7b"
+  }
+}
+```
+
+**Response Format:**
+```json
+{
+  "status": "ok",
+  "data": {
+    "endpoint": "http://127.0.0.1:8080"
+  }
+}
+```
+
+**Error Response:**
+```json
+{
+  "status": "error",
+  "error": "model not found"
+}
+```
+
+**Available Commands:**
+- `status` - Get current daemon state (idle/loading/running) and loaded preset info
+- `load` - Load a model (preset name or HuggingFace format `repo:quant`)
+- `unload` - Stop the currently running model
+- `list_presets` - List all available presets
+- `list_models` - List all downloaded models
 
 ## Daemon Lifecycle
 
 ### Starting the Daemon
 
-```
+```bash
 $ alpaca start
+# Daemon started (PID: 12345)
+# Logs: ~/.alpaca/logs/daemon.log
 ```
 
-- Daemon starts and listens on Unix socket
-- No model is loaded initially (idle state)
+Process:
+1. Check if daemon is already running (via PID file)
+2. Clean up stale socket/PID files if found
+3. Create required directories (`~/.alpaca`, `~/.alpaca/logs`, etc.)
+4. Fork background process with `--foreground` flag
+5. Background process:
+   - Writes PID file (`~/.alpaca/alpaca.pid`)
+   - Sets up log rotation for `daemon.log` and `llama.log`
+   - Creates Unix socket listener
+   - Enters idle state (no model loaded)
+
+**Foreground Mode:**
+```bash
+$ alpaca start --foreground
+```
+Runs daemon in current terminal without detaching. Useful for debugging.
 
 ### Stopping the Daemon
 
-```
+```bash
 $ alpaca stop
 ```
 
-- Sends SIGTERM to running llama-server (if any)
-- Waits for graceful shutdown
-- Daemon process exits
+Process:
+1. Read PID from `~/.alpaca/alpaca.pid`
+2. Send SIGTERM to daemon process
+3. Wait for graceful shutdown (max 10 seconds)
+4. If timeout, send SIGKILL
+5. Remove PID file and socket
+
+The daemon gracefully stops any running llama-server before exiting.
 
 ### GUI without Daemon
 
@@ -106,18 +176,108 @@ If GUI is launched without daemon running:
 - Show "Daemon not running" message
 - Prompt user to run `alpaca start`
 
-## Model Switching
+## Model Loading and Switching
 
-When user requests a model switch:
+### Loading a Model
+
+Models can be loaded in two ways:
+
+**1. Via Preset:**
+```bash
+$ alpaca load my-preset
+```
+Loads model using settings from `~/.alpaca/presets/my-preset.yaml`.
+
+**2. Via HuggingFace Format:**
+```bash
+$ alpaca load TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+```
+Loads model using metadata from `~/.alpaca/models/.metadata.json`. If not downloaded, auto-pulls first.
+
+### Model Switching Flow
+
+When switching models (loading while another is running):
+
+1. Acquire daemon lock
+2. Stop current llama-server if running:
+   - Send SIGTERM to llama-server process
+   - Wait for graceful shutdown (max 10 seconds)
+   - Force kill if timeout
+3. Load preset or create preset from HF format
+4. Start new llama-server process with preset args
+5. Pipe llama-server output to `~/.alpaca/logs/llama.log`
+6. Wait for `/health` endpoint to report ready
+7. Update daemon state to `running`
+8. Release lock
+
+### State Transitions
 
 ```
-1. Send SIGTERM to current llama-server
-2. Wait for graceful shutdown (max 10 seconds)
-3. If timeout, send SIGKILL
-4. Start llama-server with new preset
-5. Wait for /health endpoint to report ready
-6. Notify CLI/GUI of success
+idle → loading → running
+  ↑                ↓
+  └────────────────┘
+      (unload)
 ```
+
+- **idle**: No model loaded
+- **loading**: Model is starting (llama-server not ready)
+- **running**: Model is ready and serving
+
+## File System Layout
+
+```
+~/.alpaca/
+├── config.yaml              # User configuration
+├── alpaca.sock              # Unix socket for IPC
+├── alpaca.pid               # Daemon PID file
+├── presets/                 # Preset YAML files
+│   ├── codellama-7b.yaml
+│   └── llama2-13b.yaml
+├── models/                  # Downloaded GGUF files
+│   ├── .metadata.json       # Model metadata database
+│   ├── codellama-7b-instruct.Q4_K_M.gguf
+│   └── llama-2-13b-chat.Q5_K_M.gguf
+└── logs/                    # Log files
+    ├── daemon.log           # Daemon log (with rotation)
+    └── llama.log            # llama-server output (with rotation)
+```
+
+### Logging System
+
+Alpaca uses structured logging with automatic rotation:
+
+- **daemon.log**: Daemon lifecycle events (startup, shutdown, errors)
+  - Format: Structured text logs (slog)
+  - Rotation: 50MB max size, 3 backups, 7 days retention
+
+- **llama.log**: llama-server stdout/stderr
+  - Format: Raw llama-server output
+  - Rotation: Same as daemon.log
+
+Both logs use `lumberjack` for rotation and compression.
+
+### Model Metadata System
+
+Models downloaded via `alpaca model pull` are tracked in `~/.alpaca/models/.metadata.json`:
+
+```json
+{
+  "models": [
+    {
+      "repo": "TheBloke/CodeLlama-7B-GGUF",
+      "quant": "Q4_K_M",
+      "filename": "codellama-7b.Q4_K_M.gguf",
+      "size": 4368438272,
+      "downloaded_at": "2024-01-15T10:30:00Z"
+    }
+  ]
+}
+```
+
+This metadata enables:
+- Loading models via `repo:quant` identifier
+- Listing downloaded models with `alpaca model ls`
+- Tracking download history
 
 ## Cross-Platform Considerations
 

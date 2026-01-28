@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -18,6 +19,7 @@ const (
 
 // Process represents a llama-server process.
 type Process struct {
+	mu        sync.RWMutex
 	path      string
 	cmd       *exec.Cmd
 	logWriter io.Writer
@@ -31,11 +33,16 @@ func NewProcess(path string) *Process {
 // SetLogWriter sets the log writer for llama-server output.
 // If not set, stdout/stderr are used.
 func (p *Process) SetLogWriter(w io.Writer) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.logWriter = w
 }
 
 // Start starts the llama-server process with the given arguments.
 func (p *Process) Start(ctx context.Context, args []string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.cmd = exec.CommandContext(ctx, p.path, args...)
 
 	if p.logWriter != nil {
@@ -55,6 +62,9 @@ func (p *Process) Start(ctx context.Context, args []string) error {
 
 // Stop stops the llama-server process gracefully.
 func (p *Process) Stop(ctx context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	if p.cmd == nil || p.cmd.Process == nil {
 		return nil
 	}
@@ -90,6 +100,9 @@ func (p *Process) Stop(ctx context.Context) error {
 
 // IsRunning returns true if the process is running.
 func (p *Process) IsRunning() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
 	if p.cmd == nil || p.cmd.Process == nil {
 		return false
 	}

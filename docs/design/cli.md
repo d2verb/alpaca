@@ -10,18 +10,26 @@ The `alpaca` CLI communicates with the daemon via Unix socket to manage llama-se
 
 #### `alpaca start`
 
-Start the Alpaca daemon.
+Start the Alpaca daemon in the background.
 
 ```bash
 $ alpaca start
-Starting daemon...
-Daemon started successfully.
+Daemon started (PID: 12345)
+Logs: /Users/username/.alpaca/daemon.log
 ```
 
 If already running:
 ```bash
 $ alpaca start
-Daemon is already running.
+Daemon is already running (PID: 12345).
+```
+
+**Flags:**
+- `--foreground`, `-f`: Run in foreground (don't daemonize). Useful for debugging.
+
+```bash
+$ alpaca start --foreground
+# Runs daemon in foreground, logs to stdout
 ```
 
 #### `alpaca stop`
@@ -42,24 +50,24 @@ Show current status.
 
 ```bash
 $ alpaca status
-Daemon: running
-Model: unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
 Status: running
+Preset: qwen3-coder-30b
 Endpoint: http://localhost:8080
+Logs: /Users/username/.alpaca/daemon.log
 ```
 
 When no model is loaded:
 ```bash
 $ alpaca status
-Daemon: running
-Model: none
 Status: idle
+Logs: /Users/username/.alpaca/daemon.log
 ```
 
 When daemon is not running:
 ```bash
 $ alpaca status
-Daemon: not running
+Daemon is not running.
+Run: alpaca start
 ```
 
 ### Model Management
@@ -72,7 +80,7 @@ Load a model using a preset or HuggingFace repository.
 ```bash
 $ alpaca load codellama-7b-q4
 Loading codellama-7b-q4...
-Model loaded. Endpoint: http://localhost:8080
+Model ready at http://localhost:8080
 ```
 
 **Using HuggingFace format (auto-download if not present):**
@@ -80,19 +88,14 @@ Model loaded. Endpoint: http://localhost:8080
 $ alpaca load unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
 Model not found. Downloading...
 Fetching file list...
-Downloading qwen3-coder-30b-a3b-instruct.Q4_K_M.gguf (16 GB)...
-[████████████████████████████████] 100%
+Downloading qwen3-coder-30b-a3b-instruct.Q4_K_M.gguf (16.0 GB)...
+[████████████████████████████████████████] 100.0% (16.0 GB / 16.0 GB)
+Saved to: /Users/username/.alpaca/models/qwen3-coder-30b-a3b-instruct.Q4_K_M.gguf
 Loading unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M...
-Model loaded. Endpoint: http://localhost:8080
+Model ready at http://localhost:8080
 ```
 
-If another model is running, it will be stopped first:
-```bash
-$ alpaca load mistral-7b
-Stopping current model...
-Loading mistral-7b...
-Model loaded. Endpoint: http://localhost:8080
-```
+If another model is running, it will be stopped first automatically.
 
 **Argument resolution:**
 - Contains `:` → HuggingFace format (`<repo>:<quant>`)
@@ -122,30 +125,28 @@ Stop the currently running model.
 
 ```bash
 $ alpaca unload
-Stopping model...
 Model stopped.
 ```
 
 ### Preset Management
 
-#### `alpaca preset list`
+#### `alpaca preset list` (or `alpaca preset ls`)
 
 List available presets.
 
 ```bash
 $ alpaca preset list
-codellama-7b-q4
-mistral-7b
-deepseek-coder
+Available presets:
+  - codellama-7b-q4
+  - mistral-7b
+  - deepseek-coder
 ```
 
-With details:
+When no presets exist:
 ```bash
-$ alpaca preset list -v
-NAME              MODEL                                                     PORT
-codellama-7b-q4   TheBloke/CodeLlama-7B-GGUF:Q4_K_M                         8080
-mistral-7b        TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q4_K_M             8080
-deepseek-coder    TheBloke/deepseek-coder-6.7B-instruct-GGUF:Q4_K_M        8081
+$ alpaca preset list
+No presets available.
+Add presets to: /Users/username/.alpaca/presets
 ```
 
 #### `alpaca preset rm <name>`
@@ -154,21 +155,35 @@ Remove a preset.
 
 ```bash
 $ alpaca preset rm codellama-7b-q4
-Remove preset 'codellama-7b-q4'? [y/N]: y
-Removed.
+Delete preset 'codellama-7b-q4'? (y/N): y
+Preset 'codellama-7b-q4' removed.
+```
+
+If preset doesn't exist:
+```bash
+$ alpaca preset rm nonexistent
+Preset 'nonexistent' not found.
 ```
 
 ### Model File Management
 
-#### `alpaca model list`
+#### `alpaca model list` (or `alpaca model ls`)
 
 List downloaded models.
 
 ```bash
 $ alpaca model list
-unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M  (16 GB)
-TheBloke/CodeLlama-7B-GGUF:Q4_K_M            (4.1 GB)
-TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M (4.8 GB)
+Downloaded models:
+  - unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M (16.0 GB)
+  - TheBloke/CodeLlama-7B-GGUF:Q4_K_M (4.1 GB)
+  - TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M (4.8 GB)
+```
+
+When no models are downloaded:
+```bash
+$ alpaca model list
+No models downloaded.
+Run: alpaca model pull <repo>:<quant>
 ```
 
 Model information is stored in `~/.alpaca/models/.metadata.json`.
@@ -181,8 +196,8 @@ Download a model from HuggingFace.
 $ alpaca model pull TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 Fetching file list...
 Downloading codellama-7b.Q4_K_M.gguf (4.1 GB)...
-[████████████████████████████████] 100%
-Saved to: ~/.alpaca/models/codellama-7b.Q4_K_M.gguf
+[████████████████████████████████████████] 100.0% (4.1 GB / 4.1 GB)
+Saved to: /Users/username/.alpaca/models/codellama-7b.Q4_K_M.gguf
 ```
 
 **Format**: `<organization>/<repository>:<quantization>`
@@ -196,17 +211,12 @@ alpaca model pull unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
 
 **Errors**:
 
-Missing quantization type:
+Invalid format:
 ```bash
 $ alpaca model pull TheBloke/CodeLlama-7B-GGUF
-Error: quantization type required (e.g., :Q4_K_M)
-```
-
-No matching file:
-```bash
-$ alpaca model pull TheBloke/CodeLlama-7B-GGUF:Q9_X
-Error: no matching file found for 'Q9_X'
-Available: Q3_K_M, Q4_K_M, Q5_K_M, Q8_0
+Error: invalid model spec: format must be <repo>:<quant>
+Format: alpaca model pull <org>/<repo>:<quant>
+Example: alpaca model pull TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 ```
 
 #### `alpaca model rm <repo:quant>`
@@ -215,8 +225,14 @@ Remove a downloaded model.
 
 ```bash
 $ alpaca model rm unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
-Remove unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M (16 GB)? [y/N]: y
-Removed.
+Delete model 'unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M'? (y/N): y
+Model 'unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M' removed.
+```
+
+If model doesn't exist:
+```bash
+$ alpaca model rm nonexistent:Q4_K_M
+Model 'nonexistent:Q4_K_M' not found.
 ```
 
 This removes both the model file and its metadata entry.
@@ -245,6 +261,16 @@ This metadata is:
 - Used by `alpaca load` to resolve `<repo:quant>` to filenames
 - Removed when `alpaca model rm` is run
 
+## Daemon Behavior
+
+The daemon runs in the background by default:
+- Logs to `~/.alpaca/daemon.log` (daemon operations)
+- Logs to `~/.alpaca/llama.log` (llama-server output)
+- Unix socket at `~/.alpaca/alpaca.sock`
+- PID file at `~/.alpaca/alpaca.pid`
+
+Use `--foreground` flag to run in foreground for debugging.
+
 ## Exit Codes
 
 | Code | Meaning |
@@ -252,8 +278,8 @@ This metadata is:
 | 0 | Success |
 | 1 | General error |
 | 2 | Daemon not running |
-| 3 | Preset/Model not found |
-| 4 | Model file not found |
+| 3 | Preset not found |
+| 4 | Model not found |
 | 5 | Download failed |
 
 ## Global Flags

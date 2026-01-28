@@ -10,12 +10,18 @@
 		B100000100000000000000AA /* AlpacaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000100000000000000AA /* AlpacaApp.swift */; };
 		B100000200000000000000AA /* DaemonState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000200000000000000AA /* DaemonState.swift */; };
 		B100000300000000000000AA /* Preset.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000300000000000000AA /* Preset.swift */; };
-		B100000700000000000000AA /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000700000000000000AA /* Model.swift */; };
 		B100000400000000000000AA /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000400000000000000AA /* AppViewModel.swift */; };
 		B100000500000000000000AA /* DaemonClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000500000000000000AA /* DaemonClient.swift */; };
 		B100000600000000000000AA /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000600000000000000AA /* AppDelegate.swift */; };
+		B100000700000000000000AA /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000700000000000000AA /* Model.swift */; };
 		B100000800000000000000AA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C100000800000000000000AA /* Assets.xcassets */; };
 		B100000900000000000000AA /* AlpacaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000900000000000000AA /* AlpacaTests.swift */; };
+		C597A1E62F2A4D9900227D72 /* DaemonClientProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = C597A1E52F2A4D9900227D72 /* DaemonClientProtocol.swift */; };
+		C597A1E92F2A4DA900227D72 /* DaemonError.swift in Sources */ = {isa = PBXBuildFile; fileRef = C597A1E72F2A4DA900227D72 /* DaemonError.swift */; };
+		C597A1EA2F2A4DA900227D72 /* DaemonResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = C597A1E82F2A4DA900227D72 /* DaemonResponse.swift */; };
+		C597A1EF2F2A4DD600227D72 /* StatusFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C597A1ED2F2A4DD600227D72 /* StatusFormatter.swift */; };
+		C597A1F02F2A4DD600227D72 /* MenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = C597A1EC2F2A4DD600227D72 /* MenuBuilder.swift */; };
+		C597A1F32F2A4E0800227D72 /* TestDaemonClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C597A1F12F2A4E0800227D72 /* TestDaemonClient.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -32,13 +38,19 @@
 		C100000100000000000000AA /* AlpacaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlpacaApp.swift; sourceTree = "<group>"; };
 		C100000200000000000000AA /* DaemonState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonState.swift; sourceTree = "<group>"; };
 		C100000300000000000000AA /* Preset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preset.swift; sourceTree = "<group>"; };
-		C100000700000000000000AA /* Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
 		C100000400000000000000AA /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
 		C100000500000000000000AA /* DaemonClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonClient.swift; sourceTree = "<group>"; };
 		C100000600000000000000AA /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		C100000700000000000000AA /* Model.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Model.swift; sourceTree = "<group>"; };
 		C100000800000000000000AA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C100000810000000000000AA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C100000900000000000000AA /* AlpacaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlpacaTests.swift; sourceTree = "<group>"; };
+		C597A1E52F2A4D9900227D72 /* DaemonClientProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonClientProtocol.swift; sourceTree = "<group>"; };
+		C597A1E72F2A4DA900227D72 /* DaemonError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonError.swift; sourceTree = "<group>"; };
+		C597A1E82F2A4DA900227D72 /* DaemonResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonResponse.swift; sourceTree = "<group>"; };
+		C597A1EC2F2A4DD600227D72 /* MenuBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBuilder.swift; sourceTree = "<group>"; };
+		C597A1ED2F2A4DD600227D72 /* StatusFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusFormatter.swift; sourceTree = "<group>"; };
+		C597A1F12F2A4E0800227D72 /* TestDaemonClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestDaemonClient.swift; sourceTree = "<group>"; };
 		F100000100000000000000AA /* Alpaca.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Alpaca.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F100000200000000000000AA /* AlpacaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AlpacaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -61,6 +73,23 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		C597A1EE2F2A4DD600227D72 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				C597A1EC2F2A4DD600227D72 /* MenuBuilder.swift */,
+				C597A1ED2F2A4DD600227D72 /* StatusFormatter.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		C597A1F22F2A4E0800227D72 /* Mocks */ = {
+			isa = PBXGroup;
+			children = (
+				C597A1F12F2A4E0800227D72 /* TestDaemonClient.swift */,
+			);
+			path = Mocks;
+			sourceTree = "<group>";
+		};
 		H100000100000000000000AA = {
 			isa = PBXGroup;
 			children = (
@@ -78,6 +107,7 @@
 				H100000500000000000000AA /* Models */,
 				H100000600000000000000AA /* ViewModels */,
 				H100000800000000000000AA /* Services */,
+				C597A1EE2F2A4DD600227D72 /* UI */,
 				C100000800000000000000AA /* Assets.xcassets */,
 				C100000810000000000000AA /* Info.plist */,
 			);
@@ -88,6 +118,7 @@
 			isa = PBXGroup;
 			children = (
 				C100000900000000000000AA /* AlpacaTests.swift */,
+				C597A1F22F2A4E0800227D72 /* Mocks */,
 			);
 			path = AlpacaTests;
 			sourceTree = "<group>";
@@ -123,6 +154,9 @@
 			isa = PBXGroup;
 			children = (
 				C100000500000000000000AA /* DaemonClient.swift */,
+				C597A1E52F2A4D9900227D72 /* DaemonClientProtocol.swift */,
+				C597A1E72F2A4DA900227D72 /* DaemonError.swift */,
+				C597A1E82F2A4DA900227D72 /* DaemonResponse.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -220,7 +254,12 @@
 			files = (
 				B100000100000000000000AA /* AlpacaApp.swift in Sources */,
 				B100000200000000000000AA /* DaemonState.swift in Sources */,
+				C597A1E62F2A4D9900227D72 /* DaemonClientProtocol.swift in Sources */,
+				C597A1E92F2A4DA900227D72 /* DaemonError.swift in Sources */,
+				C597A1EA2F2A4DA900227D72 /* DaemonResponse.swift in Sources */,
 				B100000700000000000000AA /* Model.swift in Sources */,
+				C597A1EF2F2A4DD600227D72 /* StatusFormatter.swift in Sources */,
+				C597A1F02F2A4DD600227D72 /* MenuBuilder.swift in Sources */,
 				B100000300000000000000AA /* Preset.swift in Sources */,
 				B100000400000000000000AA /* AppViewModel.swift in Sources */,
 				B100000500000000000000AA /* DaemonClient.swift in Sources */,
@@ -232,6 +271,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C597A1F32F2A4E0800227D72 /* TestDaemonClient.swift in Sources */,
 				B100000900000000000000AA /* AlpacaTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
