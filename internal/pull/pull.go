@@ -16,10 +16,14 @@ const (
 	huggingFaceAPIURL = "https://huggingface.co/api/models"
 )
 
+// ProgressFunc is called during download with current and total bytes.
+type ProgressFunc func(downloaded, total int64)
+
 // Puller handles model downloads from HuggingFace.
 type Puller struct {
-	modelsDir string
-	client    *http.Client
+	modelsDir  string
+	client     *http.Client
+	onProgress ProgressFunc
 }
 
 // NewPuller creates a new model puller.
@@ -28,6 +32,11 @@ func NewPuller(modelsDir string) *Puller {
 		modelsDir: modelsDir,
 		client:    &http.Client{},
 	}
+}
+
+// SetProgressFunc sets the progress callback function.
+func (p *Puller) SetProgressFunc(fn ProgressFunc) {
+	p.onProgress = fn
 }
 
 // ParseModelSpec parses a model specification (repo:quant).
@@ -39,38 +48,102 @@ func ParseModelSpec(spec string) (repo, quant string, err error) {
 	return parts[0], parts[1], nil
 }
 
+// PullResult contains information about the downloaded file.
+type PullResult struct {
+	Path     string
+	Filename string
+	Size     int64
+}
+
 // Pull downloads a model from HuggingFace.
-func (p *Puller) Pull(ctx context.Context, repo, quant string) (string, error) {
+func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, error) {
 	// Find matching file
 	filename, err := p.findMatchingFile(ctx, repo, quant)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Download file
 	destPath := filepath.Join(p.modelsDir, filename)
-	if err := p.downloadFile(ctx, repo, filename, destPath); err != nil {
-		return "", err
+	size, err := p.downloadFile(ctx, repo, filename, destPath)
+	if err != nil {
+		return nil, err
 	}
 
-	return destPath, nil
+	return &PullResult{
+		Path:     destPath,
+		Filename: filename,
+		Size:     size,
+	}, nil
 }
 
-func (p *Puller) findMatchingFile(ctx context.Context, repo, quant string) (string, error) {
-	url := fmt.Sprintf("%s/%s", huggingFaceAPIURL, repo)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+// GetFileInfo fetches info about the model file without downloading.
+func (p *Puller) GetFileInfo(ctx context.Context, repo, quant string) (filename string, size int64, err error) {
+	filename, err = p.findMatchingFile(ctx, repo, quant)
 	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
+		return "", 0, err
+	}
+
+	// Get file size via HEAD request
+	url := fmt.Sprintf("https://huggingface.co/%s/resolve/main/%s", repo, filename)
+	req, err := http.NewRequestWithContext(ctx, "HEAD", url, nil)
+	if err != nil {
+		return "", 0, fmt.Errorf("create request: %w", err)
 	}
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("fetch repo info: %w", err)
+		return "", 0, fmt.Errorf("fetch file info: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("repo not found: %s", repo)
+		return "", 0, fmt.Errorf("file not found: status %d", resp.StatusCode)
+	}
+
+	return filename, resp.ContentLength, nil
+}
+
+func (p *Puller) findMatchingFile(ctx context.Context, repo, quant string) (string, error) {
+	files, err := p.listGGUFFiles(ctx, repo)
+	if err != nil {
+		return "", err
+	}
+
+	// Find GGUF file matching quant
+	quantUpper := strings.ToUpper(quant)
+	for _, filename := range files {
+		if strings.Contains(strings.ToUpper(filename), quantUpper) {
+			return filename, nil
+		}
+	}
+
+	// Build available quants for error message
+	available := extractQuants(files)
+	if len(available) > 0 {
+		return "", fmt.Errorf("no matching file found for quant '%s'\nAvailable: %s", quant, strings.Join(available, ", "))
+	}
+	return "", fmt.Errorf("no GGUF files found in repository '%s'", repo)
+}
+
+func (p *Puller) listGGUFFiles(ctx context.Context, repo string) ([]string, error) {
+	url := fmt.Sprintf("%s/%s", huggingFaceAPIURL, repo)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch repo info: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized {
+		return nil, fmt.Errorf("repository not found: %s", repo)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch repo info: status %d", resp.StatusCode)
 	}
 
 	var repoInfo struct {
@@ -79,51 +152,95 @@ func (p *Puller) findMatchingFile(ctx context.Context, repo, quant string) (stri
 		} `json:"siblings"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&repoInfo); err != nil {
-		return "", fmt.Errorf("parse repo info: %w", err)
+		return nil, fmt.Errorf("parse repo info: %w", err)
 	}
 
-	// Find GGUF file matching quant
-	quantUpper := strings.ToUpper(quant)
+	var files []string
 	for _, sibling := range repoInfo.Siblings {
-		if strings.HasSuffix(sibling.Filename, ".gguf") &&
-			strings.Contains(strings.ToUpper(sibling.Filename), quantUpper) {
-			return sibling.Filename, nil
+		if strings.HasSuffix(strings.ToLower(sibling.Filename), ".gguf") {
+			files = append(files, sibling.Filename)
 		}
 	}
-
-	return "", fmt.Errorf("no matching file found for quant '%s'", quant)
+	return files, nil
 }
 
-func (p *Puller) downloadFile(ctx context.Context, repo, filename, destPath string) error {
+// extractQuants extracts quantization types from GGUF filenames.
+func extractQuants(files []string) []string {
+	quantPatterns := []string{"Q2_K", "Q3_K_S", "Q3_K_M", "Q3_K_L", "Q4_0", "Q4_K_S", "Q4_K_M", "Q5_0", "Q5_K_S", "Q5_K_M", "Q6_K", "Q8_0"}
+	var found []string
+	seen := make(map[string]bool)
+
+	for _, file := range files {
+		fileUpper := strings.ToUpper(file)
+		for _, q := range quantPatterns {
+			if strings.Contains(fileUpper, q) && !seen[q] {
+				found = append(found, q)
+				seen[q] = true
+			}
+		}
+	}
+	return found
+}
+
+func (p *Puller) downloadFile(ctx context.Context, repo, filename, destPath string) (int64, error) {
 	url := fmt.Sprintf("https://huggingface.co/%s/resolve/main/%s", repo, filename)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
+		return 0, fmt.Errorf("create request: %w", err)
 	}
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("download: %w", err)
+		return 0, fmt.Errorf("download: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download failed: status %d", resp.StatusCode)
+		return 0, fmt.Errorf("download failed: status %d", resp.StatusCode)
 	}
 
 	// Create destination file
 	out, err := os.Create(destPath)
 	if err != nil {
-		return fmt.Errorf("create file: %w", err)
+		return 0, fmt.Errorf("create file: %w", err)
 	}
 	defer out.Close()
 
-	// Copy with progress (TODO: add progress reporting)
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		os.Remove(destPath) // Clean up partial download
-		return fmt.Errorf("write file: %w", err)
+	// Copy with progress reporting
+	var written int64
+	total := resp.ContentLength
+	buf := make([]byte, 32*1024)
+
+	for {
+		select {
+		case <-ctx.Done():
+			os.Remove(destPath)
+			return 0, ctx.Err()
+		default:
+		}
+
+		nr, er := resp.Body.Read(buf)
+		if nr > 0 {
+			nw, ew := out.Write(buf[:nr])
+			if nw > 0 {
+				written += int64(nw)
+				if p.onProgress != nil {
+					p.onProgress(written, total)
+				}
+			}
+			if ew != nil {
+				os.Remove(destPath)
+				return 0, fmt.Errorf("write file: %w", ew)
+			}
+		}
+		if er != nil {
+			if er == io.EOF {
+				break
+			}
+			os.Remove(destPath)
+			return 0, fmt.Errorf("read response: %w", er)
+		}
 	}
 
-	return nil
+	return written, nil
 }
