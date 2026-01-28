@@ -335,6 +335,7 @@ type LoadCmd struct {
 func (c *LoadCmd) Run() error {
 	paths := getPaths()
 	cl := newClient()
+	ctx := context.Background()
 
 	// If HF format, check if downloaded
 	if strings.Contains(c.Identifier, ":") {
@@ -345,7 +346,7 @@ func (c *LoadCmd) Run() error {
 
 		// Check if model exists
 		modelMgr := model.NewManager(paths.Models)
-		exists, err := modelMgr.Exists(repo, quant)
+		exists, err := modelMgr.Exists(ctx, repo, quant)
 		if err != nil {
 			return fmt.Errorf("check model: %w", err)
 		}
@@ -477,8 +478,9 @@ type ModelListCmd struct{}
 func (c *ModelListCmd) Run() error {
 	paths := getPaths()
 	modelMgr := model.NewManager(paths.Models)
+	ctx := context.Background()
 
-	entries, err := modelMgr.List()
+	entries, err := modelMgr.List(ctx)
 	if err != nil {
 		return fmt.Errorf("list models: %w", err)
 	}
@@ -528,9 +530,10 @@ func (c *ModelRmCmd) Run() error {
 
 	paths := getPaths()
 	modelMgr := model.NewManager(paths.Models)
+	ctx := context.Background()
 
 	// Check if model exists
-	exists, err := modelMgr.Exists(repo, quant)
+	exists, err := modelMgr.Exists(ctx, repo, quant)
 	if err != nil {
 		return fmt.Errorf("check model: %w", err)
 	}
@@ -549,7 +552,7 @@ func (c *ModelRmCmd) Run() error {
 	}
 
 	// Remove model
-	if err := modelMgr.Remove(repo, quant); err != nil {
+	if err := modelMgr.Remove(ctx, repo, quant); err != nil {
 		return fmt.Errorf("remove model: %w", err)
 	}
 

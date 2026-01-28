@@ -2,6 +2,7 @@
 package model
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -23,16 +24,16 @@ func NewManager(modelsDir string) *Manager {
 }
 
 // List returns all downloaded models from metadata.
-func (m *Manager) List() ([]metadata.ModelEntry, error) {
-	if err := m.metadata.Load(); err != nil {
+func (m *Manager) List(ctx context.Context) ([]metadata.ModelEntry, error) {
+	if err := m.metadata.Load(ctx); err != nil {
 		return nil, fmt.Errorf("load metadata: %w", err)
 	}
 	return m.metadata.List(), nil
 }
 
 // Remove deletes a model file and its metadata entry.
-func (m *Manager) Remove(repo, quant string) error {
-	if err := m.metadata.Load(); err != nil {
+func (m *Manager) Remove(ctx context.Context, repo, quant string) error {
+	if err := m.metadata.Load(ctx); err != nil {
 		return fmt.Errorf("load metadata: %w", err)
 	}
 
@@ -51,7 +52,7 @@ func (m *Manager) Remove(repo, quant string) error {
 	if err := m.metadata.Remove(repo, quant); err != nil {
 		return fmt.Errorf("remove metadata: %w", err)
 	}
-	if err := m.metadata.Save(); err != nil {
+	if err := m.metadata.Save(ctx); err != nil {
 		return fmt.Errorf("save metadata: %w", err)
 	}
 
@@ -59,8 +60,8 @@ func (m *Manager) Remove(repo, quant string) error {
 }
 
 // Exists checks if a model is downloaded.
-func (m *Manager) Exists(repo, quant string) (bool, error) {
-	if err := m.metadata.Load(); err != nil {
+func (m *Manager) Exists(ctx context.Context, repo, quant string) (bool, error) {
+	if err := m.metadata.Load(ctx); err != nil {
 		return false, fmt.Errorf("load metadata: %w", err)
 	}
 
@@ -69,8 +70,8 @@ func (m *Manager) Exists(repo, quant string) (bool, error) {
 }
 
 // GetFilePath resolves repo:quant to the actual file path.
-func (m *Manager) GetFilePath(repo, quant string) (string, error) {
-	if err := m.metadata.Load(); err != nil {
+func (m *Manager) GetFilePath(ctx context.Context, repo, quant string) (string, error) {
+	if err := m.metadata.Load(ctx); err != nil {
 		return "", fmt.Errorf("load metadata: %w", err)
 	}
 

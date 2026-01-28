@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -41,7 +42,13 @@ func NewManager(modelsDir string) *Manager {
 
 // Load reads metadata from disk.
 // If the file doesn't exist, returns an empty metadata (not an error).
-func (m *Manager) Load() error {
+func (m *Manager) Load(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -71,7 +78,13 @@ func (m *Manager) Load() error {
 }
 
 // Save writes metadata to disk.
-func (m *Manager) Save() error {
+func (m *Manager) Save(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

@@ -63,7 +63,7 @@ type PullResult struct {
 // Pull downloads a model from HuggingFace.
 func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, error) {
 	// Load existing metadata
-	if err := p.metadata.Load(); err != nil {
+	if err := p.metadata.Load(ctx); err != nil {
 		return nil, fmt.Errorf("load metadata: %w", err)
 	}
 
@@ -91,7 +91,7 @@ func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, err
 	if err := p.metadata.Add(entry); err != nil {
 		return nil, fmt.Errorf("add metadata entry: %w", err)
 	}
-	if err := p.metadata.Save(); err != nil {
+	if err := p.metadata.Save(ctx); err != nil {
 		return nil, fmt.Errorf("save metadata: %w", err)
 	}
 

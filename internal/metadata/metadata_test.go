@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,9 +29,10 @@ func TestLoadNonExistentFile(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
 	mgr := NewManager(tmpDir)
+	ctx := context.Background()
 
 	// Act
-	err := mgr.Load()
+	err := mgr.Load(ctx)
 
 	// Assert
 	if err != nil {
@@ -45,13 +47,14 @@ func TestLoadEmptyFile(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
 	mgr := NewManager(tmpDir)
+	ctx := context.Background()
 	metaPath := filepath.Join(tmpDir, ".metadata.json")
 	if err := os.WriteFile(metaPath, []byte(""), 0644); err != nil {
 		t.Fatalf("create empty file: %v", err)
 	}
 
 	// Act
-	err := mgr.Load()
+	err := mgr.Load(ctx)
 
 	// Assert
 	if err != nil {
@@ -66,13 +69,14 @@ func TestLoadCorruptFile(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
 	mgr := NewManager(tmpDir)
+	ctx := context.Background()
 	metaPath := filepath.Join(tmpDir, ".metadata.json")
 	if err := os.WriteFile(metaPath, []byte("not valid json"), 0644); err != nil {
 		t.Fatalf("create corrupt file: %v", err)
 	}
 
 	// Act
-	err := mgr.Load()
+	err := mgr.Load(ctx)
 
 	// Assert
 	if err == nil {
@@ -84,6 +88,7 @@ func TestSaveAndLoad(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
 	mgr := NewManager(tmpDir)
+	ctx := context.Background()
 	entry := ModelEntry{
 		Repo:         "TheBloke/CodeLlama-7B-GGUF",
 		Quant:        "Q4_K_M",
@@ -96,13 +101,13 @@ func TestSaveAndLoad(t *testing.T) {
 	}
 
 	// Act - Save
-	if err := mgr.Save(); err != nil {
+	if err := mgr.Save(ctx); err != nil {
 		t.Fatalf("save: %v", err)
 	}
 
 	// Act - Load in new manager
 	mgr2 := NewManager(tmpDir)
-	if err := mgr2.Load(); err != nil {
+	if err := mgr2.Load(ctx); err != nil {
 		t.Fatalf("load: %v", err)
 	}
 

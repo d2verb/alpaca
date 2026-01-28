@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -29,9 +30,10 @@ func TestListEmpty(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
 	mgr := NewManager(tmpDir)
+	ctx := context.Background()
 
 	// Act
-	entries, err := mgr.List()
+	entries, err := mgr.List(ctx)
 
 	// Assert
 	if err != nil {
@@ -46,6 +48,7 @@ func TestListMultiple(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
 	mgr := NewManager(tmpDir)
+	ctx := context.Background()
 
 	// Add entries to metadata
 	metaMgr := metadata.NewManager(tmpDir)
@@ -69,12 +72,12 @@ func TestListMultiple(t *testing.T) {
 	if err := metaMgr.Add(entry2); err != nil {
 		t.Fatalf("add entry2: %v", err)
 	}
-	if err := metaMgr.Save(); err != nil {
+	if err := metaMgr.Save(ctx); err != nil {
 		t.Fatalf("save metadata: %v", err)
 	}
 
 	// Act
-	entries, err := mgr.List()
+	entries, err := mgr.List(ctx)
 
 	// Assert
 	if err != nil {
@@ -89,6 +92,7 @@ func TestExistsTrue(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
 	mgr := NewManager(tmpDir)
+	ctx := context.Background()
 
 	// Add entry to metadata
 	metaMgr := metadata.NewManager(tmpDir)
@@ -100,12 +104,12 @@ func TestExistsTrue(t *testing.T) {
 	if err := metaMgr.Add(entry); err != nil {
 		t.Fatalf("add entry: %v", err)
 	}
-	if err := metaMgr.Save(); err != nil {
+	if err := metaMgr.Save(ctx); err != nil {
 		t.Fatalf("save metadata: %v", err)
 	}
 
 	// Act
-	exists, err := mgr.Exists("repo1", "Q4_K_M")
+	exists, err := mgr.Exists(ctx, "repo1", "Q4_K_M")
 
 	// Assert
 	if err != nil {
@@ -120,9 +124,10 @@ func TestExistsFalse(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
 	mgr := NewManager(tmpDir)
+	ctx := context.Background()
 
 	// Act
-	exists, err := mgr.Exists("nonexistent", "Q4_K_M")
+	exists, err := mgr.Exists(ctx, "nonexistent", "Q4_K_M")
 
 	// Assert
 	if err != nil {
@@ -137,6 +142,7 @@ func TestRemoveSuccess(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
 	mgr := NewManager(tmpDir)
+	ctx := context.Background()
 
 	// Create model file
 	modelFile := filepath.Join(tmpDir, "model.gguf")
@@ -154,12 +160,12 @@ func TestRemoveSuccess(t *testing.T) {
 	if err := metaMgr.Add(entry); err != nil {
 		t.Fatalf("add entry: %v", err)
 	}
-	if err := metaMgr.Save(); err != nil {
+	if err := metaMgr.Save(ctx); err != nil {
 		t.Fatalf("save metadata: %v", err)
 	}
 
 	// Act
-	err := mgr.Remove("repo1", "Q4_K_M")
+	err := mgr.Remove(ctx, "repo1", "Q4_K_M")
 
 	// Assert
 	if err != nil {
@@ -172,7 +178,7 @@ func TestRemoveSuccess(t *testing.T) {
 	}
 
 	// Verify metadata removed
-	entries, err := mgr.List()
+	entries, err := mgr.List(ctx)
 	if err != nil {
 		t.Fatalf("List() error = %v", err)
 	}
@@ -185,9 +191,10 @@ func TestRemoveNonExistent(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
 	mgr := NewManager(tmpDir)
+	ctx := context.Background()
 
 	// Act
-	err := mgr.Remove("nonexistent", "Q4_K_M")
+	err := mgr.Remove(ctx, "nonexistent", "Q4_K_M")
 
 	// Assert
 	if err == nil {
@@ -199,6 +206,7 @@ func TestRemoveFileAlreadyDeleted(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
 	mgr := NewManager(tmpDir)
+	ctx := context.Background()
 
 	// Add entry to metadata (but no actual file)
 	metaMgr := metadata.NewManager(tmpDir)
@@ -210,12 +218,12 @@ func TestRemoveFileAlreadyDeleted(t *testing.T) {
 	if err := metaMgr.Add(entry); err != nil {
 		t.Fatalf("add entry: %v", err)
 	}
-	if err := metaMgr.Save(); err != nil {
+	if err := metaMgr.Save(ctx); err != nil {
 		t.Fatalf("save metadata: %v", err)
 	}
 
 	// Act - should fail because metadata.GetFilePath checks file existence
-	err := mgr.Remove("repo1", "Q4_K_M")
+	err := mgr.Remove(ctx, "repo1", "Q4_K_M")
 
 	// Assert
 	if err == nil {
@@ -227,6 +235,7 @@ func TestGetFilePathSuccess(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
 	mgr := NewManager(tmpDir)
+	ctx := context.Background()
 
 	// Create model file
 	modelFile := filepath.Join(tmpDir, "model.gguf")
@@ -244,12 +253,12 @@ func TestGetFilePathSuccess(t *testing.T) {
 	if err := metaMgr.Add(entry); err != nil {
 		t.Fatalf("add entry: %v", err)
 	}
-	if err := metaMgr.Save(); err != nil {
+	if err := metaMgr.Save(ctx); err != nil {
 		t.Fatalf("save metadata: %v", err)
 	}
 
 	// Act
-	path, err := mgr.GetFilePath("repo1", "Q4_K_M")
+	path, err := mgr.GetFilePath(ctx, "repo1", "Q4_K_M")
 
 	// Assert
 	if err != nil {
@@ -264,9 +273,10 @@ func TestGetFilePathNotFound(t *testing.T) {
 	// Arrange
 	tmpDir := t.TempDir()
 	mgr := NewManager(tmpDir)
+	ctx := context.Background()
 
 	// Act
-	_, err := mgr.GetFilePath("nonexistent", "Q4_K_M")
+	_, err := mgr.GetFilePath(ctx, "nonexistent", "Q4_K_M")
 
 	// Assert
 	if err == nil {

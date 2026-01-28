@@ -77,9 +77,9 @@ func (d *Daemon) ListPresets() ([]string, error) {
 }
 
 // createPresetFromHF creates a preset from HuggingFace format (repo:quant).
-func (d *Daemon) createPresetFromHF(repo, quant string) (*preset.Preset, error) {
+func (d *Daemon) createPresetFromHF(ctx context.Context, repo, quant string) (*preset.Preset, error) {
 	// Get model file path from metadata
-	modelPath, err := d.modelManager.GetFilePath(repo, quant)
+	modelPath, err := d.modelManager.GetFilePath(ctx, repo, quant)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +117,7 @@ func (d *Daemon) Run(ctx context.Context, identifier string) error {
 		if parseErr != nil {
 			return parseErr
 		}
-		p, err = d.createPresetFromHF(repo, quant)
+		p, err = d.createPresetFromHF(ctx, repo, quant)
 	} else {
 		// Preset name
 		p, err = d.presetLoader.Load(identifier)
