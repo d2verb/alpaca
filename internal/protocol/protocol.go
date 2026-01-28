@@ -17,10 +17,8 @@ type Response struct {
 // Command names
 const (
 	CmdStatus      = "status"
-	CmdRun         = "run"
-	CmdKill        = "kill"
-	CmdLoad        = "load"   // Alias for run
-	CmdUnload      = "unload" // Alias for kill
+	CmdLoad        = "load"
+	CmdUnload      = "unload"
 	CmdListPresets = "list_presets"
 	CmdListModels  = "list_models"
 )

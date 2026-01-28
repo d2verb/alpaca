@@ -88,10 +88,10 @@ func (s *Server) handleRequest(ctx context.Context, req *protocol.Request) *prot
 	switch req.Command {
 	case protocol.CmdStatus:
 		return s.handleStatus()
-	case protocol.CmdRun, protocol.CmdLoad:
-		return s.handleRun(ctx, req)
-	case protocol.CmdKill, protocol.CmdUnload:
-		return s.handleKill(ctx)
+	case protocol.CmdLoad:
+		return s.handleLoad(ctx, req)
+	case protocol.CmdUnload:
+		return s.handleUnload(ctx)
 	case protocol.CmdListPresets:
 		return s.handleListPresets()
 	case protocol.CmdListModels:
@@ -113,14 +113,10 @@ func (s *Server) handleStatus() *protocol.Response {
 	return protocol.NewOKResponse(data)
 }
 
-func (s *Server) handleRun(ctx context.Context, req *protocol.Request) *protocol.Response {
-	// Try "identifier" first (new), fall back to "preset" (legacy)
+func (s *Server) handleLoad(ctx context.Context, req *protocol.Request) *protocol.Response {
 	identifier, ok := req.Args["identifier"].(string)
 	if !ok {
-		identifier, ok = req.Args["preset"].(string)
-		if !ok {
-			return protocol.NewErrorResponse("preset or identifier required")
-		}
+		return protocol.NewErrorResponse("identifier required")
 	}
 
 	if err := s.daemon.Run(ctx, identifier); err != nil {
@@ -133,7 +129,7 @@ func (s *Server) handleRun(ctx context.Context, req *protocol.Request) *protocol
 	})
 }
 
-func (s *Server) handleKill(ctx context.Context) *protocol.Response {
+func (s *Server) handleUnload(ctx context.Context) *protocol.Response {
 	if err := s.daemon.Kill(ctx); err != nil {
 		return protocol.NewErrorResponse(err.Error())
 	}

@@ -17,13 +17,13 @@ func TestNewRequest(t *testing.T) {
 			args:    nil,
 		},
 		{
-			name:    "run command with preset arg",
-			command: CmdRun,
-			args:    map[string]any{"preset": "codellama-7b"},
+			name:    "load command with identifier arg",
+			command: CmdLoad,
+			args:    map[string]any{"identifier": "codellama-7b"},
 		},
 		{
-			name:    "kill command without args",
-			command: CmdKill,
+			name:    "unload command without args",
+			command: CmdUnload,
 			args:    nil,
 		},
 		{
@@ -138,8 +138,8 @@ func TestRequest_JSONRoundTrip(t *testing.T) {
 			req:  NewRequest(CmdStatus, nil),
 		},
 		{
-			name: "run request with args",
-			req:  NewRequest(CmdRun, map[string]any{"preset": "test"}),
+			name: "load request with args",
+			req:  NewRequest(CmdLoad, map[string]any{"identifier": "test"}),
 		},
 	}
 

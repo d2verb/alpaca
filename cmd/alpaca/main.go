@@ -53,13 +53,10 @@ type CLI struct {
 	Start   StartCmd   `cmd:"" help:"Start the daemon"`
 	Stop    StopCmd    `cmd:"" help:"Stop the daemon"`
 	Status  StatusCmd  `cmd:"" help:"Show current status"`
-	Run     RunCmd     `cmd:"" help:"Load a model with the specified preset"`
-	Kill    KillCmd    `cmd:"" help:"Stop the currently running model"`
 	Load    LoadCmd    `cmd:"" help:"Load a model (preset or HuggingFace format)"`
 	Unload  UnloadCmd  `cmd:"" help:"Stop the currently running model"`
 	Preset  PresetCmd  `cmd:"" help:"Manage presets"`
 	Model   ModelCmd   `cmd:"" help:"Manage models"`
-	Pull    PullCmd    `cmd:"" help:"Download model from HuggingFace"`
 	Version VersionCmd `cmd:"" help:"Show version"`
 }
 
@@ -280,54 +277,6 @@ func (c *StatusCmd) Run() error {
 	return nil
 }
 
-type RunCmd struct {
-	Preset string `arg:"" help:"Preset name to load"`
-}
-
-func (c *RunCmd) Run() error {
-	cl := newClient()
-
-	fmt.Printf("Loading %s...\n", c.Preset)
-	resp, err := cl.Run(c.Preset)
-	if err != nil {
-		if strings.Contains(err.Error(), "connect") {
-			fmt.Println("Daemon is not running. Run: alpaca start")
-			os.Exit(exitDaemonNotRuning)
-		}
-		return fmt.Errorf("load preset: %w", err)
-	}
-
-	if resp.Status == "error" {
-		if strings.Contains(resp.Error, "not found") {
-			fmt.Printf("Preset '%s' not found.\n", c.Preset)
-			os.Exit(exitPresetNotFound)
-		}
-		return fmt.Errorf("%s", resp.Error)
-	}
-
-	endpoint, _ := resp.Data["endpoint"].(string)
-	fmt.Printf("Model ready at %s\n", endpoint)
-	return nil
-}
-
-type KillCmd struct{}
-
-func (c *KillCmd) Run() error {
-	cl := newClient()
-	resp, err := cl.Kill()
-	if err != nil {
-		fmt.Println("Daemon is not running.")
-		os.Exit(exitDaemonNotRuning)
-	}
-
-	if resp.Status == "error" {
-		return fmt.Errorf("%s", resp.Error)
-	}
-
-	fmt.Println("Model stopped.")
-	return nil
-}
-
 type LoadCmd struct {
 	Identifier string `arg:"" help:"Preset name or HuggingFace format (repo:quant)"`
 }
@@ -403,8 +352,8 @@ func (c *UnloadCmd) Run() error {
 }
 
 type PresetCmd struct {
-	List   PresetListCmd `cmd:"" help:"List available presets"`
-	Remove PresetRmCmd   `cmd:"" aliases:"rm" help:"Remove a preset"`
+	List   PresetListCmd `cmd:"" name:"ls" help:"List available presets"`
+	Remove PresetRmCmd   `cmd:"" name:"rm" help:"Remove a preset"`
 }
 
 type PresetListCmd struct{}
@@ -468,9 +417,9 @@ func (c *PresetRmCmd) Run() error {
 }
 
 type ModelCmd struct {
-	List   ModelListCmd `cmd:"" help:"List downloaded models"`
+	List   ModelListCmd `cmd:"" name:"ls" help:"List downloaded models"`
 	Pull   ModelPullCmd `cmd:"" help:"Download a model"`
-	Remove ModelRmCmd   `cmd:"" aliases:"rm" help:"Remove a model"`
+	Remove ModelRmCmd   `cmd:"" name:"rm" help:"Remove a model"`
 }
 
 type ModelListCmd struct{}
@@ -560,27 +509,6 @@ func (c *ModelRmCmd) Run() error {
 	return nil
 }
 
-type PullCmd struct {
-	Model string `arg:"" help:"Model to download (format: repo:quant)"`
-}
-
-func (c *PullCmd) Run() error {
-	// Parse model spec
-	repo, quant, err := pull.ParseModelSpec(c.Model)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		fmt.Println("Format: alpaca pull <org>/<repo>:<quant>")
-		fmt.Println("Example: alpaca pull TheBloke/CodeLlama-7B-GGUF:Q4_K_M")
-		os.Exit(exitError)
-	}
-
-	paths := getPaths()
-	if err := pullModel(repo, quant, paths.Models); err != nil {
-		os.Exit(exitDownloadFailed)
-	}
-	return nil
-}
-
 // pullModel downloads a model from HuggingFace.
 func pullModel(repo, quant, modelsDir string) error {
 	paths := getPaths()
@@ -665,6 +593,9 @@ func main() {
 		kong.Name("alpaca"),
 		kong.Description("Lightweight llama-server wrapper"),
 		kong.UsageOnError(),
+		kong.ConfigureHelp(kong.HelpOptions{
+			Compact: true,
+		}),
 	)
 	err := ctx.Run()
 	if err != nil {

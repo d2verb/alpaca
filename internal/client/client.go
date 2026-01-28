@@ -58,26 +58,14 @@ func (c *Client) Status() (*protocol.Response, error) {
 	return c.Send(protocol.NewRequest(protocol.CmdStatus, nil))
 }
 
-// Run sends a run request to the daemon.
-func (c *Client) Run(presetName string) (*protocol.Response, error) {
-	return c.Send(protocol.NewRequest(protocol.CmdRun, map[string]any{
-		"preset": presetName,
-	}))
-}
-
-// Kill sends a kill request to the daemon.
-func (c *Client) Kill() (*protocol.Response, error) {
-	return c.Send(protocol.NewRequest(protocol.CmdKill, nil))
-}
-
-// Load sends a load request to the daemon (new command).
+// Load sends a load request to the daemon.
 func (c *Client) Load(identifier string) (*protocol.Response, error) {
 	return c.Send(protocol.NewRequest(protocol.CmdLoad, map[string]any{
 		"identifier": identifier,
 	}))
 }
 
-// Unload sends an unload request to the daemon (new command).
+// Unload sends an unload request to the daemon.
 func (c *Client) Unload() (*protocol.Response, error) {
 	return c.Send(protocol.NewRequest(protocol.CmdUnload, nil))
 }
