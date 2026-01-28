@@ -4,6 +4,7 @@ package llama
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"syscall"
@@ -17,8 +18,9 @@ const (
 
 // Process represents a llama-server process.
 type Process struct {
-	path string
-	cmd  *exec.Cmd
+	path      string
+	cmd       *exec.Cmd
+	logWriter io.Writer
 }
 
 // NewProcess creates a new process manager.
@@ -26,11 +28,23 @@ func NewProcess(path string) *Process {
 	return &Process{path: path}
 }
 
+// SetLogWriter sets the log writer for llama-server output.
+// If not set, stdout/stderr are used.
+func (p *Process) SetLogWriter(w io.Writer) {
+	p.logWriter = w
+}
+
 // Start starts the llama-server process with the given arguments.
 func (p *Process) Start(ctx context.Context, args []string) error {
 	p.cmd = exec.CommandContext(ctx, p.path, args...)
-	p.cmd.Stdout = os.Stdout
-	p.cmd.Stderr = os.Stderr
+
+	if p.logWriter != nil {
+		p.cmd.Stdout = p.logWriter
+		p.cmd.Stderr = p.logWriter
+	} else {
+		p.cmd.Stdout = os.Stdout
+		p.cmd.Stderr = os.Stderr
+	}
 
 	if err := p.cmd.Start(); err != nil {
 		return fmt.Errorf("start llama-server: %w", err)

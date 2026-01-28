@@ -4,6 +4,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"io"
 	"sync"
 
 	"github.com/d2verb/alpaca/internal/llama"
@@ -26,22 +27,25 @@ type Daemon struct {
 	preset  *preset.Preset
 	process *llama.Process
 
-	presetLoader *preset.Loader
-	config       *Config
+	presetLoader   *preset.Loader
+	config         *Config
+	llamaLogWriter io.Writer
 }
 
 // Config holds daemon configuration.
 type Config struct {
 	LlamaServerPath string
 	SocketPath      string
+	LlamaLogWriter  io.Writer
 }
 
 // New creates a new daemon instance.
 func New(cfg *Config, presetLoader *preset.Loader) *Daemon {
 	return &Daemon{
-		state:        StateIdle,
-		presetLoader: presetLoader,
-		config:       cfg,
+		state:          StateIdle,
+		presetLoader:   presetLoader,
+		config:         cfg,
+		llamaLogWriter: cfg.LlamaLogWriter,
 	}
 }
 
@@ -87,6 +91,9 @@ func (d *Daemon) Run(ctx context.Context, presetName string) error {
 
 	// Start llama-server
 	proc := llama.NewProcess(d.config.LlamaServerPath)
+	if d.llamaLogWriter != nil {
+		proc.SetLogWriter(d.llamaLogWriter)
+	}
 	if err := proc.Start(ctx, p.BuildArgs()); err != nil {
 		d.state = StateIdle
 		d.preset = nil

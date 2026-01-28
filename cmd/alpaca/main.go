@@ -2,17 +2,20 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"net"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/d2verb/alpaca/internal/client"
 	"github.com/d2verb/alpaca/internal/config"
 	"github.com/d2verb/alpaca/internal/daemon"
+	"github.com/d2verb/alpaca/internal/logging"
 	"github.com/d2verb/alpaca/internal/preset"
 	"github.com/d2verb/alpaca/internal/pull"
 )
@@ -45,15 +48,6 @@ func newClient() *client.Client {
 	return client.New(paths.Socket)
 }
 
-func isDaemonRunning(socketPath string) bool {
-	conn, err := net.Dial("unix", socketPath)
-	if err != nil {
-		return false
-	}
-	conn.Close()
-	return true
-}
-
 type CLI struct {
 	Start  StartCmd  `cmd:"" help:"Start the daemon"`
 	Stop   StopCmd   `cmd:"" help:"Stop the daemon"`
@@ -66,15 +60,31 @@ type CLI struct {
 	Version VersionCmd `cmd:"" help:"Show version"`
 }
 
-type StartCmd struct{}
+type StartCmd struct {
+	Foreground bool `short:"f" help:"Run in foreground (don't daemonize)"`
+}
 
 func (c *StartCmd) Run() error {
 	paths := getPaths()
 
 	// Check if already running
-	if isDaemonRunning(paths.Socket) {
-		fmt.Println("Daemon is already running.")
+	status, err := daemon.GetDaemonStatus(paths.PID, paths.Socket)
+	if err != nil && !errors.Is(err, daemon.ErrPIDFileNotFound) {
+		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
+	}
+
+	if status.Running {
+		fmt.Printf("Daemon is already running (PID: %d).\n", status.PID)
 		return nil
+	}
+
+	// Clean up stale files if any
+	if status.SocketExists && !status.Running {
+		fmt.Println("Cleaning up stale socket...")
+		os.Remove(paths.Socket)
+	}
+	if status.PID > 0 && !status.Running {
+		daemon.RemovePIDFile(paths.PID)
 	}
 
 	// Create directories if needed
@@ -82,45 +92,162 @@ func (c *StartCmd) Run() error {
 		return fmt.Errorf("create directories: %w", err)
 	}
 
-	// Start daemon in foreground (MVP simplification)
+	// If not foreground mode, spawn background process
+	if !c.Foreground {
+		return c.startBackground(paths)
+	}
+
+	// Foreground mode: run the actual daemon
+	return c.runDaemon(paths)
+}
+
+func (c *StartCmd) startBackground(paths *config.Paths) error {
+	// Re-exec ourselves with --foreground flag
+	cmd := exec.Command(os.Args[0], "start", "--foreground")
+	cmd.Env = os.Environ()
+
+	// Detach from controlling terminal (Unix/macOS only)
+	cmd.Stdin = nil
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setsid: true, // Create new session and detach from terminal
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("start daemon: %w", err)
+	}
+
+	// Wait for daemon to become ready (max 5 seconds)
+	for i := 0; i < 50; i++ {
+		time.Sleep(100 * time.Millisecond)
+		if daemon.IsSocketAvailable(paths.Socket) {
+			// User-facing output (not logged)
+			fmt.Printf("Daemon started (PID: %d)\n", cmd.Process.Pid)
+			fmt.Printf("Logs: %s\n", paths.DaemonLog)
+			return nil
+		}
+	}
+
+	return fmt.Errorf("daemon did not start within 5 seconds, check logs: %s", paths.DaemonLog)
+}
+
+func (c *StartCmd) runDaemon(paths *config.Paths) error {
+	// Set up log writers
+	daemonLogWriter := logging.NewRotatingWriter(logging.DefaultConfig(paths.DaemonLog))
+	defer daemonLogWriter.Close()
+
+	llamaLogWriter := logging.NewRotatingWriter(logging.DefaultConfig(paths.LlamaLog))
+	defer llamaLogWriter.Close()
+
+	// Create logger for daemon
+	logger := logging.NewLogger(daemonLogWriter)
+	logger.Info("daemon starting")
+
+	// Write PID file
+	if err := daemon.WritePIDFile(paths.PID); err != nil {
+		return fmt.Errorf("write PID file: %w", err)
+	}
+	defer daemon.RemovePIDFile(paths.PID)
+
+	// Start daemon
 	presetLoader := preset.NewLoader(paths.Presets)
 	d := daemon.New(&daemon.Config{
 		LlamaServerPath: "llama-server",
 		SocketPath:      paths.Socket,
+		LlamaLogWriter:  llamaLogWriter,
 	}, presetLoader)
 
 	server := daemon.NewServer(d, paths.Socket)
 
-	fmt.Printf("Daemon listening on %s\n", paths.Socket)
-	fmt.Println("Press Ctrl+C to stop")
+	logger.Info("daemon listening", "socket", paths.Socket)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	if err := server.Start(ctx); err != nil {
+		logger.Error("start server failed", "error", err)
 		return fmt.Errorf("start server: %w", err)
 	}
 
 	<-ctx.Done()
+	logger.Info("daemon stopping")
+
 	if err := server.Stop(); err != nil {
+		logger.Error("stop server failed", "error", err)
 		return fmt.Errorf("stop server: %w", err)
 	}
 
-	fmt.Println("\nDaemon stopped.")
+	logger.Info("daemon stopped")
 	return nil
 }
 
 type StopCmd struct{}
 
 func (c *StopCmd) Run() error {
-	// For MVP (foreground daemon), user uses Ctrl+C
-	fmt.Println("Use Ctrl+C to stop the daemon running in foreground.")
+	paths := getPaths()
+
+	// Get daemon status
+	status, err := daemon.GetDaemonStatus(paths.PID, paths.Socket)
+	if err != nil && !errors.Is(err, daemon.ErrPIDFileNotFound) {
+		// If there's an error but socket exists, try to clean up
+		if status.SocketExists {
+			fmt.Println("Warning: stale daemon state detected")
+			fmt.Printf("Manual cleanup may be needed: rm %s\n", paths.Socket)
+		}
+		return fmt.Errorf("check daemon status: %w", err)
+	}
+
+	if !status.Running {
+		fmt.Println("Daemon is not running.")
+		// Clean up stale files
+		daemon.RemovePIDFile(paths.PID)
+		if status.SocketExists {
+			os.Remove(paths.Socket)
+		}
+		return nil
+	}
+
+	// Send SIGTERM
+	process, err := os.FindProcess(status.PID)
+	if err != nil {
+		return fmt.Errorf("find process: %w", err)
+	}
+
+	fmt.Println("Stopping daemon...")
+	if err := process.Signal(syscall.SIGTERM); err != nil {
+		return fmt.Errorf("send SIGTERM: %w", err)
+	}
+
+	// Wait for process to exit (max 10 seconds)
+	for i := 0; i < 100; i++ {
+		time.Sleep(100 * time.Millisecond)
+		running, err := daemon.IsProcessRunning(status.PID)
+		if err != nil {
+			return fmt.Errorf("check process: %w", err)
+		}
+		if !running {
+			fmt.Println("Daemon stopped.")
+			daemon.RemovePIDFile(paths.PID)
+			return nil
+		}
+	}
+
+	// Force kill if still running
+	fmt.Println("Daemon did not stop gracefully, forcing...")
+	if err := process.Kill(); err != nil {
+		return fmt.Errorf("kill daemon: %w", err)
+	}
+
+	daemon.RemovePIDFile(paths.PID)
+	fmt.Println("Daemon stopped.")
 	return nil
 }
 
 type StatusCmd struct{}
 
 func (c *StatusCmd) Run() error {
+	paths := getPaths()
 	cl := newClient()
 	resp, err := cl.Status()
 	if err != nil {
@@ -138,6 +265,7 @@ func (c *StatusCmd) Run() error {
 	if endpoint, ok := resp.Data["endpoint"].(string); ok {
 		fmt.Printf("Endpoint: %s\n", endpoint)
 	}
+	fmt.Printf("Logs: %s\n", paths.DaemonLog)
 
 	return nil
 }

@@ -29,6 +29,7 @@ func TestGetPaths(t *testing.T) {
 
 	home, _ := os.UserHomeDir()
 	alpacaHome := filepath.Join(home, ".alpaca")
+	logsDir := filepath.Join(alpacaHome, "logs")
 
 	tests := []struct {
 		name string
@@ -41,6 +42,9 @@ func TestGetPaths(t *testing.T) {
 		{"PID", paths.PID, filepath.Join(alpacaHome, "alpaca.pid")},
 		{"Presets", paths.Presets, filepath.Join(alpacaHome, "presets")},
 		{"Models", paths.Models, filepath.Join(alpacaHome, "models")},
+		{"Logs", paths.Logs, logsDir},
+		{"DaemonLog", paths.DaemonLog, filepath.Join(logsDir, "daemon.log")},
+		{"LlamaLog", paths.LlamaLog, filepath.Join(logsDir, "llama.log")},
 	}
 
 	for _, tt := range tests {
@@ -74,15 +78,26 @@ func TestGetPaths_ContainsAlpacaDir(t *testing.T) {
 	if !strings.HasPrefix(paths.Models, paths.Home) {
 		t.Errorf("Models should be under Home: %q", paths.Models)
 	}
+	if !strings.HasPrefix(paths.Logs, paths.Home) {
+		t.Errorf("Logs should be under Home: %q", paths.Logs)
+	}
+	if !strings.HasPrefix(paths.DaemonLog, paths.Home) {
+		t.Errorf("DaemonLog should be under Home: %q", paths.DaemonLog)
+	}
+	if !strings.HasPrefix(paths.LlamaLog, paths.Home) {
+		t.Errorf("LlamaLog should be under Home: %q", paths.LlamaLog)
+	}
 }
 
 func TestPaths_EnsureDirectories(t *testing.T) {
 	// Use temp directory as base
 	tmpDir := t.TempDir()
+	alpacaHome := filepath.Join(tmpDir, ".alpaca")
 	paths := &Paths{
-		Home:    filepath.Join(tmpDir, ".alpaca"),
-		Presets: filepath.Join(tmpDir, ".alpaca", "presets"),
-		Models:  filepath.Join(tmpDir, ".alpaca", "models"),
+		Home:    alpacaHome,
+		Presets: filepath.Join(alpacaHome, "presets"),
+		Models:  filepath.Join(alpacaHome, "models"),
+		Logs:    filepath.Join(alpacaHome, "logs"),
 	}
 
 	// Directories should not exist yet
@@ -96,7 +111,7 @@ func TestPaths_EnsureDirectories(t *testing.T) {
 	}
 
 	// Verify directories exist
-	dirs := []string{paths.Home, paths.Presets, paths.Models}
+	dirs := []string{paths.Home, paths.Presets, paths.Models, paths.Logs}
 	for _, dir := range dirs {
 		info, err := os.Stat(dir)
 		if err != nil {

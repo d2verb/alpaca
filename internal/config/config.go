@@ -31,12 +31,15 @@ func DefaultConfig() *Config {
 
 // Paths returns common paths used by Alpaca.
 type Paths struct {
-	Home    string
-	Config  string
-	Socket  string
-	PID     string
-	Presets string
-	Models  string
+	Home      string
+	Config    string
+	Socket    string
+	PID       string
+	Presets   string
+	Models    string
+	Logs      string
+	DaemonLog string
+	LlamaLog  string
 }
 
 // GetPaths returns the paths for the current user.
@@ -47,19 +50,23 @@ func GetPaths() (*Paths, error) {
 	}
 
 	alpacaHome := filepath.Join(home, ".alpaca")
+	logsDir := filepath.Join(alpacaHome, "logs")
 	return &Paths{
-		Home:    alpacaHome,
-		Config:  filepath.Join(alpacaHome, "config.yaml"),
-		Socket:  filepath.Join(alpacaHome, "alpaca.sock"),
-		PID:     filepath.Join(alpacaHome, "alpaca.pid"),
-		Presets: filepath.Join(alpacaHome, "presets"),
-		Models:  filepath.Join(alpacaHome, "models"),
+		Home:      alpacaHome,
+		Config:    filepath.Join(alpacaHome, "config.yaml"),
+		Socket:    filepath.Join(alpacaHome, "alpaca.sock"),
+		PID:       filepath.Join(alpacaHome, "alpaca.pid"),
+		Presets:   filepath.Join(alpacaHome, "presets"),
+		Models:    filepath.Join(alpacaHome, "models"),
+		Logs:      logsDir,
+		DaemonLog: filepath.Join(logsDir, "daemon.log"),
+		LlamaLog:  filepath.Join(logsDir, "llama.log"),
 	}, nil
 }
 
 // EnsureDirectories creates the required directories if they don't exist.
 func (p *Paths) EnsureDirectories() error {
-	dirs := []string{p.Home, p.Presets, p.Models}
+	dirs := []string{p.Home, p.Presets, p.Models, p.Logs}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return err
