@@ -10,6 +10,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/d2verb/alpaca/internal/metadata"
 )
 
 const (
@@ -24,6 +27,7 @@ type Puller struct {
 	modelsDir  string
 	client     *http.Client
 	onProgress ProgressFunc
+	metadata   *metadata.Manager
 }
 
 // NewPuller creates a new model puller.
@@ -31,6 +35,7 @@ func NewPuller(modelsDir string) *Puller {
 	return &Puller{
 		modelsDir: modelsDir,
 		client:    &http.Client{},
+		metadata:  metadata.NewManager(modelsDir),
 	}
 }
 
@@ -57,6 +62,11 @@ type PullResult struct {
 
 // Pull downloads a model from HuggingFace.
 func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, error) {
+	// Load existing metadata
+	if err := p.metadata.Load(); err != nil {
+		return nil, fmt.Errorf("load metadata: %w", err)
+	}
+
 	// Find matching file
 	filename, err := p.findMatchingFile(ctx, repo, quant)
 	if err != nil {
@@ -68,6 +78,21 @@ func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, err
 	size, err := p.downloadFile(ctx, repo, filename, destPath)
 	if err != nil {
 		return nil, err
+	}
+
+	// Save metadata entry
+	entry := metadata.ModelEntry{
+		Repo:         repo,
+		Quant:        quant,
+		Filename:     filename,
+		Size:         size,
+		DownloadedAt: time.Now().UTC(),
+	}
+	if err := p.metadata.Add(entry); err != nil {
+		return nil, fmt.Errorf("add metadata entry: %w", err)
+	}
+	if err := p.metadata.Save(); err != nil {
+		return nil, fmt.Errorf("save metadata: %w", err)
 	}
 
 	return &PullResult{

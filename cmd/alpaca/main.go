@@ -16,6 +16,7 @@ import (
 	"github.com/d2verb/alpaca/internal/config"
 	"github.com/d2verb/alpaca/internal/daemon"
 	"github.com/d2verb/alpaca/internal/logging"
+	"github.com/d2verb/alpaca/internal/model"
 	"github.com/d2verb/alpaca/internal/preset"
 	"github.com/d2verb/alpaca/internal/pull"
 )
@@ -49,14 +50,16 @@ func newClient() *client.Client {
 }
 
 type CLI struct {
-	Start  StartCmd  `cmd:"" help:"Start the daemon"`
-	Stop   StopCmd   `cmd:"" help:"Stop the daemon"`
-	Status StatusCmd `cmd:"" help:"Show current status"`
-	Run    RunCmd    `cmd:"" help:"Load a model with the specified preset"`
-	Kill   KillCmd   `cmd:"" help:"Stop the currently running model"`
-	Preset PresetCmd `cmd:"" help:"Manage presets"`
-	Pull   PullCmd   `cmd:"" help:"Download model from HuggingFace"`
-
+	Start   StartCmd   `cmd:"" help:"Start the daemon"`
+	Stop    StopCmd    `cmd:"" help:"Stop the daemon"`
+	Status  StatusCmd  `cmd:"" help:"Show current status"`
+	Run     RunCmd     `cmd:"" help:"Load a model with the specified preset"`
+	Kill    KillCmd    `cmd:"" help:"Stop the currently running model"`
+	Load    LoadCmd    `cmd:"" help:"Load a model (preset or HuggingFace format)"`
+	Unload  UnloadCmd  `cmd:"" help:"Stop the currently running model"`
+	Preset  PresetCmd  `cmd:"" help:"Manage presets"`
+	Model   ModelCmd   `cmd:"" help:"Manage models"`
+	Pull    PullCmd    `cmd:"" help:"Download model from HuggingFace"`
 	Version VersionCmd `cmd:"" help:"Show version"`
 }
 
@@ -150,13 +153,20 @@ func (c *StartCmd) runDaemon(paths *config.Paths) error {
 	}
 	defer daemon.RemovePIDFile(paths.PID)
 
+	// Load user config
+	userConfig, err := config.LoadConfig(paths.Config)
+	if err != nil {
+		userConfig = config.DefaultConfig()
+	}
+
 	// Start daemon
 	presetLoader := preset.NewLoader(paths.Presets)
+	modelManager := model.NewManager(paths.Models)
 	d := daemon.New(&daemon.Config{
-		LlamaServerPath: "llama-server",
+		LlamaServerPath: userConfig.LlamaServerPath,
 		SocketPath:      paths.Socket,
 		LlamaLogWriter:  llamaLogWriter,
-	}, presetLoader)
+	}, presetLoader, modelManager, userConfig)
 
 	server := daemon.NewServer(d, paths.Socket)
 
@@ -318,8 +328,82 @@ func (c *KillCmd) Run() error {
 	return nil
 }
 
+type LoadCmd struct {
+	Identifier string `arg:"" help:"Preset name or HuggingFace format (repo:quant)"`
+}
+
+func (c *LoadCmd) Run() error {
+	paths := getPaths()
+	cl := newClient()
+
+	// If HF format, check if downloaded
+	if strings.Contains(c.Identifier, ":") {
+		repo, quant, err := pull.ParseModelSpec(c.Identifier)
+		if err != nil {
+			return fmt.Errorf("invalid model spec: %w", err)
+		}
+
+		// Check if model exists
+		modelMgr := model.NewManager(paths.Models)
+		exists, err := modelMgr.Exists(repo, quant)
+		if err != nil {
+			return fmt.Errorf("check model: %w", err)
+		}
+
+		// Auto-pull if not downloaded
+		if !exists {
+			fmt.Println("Model not found. Downloading...")
+			if err := pullModel(repo, quant, paths.Models); err != nil {
+				os.Exit(exitDownloadFailed)
+			}
+		}
+	}
+
+	// Load model
+	fmt.Printf("Loading %s...\n", c.Identifier)
+	resp, err := cl.Load(c.Identifier)
+	if err != nil {
+		if strings.Contains(err.Error(), "connect") {
+			fmt.Println("Daemon is not running. Run: alpaca start")
+			os.Exit(exitDaemonNotRuning)
+		}
+		return fmt.Errorf("load model: %w", err)
+	}
+
+	if resp.Status == "error" {
+		if strings.Contains(resp.Error, "not found") {
+			fmt.Printf("Model '%s' not found.\n", c.Identifier)
+			os.Exit(exitModelNotFound)
+		}
+		return fmt.Errorf("%s", resp.Error)
+	}
+
+	endpoint, _ := resp.Data["endpoint"].(string)
+	fmt.Printf("Model ready at %s\n", endpoint)
+	return nil
+}
+
+type UnloadCmd struct{}
+
+func (c *UnloadCmd) Run() error {
+	cl := newClient()
+	resp, err := cl.Unload()
+	if err != nil {
+		fmt.Println("Daemon is not running.")
+		os.Exit(exitDaemonNotRuning)
+	}
+
+	if resp.Status == "error" {
+		return fmt.Errorf("%s", resp.Error)
+	}
+
+	fmt.Println("Model stopped.")
+	return nil
+}
+
 type PresetCmd struct {
-	List PresetListCmd `cmd:"" help:"List available presets"`
+	List   PresetListCmd `cmd:"" help:"List available presets"`
+	Remove PresetRmCmd   `cmd:"" aliases:"rm" help:"Remove a preset"`
 }
 
 type PresetListCmd struct{}
@@ -350,6 +434,129 @@ func (c *PresetListCmd) Run() error {
 	return nil
 }
 
+type PresetRmCmd struct {
+	Name string `arg:"" help:"Preset name to remove"`
+}
+
+func (c *PresetRmCmd) Run() error {
+	paths := getPaths()
+	presetPath := fmt.Sprintf("%s/%s.yaml", paths.Presets, c.Name)
+
+	// Check if preset exists
+	if _, err := os.Stat(presetPath); os.IsNotExist(err) {
+		fmt.Printf("Preset '%s' not found.\n", c.Name)
+		os.Exit(exitPresetNotFound)
+	}
+
+	// Confirmation prompt
+	fmt.Printf("Delete preset '%s'? (y/N): ", c.Name)
+	var response string
+	fmt.Scanln(&response)
+	if response != "y" && response != "Y" {
+		fmt.Println("Cancelled.")
+		return nil
+	}
+
+	// Delete file
+	if err := os.Remove(presetPath); err != nil {
+		return fmt.Errorf("remove preset: %w", err)
+	}
+
+	fmt.Printf("Preset '%s' removed.\n", c.Name)
+	return nil
+}
+
+type ModelCmd struct {
+	List   ModelListCmd `cmd:"" help:"List downloaded models"`
+	Pull   ModelPullCmd `cmd:"" help:"Download a model"`
+	Remove ModelRmCmd   `cmd:"" aliases:"rm" help:"Remove a model"`
+}
+
+type ModelListCmd struct{}
+
+func (c *ModelListCmd) Run() error {
+	paths := getPaths()
+	modelMgr := model.NewManager(paths.Models)
+
+	entries, err := modelMgr.List()
+	if err != nil {
+		return fmt.Errorf("list models: %w", err)
+	}
+
+	if len(entries) == 0 {
+		fmt.Println("No models downloaded.")
+		fmt.Println("Run: alpaca model pull <repo>:<quant>")
+		return nil
+	}
+
+	fmt.Println("Downloaded models:")
+	for _, entry := range entries {
+		fmt.Printf("  - %s:%s (%s)\n", entry.Repo, entry.Quant, formatSize(entry.Size))
+	}
+	return nil
+}
+
+type ModelPullCmd struct {
+	Model string `arg:"" help:"Model to download (format: repo:quant)"`
+}
+
+func (c *ModelPullCmd) Run() error {
+	repo, quant, err := pull.ParseModelSpec(c.Model)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Println("Format: alpaca model pull <org>/<repo>:<quant>")
+		fmt.Println("Example: alpaca model pull TheBloke/CodeLlama-7B-GGUF:Q4_K_M")
+		os.Exit(exitError)
+	}
+
+	paths := getPaths()
+	if err := pullModel(repo, quant, paths.Models); err != nil {
+		os.Exit(exitDownloadFailed)
+	}
+	return nil
+}
+
+type ModelRmCmd struct {
+	Model string `arg:"" help:"Model to remove (format: repo:quant)"`
+}
+
+func (c *ModelRmCmd) Run() error {
+	repo, quant, err := pull.ParseModelSpec(c.Model)
+	if err != nil {
+		return fmt.Errorf("invalid model spec: %w", err)
+	}
+
+	paths := getPaths()
+	modelMgr := model.NewManager(paths.Models)
+
+	// Check if model exists
+	exists, err := modelMgr.Exists(repo, quant)
+	if err != nil {
+		return fmt.Errorf("check model: %w", err)
+	}
+	if !exists {
+		fmt.Printf("Model '%s:%s' not found.\n", repo, quant)
+		os.Exit(exitModelNotFound)
+	}
+
+	// Confirmation prompt
+	fmt.Printf("Delete model '%s:%s'? (y/N): ", repo, quant)
+	var response string
+	fmt.Scanln(&response)
+	if response != "y" && response != "Y" {
+		fmt.Println("Cancelled.")
+		return nil
+	}
+
+	// Remove model
+	if err := modelMgr.Remove(repo, quant); err != nil {
+		return fmt.Errorf("remove model: %w", err)
+	}
+
+	fmt.Printf("Model '%s:%s' removed.\n", repo, quant)
+	return nil
+}
+
 type PullCmd struct {
 	Model string `arg:"" help:"Model to download (format: repo:quant)"`
 }
@@ -365,18 +572,27 @@ func (c *PullCmd) Run() error {
 	}
 
 	paths := getPaths()
+	if err := pullModel(repo, quant, paths.Models); err != nil {
+		os.Exit(exitDownloadFailed)
+	}
+	return nil
+}
+
+// pullModel downloads a model from HuggingFace.
+func pullModel(repo, quant, modelsDir string) error {
+	paths := getPaths()
 	if err := paths.EnsureDirectories(); err != nil {
 		return fmt.Errorf("create directories: %w", err)
 	}
 
-	puller := pull.NewPuller(paths.Models)
+	puller := pull.NewPuller(modelsDir)
 
 	// Get file info first
 	fmt.Println("Fetching file list...")
 	filename, size, err := puller.GetFileInfo(context.Background(), repo, quant)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(exitDownloadFailed)
+		return err
 	}
 
 	fmt.Printf("Downloading %s (%s)...\n", filename, formatSize(size))
@@ -390,7 +606,7 @@ func (c *PullCmd) Run() error {
 	result, err := puller.Pull(context.Background(), repo, quant)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "\nError: %v\n", err)
-		os.Exit(exitDownloadFailed)
+		return err
 	}
 
 	// Ensure progress bar shows 100% completion

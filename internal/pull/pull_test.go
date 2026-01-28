@@ -171,4 +171,7 @@ func TestNewPuller(t *testing.T) {
 	if puller.onProgress != nil {
 		t.Error("onProgress should be nil by default")
 	}
+	if puller.metadata == nil {
+		t.Error("metadata should not be nil")
+	}
 }

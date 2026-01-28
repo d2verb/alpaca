@@ -19,6 +19,12 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.DefaultHost != DefaultHost {
 		t.Errorf("DefaultHost = %q, want %q", cfg.DefaultHost, DefaultHost)
 	}
+	if cfg.DefaultCtxSize != 4096 {
+		t.Errorf("DefaultCtxSize = %d, want 4096", cfg.DefaultCtxSize)
+	}
+	if cfg.DefaultGPULayers != -1 {
+		t.Errorf("DefaultGPULayers = %d, want -1", cfg.DefaultGPULayers)
+	}
 }
 
 func TestGetPaths(t *testing.T) {
@@ -136,5 +142,115 @@ func TestConstants(t *testing.T) {
 	}
 	if DefaultHost != "127.0.0.1" {
 		t.Errorf("DefaultHost = %q, want 127.0.0.1", DefaultHost)
+	}
+}
+
+func TestLoadConfigNonExistent(t *testing.T) {
+	// Arrange
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "nonexistent.yaml")
+
+	// Act
+	cfg, err := LoadConfig(configPath)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("expected no error for non-existent file, got %v", err)
+	}
+	// Should return defaults
+	if cfg.LlamaServerPath != "llama-server" {
+		t.Errorf("LlamaServerPath = %q, want llama-server", cfg.LlamaServerPath)
+	}
+	if cfg.DefaultCtxSize != 4096 {
+		t.Errorf("DefaultCtxSize = %d, want 4096", cfg.DefaultCtxSize)
+	}
+}
+
+func TestLoadConfigPartial(t *testing.T) {
+	// Arrange
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	configContent := `default_ctx_size: 8192
+default_gpu_layers: 33
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	// Act
+	cfg, err := LoadConfig(configPath)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v", err)
+	}
+	// Overridden values
+	if cfg.DefaultCtxSize != 8192 {
+		t.Errorf("DefaultCtxSize = %d, want 8192", cfg.DefaultCtxSize)
+	}
+	if cfg.DefaultGPULayers != 33 {
+		t.Errorf("DefaultGPULayers = %d, want 33", cfg.DefaultGPULayers)
+	}
+	// Default values for unspecified fields
+	if cfg.LlamaServerPath != "llama-server" {
+		t.Errorf("LlamaServerPath = %q, want llama-server", cfg.LlamaServerPath)
+	}
+	if cfg.DefaultPort != 8080 {
+		t.Errorf("DefaultPort = %d, want 8080", cfg.DefaultPort)
+	}
+}
+
+func TestLoadConfigComplete(t *testing.T) {
+	// Arrange
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	configContent := `llama_server_path: /usr/local/bin/llama-server
+default_port: 9090
+default_host: 0.0.0.0
+default_ctx_size: 16384
+default_gpu_layers: 99
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	// Act
+	cfg, err := LoadConfig(configPath)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("LoadConfig() error = %v", err)
+	}
+	if cfg.LlamaServerPath != "/usr/local/bin/llama-server" {
+		t.Errorf("LlamaServerPath = %q, want /usr/local/bin/llama-server", cfg.LlamaServerPath)
+	}
+	if cfg.DefaultPort != 9090 {
+		t.Errorf("DefaultPort = %d, want 9090", cfg.DefaultPort)
+	}
+	if cfg.DefaultHost != "0.0.0.0" {
+		t.Errorf("DefaultHost = %q, want 0.0.0.0", cfg.DefaultHost)
+	}
+	if cfg.DefaultCtxSize != 16384 {
+		t.Errorf("DefaultCtxSize = %d, want 16384", cfg.DefaultCtxSize)
+	}
+	if cfg.DefaultGPULayers != 99 {
+		t.Errorf("DefaultGPULayers = %d, want 99", cfg.DefaultGPULayers)
+	}
+}
+
+func TestLoadConfigInvalidYAML(t *testing.T) {
+	// Arrange
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte("not: valid: yaml:"), 0644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	// Act
+	_, err := LoadConfig(configPath)
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error for invalid YAML")
 	}
 }

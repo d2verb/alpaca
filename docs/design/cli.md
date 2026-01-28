@@ -43,7 +43,7 @@ Show current status.
 ```bash
 $ alpaca status
 Daemon: running
-Model: codellama-7b-q4
+Model: unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
 Status: running
 Endpoint: http://localhost:8080
 ```
@@ -64,30 +64,64 @@ Daemon: not running
 
 ### Model Management
 
-#### `alpaca run <preset>`
+#### `alpaca load <preset|repo:quant>`
 
-Load a model using the specified preset.
+Load a model using a preset or HuggingFace repository.
 
+**Using preset:**
 ```bash
-$ alpaca run codellama-7b-q4
+$ alpaca load codellama-7b-q4
 Loading codellama-7b-q4...
+Model loaded. Endpoint: http://localhost:8080
+```
+
+**Using HuggingFace format (auto-download if not present):**
+```bash
+$ alpaca load unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
+Model not found. Downloading...
+Fetching file list...
+Downloading qwen3-coder-30b-a3b-instruct.Q4_K_M.gguf (16 GB)...
+[████████████████████████████████] 100%
+Loading unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M...
 Model loaded. Endpoint: http://localhost:8080
 ```
 
 If another model is running, it will be stopped first:
 ```bash
-$ alpaca run mistral-7b
+$ alpaca load mistral-7b
 Stopping current model...
 Loading mistral-7b...
 Model loaded. Endpoint: http://localhost:8080
 ```
 
-#### `alpaca kill`
+**Argument resolution:**
+- Contains `:` → HuggingFace format (`<repo>:<quant>`)
+- Otherwise → Preset name
+
+**Default settings for HuggingFace models:**
+When loading a model without a preset, the following defaults are used:
+```yaml
+host: 127.0.0.1
+port: 8080
+ctx_size: 4096
+n_gpu_layers: -1  # Use all GPU layers
+```
+
+These can be overridden in `~/.alpaca/config.yaml`:
+```yaml
+llama_server_path: llama-server
+default_port: 8080
+default_host: 127.0.0.1
+default_ctx_size: 4096
+default_gpu_layers: -1
+```
+
+#### `alpaca unload`
 
 Stop the currently running model.
 
 ```bash
-$ alpaca kill
+$ alpaca unload
 Stopping model...
 Model stopped.
 ```
@@ -108,20 +142,43 @@ deepseek-coder
 With details:
 ```bash
 $ alpaca preset list -v
-NAME              MODEL                                      PORT
-codellama-7b-q4   ~/.alpaca/models/codellama-7b.Q4_K_M.gguf  8080
-mistral-7b        ~/.alpaca/models/mistral-7b.Q4_K_M.gguf    8080
-deepseek-coder    ~/.alpaca/models/deepseek-coder.Q4_K_M.gguf 8081
+NAME              MODEL                                                     PORT
+codellama-7b-q4   TheBloke/CodeLlama-7B-GGUF:Q4_K_M                         8080
+mistral-7b        TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q4_K_M             8080
+deepseek-coder    TheBloke/deepseek-coder-6.7B-instruct-GGUF:Q4_K_M        8081
 ```
 
-### Model Download
+#### `alpaca preset rm <name>`
 
-#### `alpaca pull <repo>:<quant>`
+Remove a preset.
+
+```bash
+$ alpaca preset rm codellama-7b-q4
+Remove preset 'codellama-7b-q4'? [y/N]: y
+Removed.
+```
+
+### Model File Management
+
+#### `alpaca model list`
+
+List downloaded models.
+
+```bash
+$ alpaca model list
+unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M  (16 GB)
+TheBloke/CodeLlama-7B-GGUF:Q4_K_M            (4.1 GB)
+TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M (4.8 GB)
+```
+
+Model information is stored in `~/.alpaca/models/.metadata.json`.
+
+#### `alpaca model pull <repo:quant>`
 
 Download a model from HuggingFace.
 
 ```bash
-$ alpaca pull TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+$ alpaca model pull TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 Fetching file list...
 Downloading codellama-7b.Q4_K_M.gguf (4.1 GB)...
 [████████████████████████████████] 100%
@@ -132,25 +189,61 @@ Saved to: ~/.alpaca/models/codellama-7b.Q4_K_M.gguf
 
 **Examples**:
 ```bash
-alpaca pull TheBloke/CodeLlama-7B-GGUF:Q4_K_M
-alpaca pull TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M
-alpaca pull TheBloke/deepseek-coder-6.7B-instruct-GGUF:Q4_K_M
+alpaca model pull TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+alpaca model pull TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M
+alpaca model pull unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
 ```
 
 **Errors**:
 
 Missing quantization type:
 ```bash
-$ alpaca pull TheBloke/CodeLlama-7B-GGUF
+$ alpaca model pull TheBloke/CodeLlama-7B-GGUF
 Error: quantization type required (e.g., :Q4_K_M)
 ```
 
 No matching file:
 ```bash
-$ alpaca pull TheBloke/CodeLlama-7B-GGUF:Q9_X
+$ alpaca model pull TheBloke/CodeLlama-7B-GGUF:Q9_X
 Error: no matching file found for 'Q9_X'
 Available: Q3_K_M, Q4_K_M, Q5_K_M, Q8_0
 ```
+
+#### `alpaca model rm <repo:quant>`
+
+Remove a downloaded model.
+
+```bash
+$ alpaca model rm unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
+Remove unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M (16 GB)? [y/N]: y
+Removed.
+```
+
+This removes both the model file and its metadata entry.
+
+## Metadata Management
+
+Model metadata is stored in `~/.alpaca/models/.metadata.json`:
+
+```json
+{
+  "models": [
+    {
+      "repo": "unsloth/qwen3-coder-30b-a3b-instruct",
+      "quant": "Q4_K_M",
+      "filename": "qwen3-coder-30b-a3b-instruct.Q4_K_M.gguf",
+      "size": 17179869184,
+      "downloaded_at": "2026-01-28T10:30:00Z"
+    }
+  ]
+}
+```
+
+This metadata is:
+- Created/updated when `alpaca model pull` is run
+- Read by `alpaca model list` to display HuggingFace format
+- Used by `alpaca load` to resolve `<repo:quant>` to filenames
+- Removed when `alpaca model rm` is run
 
 ## Exit Codes
 
@@ -159,7 +252,7 @@ Available: Q3_K_M, Q4_K_M, Q5_K_M, Q8_0
 | 0 | Success |
 | 1 | General error |
 | 2 | Daemon not running |
-| 3 | Preset not found |
+| 3 | Preset/Model not found |
 | 4 | Model file not found |
 | 5 | Download failed |
 

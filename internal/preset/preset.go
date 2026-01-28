@@ -55,7 +55,7 @@ func (p *Preset) BuildArgs() []string {
 	if p.ContextSize > 0 {
 		args = append(args, "--ctx-size", strconv.Itoa(p.ContextSize))
 	}
-	if p.GPULayers > 0 {
+	if p.GPULayers != 0 {
 		args = append(args, "--n-gpu-layers", strconv.Itoa(p.GPULayers))
 	}
 	if p.Threads > 0 {

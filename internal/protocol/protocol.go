@@ -19,6 +19,8 @@ const (
 	CmdStatus      = "status"
 	CmdRun         = "run"
 	CmdKill        = "kill"
+	CmdLoad        = "load"   // Alias for run
+	CmdUnload      = "unload" // Alias for kill
 	CmdListPresets = "list_presets"
 )
 

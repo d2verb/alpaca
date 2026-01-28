@@ -70,6 +70,18 @@ func (c *Client) Kill() (*protocol.Response, error) {
 	return c.Send(protocol.NewRequest(protocol.CmdKill, nil))
 }
 
+// Load sends a load request to the daemon (new command).
+func (c *Client) Load(identifier string) (*protocol.Response, error) {
+	return c.Send(protocol.NewRequest(protocol.CmdLoad, map[string]any{
+		"identifier": identifier,
+	}))
+}
+
+// Unload sends an unload request to the daemon (new command).
+func (c *Client) Unload() (*protocol.Response, error) {
+	return c.Send(protocol.NewRequest(protocol.CmdUnload, nil))
+}
+
 // ListPresets sends a list_presets request to the daemon.
 func (c *Client) ListPresets() (*protocol.Response, error) {
 	return c.Send(protocol.NewRequest(protocol.CmdListPresets, nil))

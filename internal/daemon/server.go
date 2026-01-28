@@ -88,9 +88,9 @@ func (s *Server) handleRequest(ctx context.Context, req *protocol.Request) *prot
 	switch req.Command {
 	case protocol.CmdStatus:
 		return s.handleStatus()
-	case protocol.CmdRun:
+	case protocol.CmdRun, protocol.CmdLoad:
 		return s.handleRun(ctx, req)
-	case protocol.CmdKill:
+	case protocol.CmdKill, protocol.CmdUnload:
 		return s.handleKill(ctx)
 	case protocol.CmdListPresets:
 		return s.handleListPresets()
@@ -112,12 +112,16 @@ func (s *Server) handleStatus() *protocol.Response {
 }
 
 func (s *Server) handleRun(ctx context.Context, req *protocol.Request) *protocol.Response {
-	presetName, ok := req.Args["preset"].(string)
+	// Try "identifier" first (new), fall back to "preset" (legacy)
+	identifier, ok := req.Args["identifier"].(string)
 	if !ok {
-		return protocol.NewErrorResponse("preset name required")
+		identifier, ok = req.Args["preset"].(string)
+		if !ok {
+			return protocol.NewErrorResponse("preset or identifier required")
+		}
 	}
 
-	if err := s.daemon.Run(ctx, presetName); err != nil {
+	if err := s.daemon.Run(ctx, identifier); err != nil {
 		return protocol.NewErrorResponse(err.Error())
 	}
 

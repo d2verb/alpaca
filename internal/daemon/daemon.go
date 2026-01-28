@@ -5,10 +5,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 
+	"github.com/d2verb/alpaca/internal/config"
 	"github.com/d2verb/alpaca/internal/llama"
+	"github.com/d2verb/alpaca/internal/model"
 	"github.com/d2verb/alpaca/internal/preset"
+	"github.com/d2verb/alpaca/internal/pull"
 )
 
 // State represents the daemon state.
@@ -28,6 +32,8 @@ type Daemon struct {
 	process *llama.Process
 
 	presetLoader   *preset.Loader
+	modelManager   *model.Manager
+	userConfig     *config.Config
 	config         *Config
 	llamaLogWriter io.Writer
 }
@@ -40,10 +46,12 @@ type Config struct {
 }
 
 // New creates a new daemon instance.
-func New(cfg *Config, presetLoader *preset.Loader) *Daemon {
+func New(cfg *Config, presetLoader *preset.Loader, modelManager *model.Manager, userConfig *config.Config) *Daemon {
 	return &Daemon{
 		state:          StateIdle,
 		presetLoader:   presetLoader,
+		modelManager:   modelManager,
+		userConfig:     userConfig,
 		config:         cfg,
 		llamaLogWriter: cfg.LlamaLogWriter,
 	}
@@ -68,8 +76,27 @@ func (d *Daemon) ListPresets() ([]string, error) {
 	return d.presetLoader.List()
 }
 
-// Run loads and runs a preset.
-func (d *Daemon) Run(ctx context.Context, presetName string) error {
+// createPresetFromHF creates a preset from HuggingFace format (repo:quant).
+func (d *Daemon) createPresetFromHF(repo, quant string) (*preset.Preset, error) {
+	// Get model file path from metadata
+	modelPath, err := d.modelManager.GetFilePath(repo, quant)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create preset with defaults from userConfig
+	return &preset.Preset{
+		Name:        fmt.Sprintf("%s:%s", repo, quant),
+		Model:       modelPath,
+		Host:        d.userConfig.DefaultHost,
+		Port:        d.userConfig.DefaultPort,
+		ContextSize: d.userConfig.DefaultCtxSize,
+		GPULayers:   d.userConfig.DefaultGPULayers,
+	}, nil
+}
+
+// Run loads and runs a model (preset name or HuggingFace format).
+func (d *Daemon) Run(ctx context.Context, identifier string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -80,8 +107,22 @@ func (d *Daemon) Run(ctx context.Context, presetName string) error {
 		}
 	}
 
-	// Load preset
-	p, err := d.presetLoader.Load(presetName)
+	// Determine if identifier is HuggingFace format or preset name
+	var p *preset.Preset
+	var err error
+
+	if strings.Contains(identifier, ":") {
+		// HuggingFace format (repo:quant)
+		repo, quant, parseErr := pull.ParseModelSpec(identifier)
+		if parseErr != nil {
+			return parseErr
+		}
+		p, err = d.createPresetFromHF(repo, quant)
+	} else {
+		// Preset name
+		p, err = d.presetLoader.Load(identifier)
+	}
+
 	if err != nil {
 		return err
 	}
