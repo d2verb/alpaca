@@ -92,9 +92,13 @@ tasks:
   # GUI (macOS)
   gui:build:
     desc: Build the GUI app
-    dir: gui/Alpaca
     cmds:
-      - xcodebuild -scheme Alpaca -configuration Release build
+      - xcodebuild -project gui/Alpaca/Alpaca.xcodeproj -scheme Alpaca -configuration Release build
+
+  gui:test:
+    desc: Run GUI tests with coverage
+    cmds:
+      - xcodebuild test -project gui/Alpaca/Alpaca.xcodeproj -scheme Alpaca -destination 'platform=macOS' -enableCodeCoverage YES
 
   gui:open:
     desc: Open GUI project in Xcode
