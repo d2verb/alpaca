@@ -18,6 +18,8 @@
 		B100000900000000000000AA /* AlpacaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000900000000000000AA /* AlpacaTests.swift */; };
 		C53B4B7B2F2B913500C6F20E /* DaemonClientLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C53B4B792F2B913500C6F20E /* DaemonClientLogicTests.swift */; };
 		C53B4B7C2F2B913500C6F20E /* DaemonResponseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C53B4B7A2F2B913500C6F20E /* DaemonResponseTests.swift */; };
+		C53B4B7E2F2B913500C6F20E /* MenuBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C53B4B7D2F2B913500C6F20E /* MenuBuilderTests.swift */; };
+		C53B4B802F2B913500C6F20E /* StatusFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C53B4B7F2F2B913500C6F20E /* StatusFormatterTests.swift */; };
 		C597A1E62F2A4D9900227D72 /* DaemonClientProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = C597A1E52F2A4D9900227D72 /* DaemonClientProtocol.swift */; };
 		C597A1E92F2A4DA900227D72 /* DaemonError.swift in Sources */ = {isa = PBXBuildFile; fileRef = C597A1E72F2A4DA900227D72 /* DaemonError.swift */; };
 		C597A1EA2F2A4DA900227D72 /* DaemonResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = C597A1E82F2A4DA900227D72 /* DaemonResponse.swift */; };
@@ -49,6 +51,8 @@
 		C100000900000000000000AA /* AlpacaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlpacaTests.swift; sourceTree = "<group>"; };
 		C53B4B792F2B913500C6F20E /* DaemonClientLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonClientLogicTests.swift; sourceTree = "<group>"; };
 		C53B4B7A2F2B913500C6F20E /* DaemonResponseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonResponseTests.swift; sourceTree = "<group>"; };
+		C53B4B7D2F2B913500C6F20E /* MenuBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBuilderTests.swift; sourceTree = "<group>"; };
+		C53B4B7F2F2B913500C6F20E /* StatusFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusFormatterTests.swift; sourceTree = "<group>"; };
 		C597A1E52F2A4D9900227D72 /* DaemonClientProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonClientProtocol.swift; sourceTree = "<group>"; };
 		C597A1E72F2A4DA900227D72 /* DaemonError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonError.swift; sourceTree = "<group>"; };
 		C597A1E82F2A4DA900227D72 /* DaemonResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonResponse.swift; sourceTree = "<group>"; };
@@ -124,6 +128,8 @@
 				C100000900000000000000AA /* AlpacaTests.swift */,
 				C53B4B792F2B913500C6F20E /* DaemonClientLogicTests.swift */,
 				C53B4B7A2F2B913500C6F20E /* DaemonResponseTests.swift */,
+				C53B4B7D2F2B913500C6F20E /* MenuBuilderTests.swift */,
+				C53B4B7F2F2B913500C6F20E /* StatusFormatterTests.swift */,
 				C597A1F22F2A4E0800227D72 /* Mocks */,
 			);
 			path = AlpacaTests;
@@ -279,6 +285,8 @@
 			files = (
 				C53B4B7B2F2B913500C6F20E /* DaemonClientLogicTests.swift in Sources */,
 				C53B4B7C2F2B913500C6F20E /* DaemonResponseTests.swift in Sources */,
+				C53B4B7E2F2B913500C6F20E /* MenuBuilderTests.swift in Sources */,
+				C53B4B802F2B913500C6F20E /* StatusFormatterTests.swift in Sources */,
 				C597A1F32F2A4E0800227D72 /* TestDaemonClient.swift in Sources */,
 				B100000900000000000000AA /* AlpacaTests.swift in Sources */,
 			);
