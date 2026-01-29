@@ -27,10 +27,12 @@ final class AppViewModel {
     func refreshStatus() async {
         do {
             state = try await client.getStatus()
-            errorMessage = nil
+            // Clear error when model is successfully running
+            if state.isRunning {
+                errorMessage = nil
+            }
         } catch DaemonError.notRunning {
             state = .notRunning
-            errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
         }
