@@ -1,6 +1,12 @@
-# Alpaca
+<div align="center">
+  <img src="alpaca-icon.png" alt="Alpaca Logo" width="200"/>
+  <h1>Alpaca</h1>
+  <p>A lightweight wrapper around <a href="https://github.com/ggerganov/llama.cpp">llama-server</a> for macOS</p>
 
-A lightweight wrapper around [llama-server](https://github.com/ggerganov/llama.cpp) for macOS.
+  [![CI](https://github.com/d2verb/alpaca/actions/workflows/ci.yml/badge.svg)](https://github.com/d2verb/alpaca/actions/workflows/ci.yml)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![Go Version](https://img.shields.io/github/go-mod/go-version/d2verb/alpaca)](https://go.dev/)
+</div>
 
 ## Why Alpaca?
 
