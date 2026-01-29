@@ -8,7 +8,10 @@ import (
 	"github.com/alecthomas/kong"
 )
 
-var version = "dev"
+var (
+	version = "dev"
+	commit  = "unknown"
+)
 
 type CLI struct {
 	Start   StartCmd   `cmd:"" help:"Start the daemon"`
