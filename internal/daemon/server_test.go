@@ -97,10 +97,10 @@ func TestHandleStatus_Idle(t *testing.T) {
 func TestHandleStatus_Running(t *testing.T) {
 	// Arrange
 	testPreset := &preset.Preset{
-		Name: "test-preset",
+		Name:  "test-preset",
 		Model: "f:/path/to/model.gguf",
-		Host: "127.0.0.1",
-		Port: 8080,
+		Host:  "127.0.0.1",
+		Port:  8080,
 	}
 
 	presets := &stubPresetLoader{
@@ -149,10 +149,10 @@ func TestHandleStatus_Running(t *testing.T) {
 func TestHandleLoad_Success(t *testing.T) {
 	// Arrange
 	testPreset := &preset.Preset{
-		Name: "test-preset",
+		Name:  "test-preset",
 		Model: "f:/path/to/model.gguf",
-		Host: "127.0.0.1",
-		Port: 8080,
+		Host:  "127.0.0.1",
+		Port:  8080,
 	}
 
 	presets := &stubPresetLoader{
@@ -285,10 +285,10 @@ func TestHandleLoad_ModelNotFound(t *testing.T) {
 func TestHandleLoad_ServerStartFailed(t *testing.T) {
 	// Arrange
 	testPreset := &preset.Preset{
-		Name: "test-preset",
+		Name:  "test-preset",
 		Model: "f:/path/to/model.gguf",
-		Host: "127.0.0.1",
-		Port: 8080,
+		Host:  "127.0.0.1",
+		Port:  8080,
 	}
 
 	presets := &stubPresetLoader{
@@ -334,10 +334,10 @@ func TestHandleLoad_ServerStartFailed(t *testing.T) {
 func TestHandleUnload_Success(t *testing.T) {
 	// Arrange
 	testPreset := &preset.Preset{
-		Name: "test-preset",
+		Name:  "test-preset",
 		Model: "f:/path/to/model.gguf",
-		Host: "127.0.0.1",
-		Port: 8080,
+		Host:  "127.0.0.1",
+		Port:  8080,
 	}
 
 	presets := &stubPresetLoader{
@@ -398,10 +398,10 @@ func TestHandleUnload_WhenIdle(t *testing.T) {
 func TestHandleUnload_Error(t *testing.T) {
 	// Arrange
 	testPreset := &preset.Preset{
-		Name: "test-preset",
+		Name:  "test-preset",
 		Model: "f:/path/to/model.gguf",
-		Host: "127.0.0.1",
-		Port: 8080,
+		Host:  "127.0.0.1",
+		Port:  8080,
 	}
 
 	presets := &stubPresetLoader{
@@ -589,10 +589,10 @@ func TestHandleRequest_Status(t *testing.T) {
 func TestHandleRequest_Load(t *testing.T) {
 	// Arrange
 	testPreset := &preset.Preset{
-		Name: "test-preset",
+		Name:  "test-preset",
 		Model: "f:/path/to/model.gguf",
-		Host: "127.0.0.1",
-		Port: 8080,
+		Host:  "127.0.0.1",
+		Port:  8080,
 	}
 
 	presets := &stubPresetLoader{

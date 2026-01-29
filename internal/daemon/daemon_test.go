@@ -216,12 +216,12 @@ func TestConcurrentStateAccess(t *testing.T) {
 
 // mockProcess is a mock implementation of llamaProcess for testing.
 type mockProcess struct {
-	startErr      error
-	stopErr       error
-	startCalled   bool
-	stopCalled    bool
-	logWriter     io.Writer
-	receivedArgs  []string
+	startErr     error
+	stopErr      error
+	startCalled  bool
+	stopCalled   bool
+	logWriter    io.Writer
+	receivedArgs []string
 }
 
 func (m *mockProcess) Start(ctx context.Context, args []string) error {

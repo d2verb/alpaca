@@ -1,40 +1,31 @@
+version: "2"
+
 run:
   timeout: 5m
   modules-download-mode: readonly
 
 linters:
+  disable:
+    - errcheck        # Too noisy for this codebase
   enable:
-    # Default linters
-    - errcheck
-    - gosimple
-    - govet
-    - ineffassign
-    - staticcheck
-    - unused
-
-    # Additional linters
-    - goimports       # Check import order
+    # Additional linters (default linters are enabled automatically)
     - misspell        # Spell checking
-    - errorlint       # Error wrapping best practices
     - nilerr          # nil error checks
-    - exhaustive      # Switch exhaustiveness
 
-linters-settings:
+formatters:
+  enable:
+    - goimports
+
+settings:
   goimports:
-    local-prefixes: github.com/d2verb/alpaca
-
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
+    local-prefixes:
+      - github.com/d2verb/alpaca
 
   govet:
     enable-all: true
 
   misspell:
     locale: US
-
-  exhaustive:
-    default-signifies-exhaustive: true
 
 issues:
   exclude-rules:

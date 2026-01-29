@@ -68,8 +68,8 @@ type Daemon struct {
 	llamaLogWriter io.Writer
 
 	// Test hooks (optional, defaults to real implementations)
-	newProcess    func(path string) llamaProcess
-	waitForReady  healthChecker
+	newProcess   func(path string) llamaProcess
+	waitForReady healthChecker
 }
 
 // Config holds daemon configuration.

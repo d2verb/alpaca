@@ -53,10 +53,7 @@ func (p *Preset) Endpoint() string {
 // BuildArgs builds the command-line arguments for llama-server.
 func (p *Preset) BuildArgs() []string {
 	// Extract actual file path from f: prefix if present
-	modelPath := p.Model
-	if strings.HasPrefix(modelPath, "f:") {
-		modelPath = strings.TrimPrefix(modelPath, "f:")
-	}
+	modelPath := strings.TrimPrefix(p.Model, "f:")
 
 	args := []string{
 		"-m", modelPath,
