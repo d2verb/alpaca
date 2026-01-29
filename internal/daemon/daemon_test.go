@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -207,4 +208,770 @@ func TestConcurrentStateAccess(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+// mockProcess is a mock implementation of llamaProcess for testing.
+type mockProcess struct {
+	startErr      error
+	stopErr       error
+	startCalled   bool
+	stopCalled    bool
+	logWriter     io.Writer
+	receivedArgs  []string
+}
+
+func (m *mockProcess) Start(ctx context.Context, args []string) error {
+	m.startCalled = true
+	m.receivedArgs = args
+	return m.startErr
+}
+
+func (m *mockProcess) Stop(ctx context.Context) error {
+	m.stopCalled = true
+	return m.stopErr
+}
+
+func (m *mockProcess) SetLogWriter(w io.Writer) {
+	m.logWriter = w
+}
+
+// mockHealthChecker returns a health checker function that can be configured to succeed or fail.
+func mockHealthChecker(err error) healthChecker {
+	return func(ctx context.Context, endpoint string) error {
+		return err
+	}
+}
+
+func TestDaemonRun_PresetNameSuccess(t *testing.T) {
+	// Arrange
+	testPreset := &preset.Preset{
+		Name:        "test-preset",
+		Model:       "f:/path/to/model.gguf",
+		Host:        "127.0.0.1",
+		Port:        8080,
+		ContextSize: 4096,
+		GPULayers:   -1,
+	}
+
+	presets := &stubPresetLoader{
+		presets: map[string]*preset.Preset{
+			"test-preset": testPreset,
+		},
+	}
+	models := &stubModelManager{}
+	cfg := &Config{
+		LlamaServerPath: "/usr/local/bin/llama-server",
+		SocketPath:      "/tmp/test.sock",
+	}
+	userCfg := config.DefaultConfig()
+
+	d := New(cfg, presets, models, userCfg)
+
+	// Mock dependencies
+	mockProc := &mockProcess{}
+	d.newProcess = func(path string) llamaProcess {
+		return mockProc
+	}
+	d.waitForReady = mockHealthChecker(nil) // Success
+
+	// Act
+	err := d.Run(context.Background(), "p:test-preset")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if d.State() != StateRunning {
+		t.Errorf("State() = %q, want %q", d.State(), StateRunning)
+	}
+	if d.CurrentPreset() != testPreset {
+		t.Error("CurrentPreset() should return loaded preset")
+	}
+	if !mockProc.startCalled {
+		t.Error("Process.Start() should be called")
+	}
+	if mockProc.stopCalled {
+		t.Error("Process.Stop() should not be called on success")
+	}
+}
+
+func TestDaemonRun_FilePathSuccess(t *testing.T) {
+	// Arrange
+	presets := &stubPresetLoader{}
+	models := &stubModelManager{}
+	cfg := &Config{
+		LlamaServerPath: "/usr/local/bin/llama-server",
+		SocketPath:      "/tmp/test.sock",
+	}
+	userCfg := &config.Config{
+		DefaultHost:      "0.0.0.0",
+		DefaultPort:      9090,
+		DefaultCtxSize:   8192,
+		DefaultGPULayers: 35,
+	}
+
+	d := New(cfg, presets, models, userCfg)
+
+	// Mock dependencies
+	mockProc := &mockProcess{}
+	d.newProcess = func(path string) llamaProcess {
+		return mockProc
+	}
+	d.waitForReady = mockHealthChecker(nil)
+
+	// Act
+	err := d.Run(context.Background(), "f:/path/to/custom.gguf")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if d.State() != StateRunning {
+		t.Errorf("State() = %q, want %q", d.State(), StateRunning)
+	}
+
+	preset := d.CurrentPreset()
+	if preset == nil {
+		t.Fatal("CurrentPreset() should not be nil")
+	}
+	if preset.Model != "f:/path/to/custom.gguf" {
+		t.Errorf("Preset.Model = %q, want %q", preset.Model, "f:/path/to/custom.gguf")
+	}
+	if preset.Host != "0.0.0.0" {
+		t.Errorf("Preset.Host = %q, want %q", preset.Host, "0.0.0.0")
+	}
+	if preset.Port != 9090 {
+		t.Errorf("Preset.Port = %d, want %d", preset.Port, 9090)
+	}
+}
+
+func TestDaemonRun_HuggingFaceSuccess(t *testing.T) {
+	// Arrange
+	presets := &stubPresetLoader{}
+	models := &stubModelManager{
+		filePath: "/models/codellama-7b.Q4_K_M.gguf",
+	}
+	cfg := &Config{
+		LlamaServerPath: "/usr/local/bin/llama-server",
+		SocketPath:      "/tmp/test.sock",
+	}
+	userCfg := config.DefaultConfig()
+
+	d := New(cfg, presets, models, userCfg)
+
+	// Mock dependencies
+	mockProc := &mockProcess{}
+	d.newProcess = func(path string) llamaProcess {
+		return mockProc
+	}
+	d.waitForReady = mockHealthChecker(nil)
+
+	// Act
+	err := d.Run(context.Background(), "h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if d.State() != StateRunning {
+		t.Errorf("State() = %q, want %q", d.State(), StateRunning)
+	}
+
+	preset := d.CurrentPreset()
+	if preset == nil {
+		t.Fatal("CurrentPreset() should not be nil")
+	}
+	if preset.Name != "h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M" {
+		t.Errorf("Preset.Name = %q, want %q", preset.Name, "h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M")
+	}
+	if preset.Model != "f:/models/codellama-7b.Q4_K_M.gguf" {
+		t.Errorf("Preset.Model = %q, want %q", preset.Model, "f:/models/codellama-7b.Q4_K_M.gguf")
+	}
+}
+
+func TestDaemonRun_PresetNotFound(t *testing.T) {
+	// Arrange
+	presets := &stubPresetLoader{
+		presets: map[string]*preset.Preset{},
+	}
+	models := &stubModelManager{}
+	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	userCfg := config.DefaultConfig()
+
+	d := New(cfg, presets, models, userCfg)
+
+	// Mock dependencies
+	mockProc := &mockProcess{}
+	d.newProcess = func(path string) llamaProcess {
+		return mockProc
+	}
+	d.waitForReady = mockHealthChecker(nil)
+
+	// Act
+	err := d.Run(context.Background(), "p:nonexistent")
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if d.State() != StateIdle {
+		t.Errorf("State() = %q, want %q on error", d.State(), StateIdle)
+	}
+	if d.CurrentPreset() != nil {
+		t.Error("CurrentPreset() should be nil on error")
+	}
+	if mockProc.startCalled {
+		t.Error("Process.Start() should not be called when preset not found")
+	}
+}
+
+func TestDaemonRun_ModelNotFound(t *testing.T) {
+	// Arrange
+	presets := &stubPresetLoader{}
+	models := &stubModelManager{
+		err: fmt.Errorf("model not found"),
+	}
+	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	userCfg := config.DefaultConfig()
+
+	d := New(cfg, presets, models, userCfg)
+
+	// Mock dependencies
+	mockProc := &mockProcess{}
+	d.newProcess = func(path string) llamaProcess {
+		return mockProc
+	}
+	d.waitForReady = mockHealthChecker(nil)
+
+	// Act
+	err := d.Run(context.Background(), "h:unknown/repo:Q4_K_M")
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if d.State() != StateIdle {
+		t.Errorf("State() = %q, want %q on error", d.State(), StateIdle)
+	}
+	if d.CurrentPreset() != nil {
+		t.Error("CurrentPreset() should be nil on error")
+	}
+	if mockProc.startCalled {
+		t.Error("Process.Start() should not be called when model not found")
+	}
+}
+
+func TestDaemonRun_ProcessStartFailure(t *testing.T) {
+	// Arrange
+	testPreset := &preset.Preset{
+		Name:  "test-preset",
+		Model: "f:/path/to/model.gguf",
+		Host:  "127.0.0.1",
+		Port:  8080,
+	}
+
+	presets := &stubPresetLoader{
+		presets: map[string]*preset.Preset{
+			"test-preset": testPreset,
+		},
+	}
+	models := &stubModelManager{}
+	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	userCfg := config.DefaultConfig()
+
+	d := New(cfg, presets, models, userCfg)
+
+	// Mock dependencies
+	mockProc := &mockProcess{
+		startErr: fmt.Errorf("failed to start process"),
+	}
+	d.newProcess = func(path string) llamaProcess {
+		return mockProc
+	}
+	d.waitForReady = mockHealthChecker(nil)
+
+	// Act
+	err := d.Run(context.Background(), "p:test-preset")
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if d.State() != StateIdle {
+		t.Errorf("State() = %q, want %q after start failure", d.State(), StateIdle)
+	}
+	if d.CurrentPreset() != nil {
+		t.Error("CurrentPreset() should be nil after start failure")
+	}
+	if !mockProc.startCalled {
+		t.Error("Process.Start() should be called")
+	}
+}
+
+func TestDaemonRun_HealthCheckTimeout(t *testing.T) {
+	// Arrange
+	testPreset := &preset.Preset{
+		Name:  "test-preset",
+		Model: "f:/path/to/model.gguf",
+		Host:  "127.0.0.1",
+		Port:  8080,
+	}
+
+	presets := &stubPresetLoader{
+		presets: map[string]*preset.Preset{
+			"test-preset": testPreset,
+		},
+	}
+	models := &stubModelManager{}
+	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	userCfg := config.DefaultConfig()
+
+	d := New(cfg, presets, models, userCfg)
+
+	// Mock dependencies
+	mockProc := &mockProcess{}
+	d.newProcess = func(path string) llamaProcess {
+		return mockProc
+	}
+	d.waitForReady = mockHealthChecker(fmt.Errorf("health check timeout"))
+
+	// Act
+	err := d.Run(context.Background(), "p:test-preset")
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if d.State() != StateIdle {
+		t.Errorf("State() = %q, want %q after health check failure", d.State(), StateIdle)
+	}
+	if d.CurrentPreset() != nil {
+		t.Error("CurrentPreset() should be nil after health check failure")
+	}
+	if !mockProc.startCalled {
+		t.Error("Process.Start() should be called")
+	}
+	if !mockProc.stopCalled {
+		t.Error("Process.Stop() should be called to cleanup after health check failure")
+	}
+}
+
+func TestDaemonRun_StopsExistingModel(t *testing.T) {
+	// Arrange
+	firstPreset := &preset.Preset{
+		Name:  "first-preset",
+		Model: "f:/path/to/first.gguf",
+		Host:  "127.0.0.1",
+		Port:  8080,
+	}
+	secondPreset := &preset.Preset{
+		Name:  "second-preset",
+		Model: "f:/path/to/second.gguf",
+		Host:  "127.0.0.1",
+		Port:  8080,
+	}
+
+	presets := &stubPresetLoader{
+		presets: map[string]*preset.Preset{
+			"first-preset":  firstPreset,
+			"second-preset": secondPreset,
+		},
+	}
+	models := &stubModelManager{}
+	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	userCfg := config.DefaultConfig()
+
+	d := New(cfg, presets, models, userCfg)
+
+	// Mock dependencies
+	firstMockProc := &mockProcess{}
+	secondMockProc := &mockProcess{}
+	callCount := 0
+	d.newProcess = func(path string) llamaProcess {
+		callCount++
+		if callCount == 1 {
+			return firstMockProc
+		}
+		return secondMockProc
+	}
+	d.waitForReady = mockHealthChecker(nil)
+
+	// Act
+	// Load first model
+	err := d.Run(context.Background(), "p:first-preset")
+	if err != nil {
+		t.Fatalf("first Run() failed: %v", err)
+	}
+
+	// Load second model (should stop first)
+	err = d.Run(context.Background(), "p:second-preset")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("second Run() failed: %v", err)
+	}
+	if !firstMockProc.stopCalled {
+		t.Error("first process should be stopped when loading second model")
+	}
+	if d.State() != StateRunning {
+		t.Errorf("State() = %q, want %q", d.State(), StateRunning)
+	}
+	if d.CurrentPreset() != secondPreset {
+		t.Error("CurrentPreset() should be second preset")
+	}
+}
+
+func TestDaemonRun_InvalidIdentifier(t *testing.T) {
+	// Arrange
+	presets := &stubPresetLoader{}
+	models := &stubModelManager{}
+	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	userCfg := config.DefaultConfig()
+
+	d := New(cfg, presets, models, userCfg)
+
+	// Mock dependencies
+	mockProc := &mockProcess{}
+	d.newProcess = func(path string) llamaProcess {
+		return mockProc
+	}
+	d.waitForReady = mockHealthChecker(nil)
+
+	// Act
+	err := d.Run(context.Background(), "invalid:format:too:many:colons")
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error for invalid identifier, got nil")
+	}
+	if d.State() != StateIdle {
+		t.Errorf("State() = %q, want %q", d.State(), StateIdle)
+	}
+	if mockProc.startCalled {
+		t.Error("Process.Start() should not be called for invalid identifier")
+	}
+}
+
+func TestDaemonKill_WhenRunning(t *testing.T) {
+	// Arrange
+	testPreset := &preset.Preset{
+		Name:  "test-preset",
+		Model: "f:/path/to/model.gguf",
+		Host:  "127.0.0.1",
+		Port:  8080,
+	}
+
+	presets := &stubPresetLoader{
+		presets: map[string]*preset.Preset{
+			"test-preset": testPreset,
+		},
+	}
+	models := &stubModelManager{}
+	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	userCfg := config.DefaultConfig()
+
+	d := New(cfg, presets, models, userCfg)
+
+	// Mock dependencies
+	mockProc := &mockProcess{}
+	d.newProcess = func(path string) llamaProcess {
+		return mockProc
+	}
+	d.waitForReady = mockHealthChecker(nil)
+
+	// Start a model first
+	err := d.Run(context.Background(), "p:test-preset")
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// Act
+	err = d.Kill(context.Background())
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !mockProc.stopCalled {
+		t.Error("Process.Stop() should be called")
+	}
+	if d.State() != StateIdle {
+		t.Errorf("State() = %q, want %q after Kill()", d.State(), StateIdle)
+	}
+	if d.CurrentPreset() != nil {
+		t.Error("CurrentPreset() should be nil after Kill()")
+	}
+}
+
+func TestDaemonKill_WhenIdle(t *testing.T) {
+	// Arrange
+	presets := &stubPresetLoader{}
+	models := &stubModelManager{}
+	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	userCfg := config.DefaultConfig()
+
+	d := New(cfg, presets, models, userCfg)
+
+	// Act
+	err := d.Kill(context.Background())
+
+	// Assert
+	if err != nil {
+		t.Fatalf("Kill() on idle daemon should not error: %v", err)
+	}
+	if d.State() != StateIdle {
+		t.Errorf("State() = %q, want %q", d.State(), StateIdle)
+	}
+}
+
+func TestDaemonKill_StopError(t *testing.T) {
+	// Arrange
+	testPreset := &preset.Preset{
+		Name:  "test-preset",
+		Model: "f:/path/to/model.gguf",
+		Host:  "127.0.0.1",
+		Port:  8080,
+	}
+
+	presets := &stubPresetLoader{
+		presets: map[string]*preset.Preset{
+			"test-preset": testPreset,
+		},
+	}
+	models := &stubModelManager{}
+	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	userCfg := config.DefaultConfig()
+
+	d := New(cfg, presets, models, userCfg)
+
+	// Mock dependencies
+	mockProc := &mockProcess{
+		stopErr: fmt.Errorf("failed to stop process"),
+	}
+	d.newProcess = func(path string) llamaProcess {
+		return mockProc
+	}
+	d.waitForReady = mockHealthChecker(nil)
+
+	// Start a model first
+	err := d.Run(context.Background(), "p:test-preset")
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// Act
+	err = d.Kill(context.Background())
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error from Kill(), got nil")
+	}
+	if !mockProc.stopCalled {
+		t.Error("Process.Stop() should be called even if it errors")
+	}
+}
+
+func TestDaemonRun_PresetWithHFModel(t *testing.T) {
+	// Arrange - Preset that references a HuggingFace model
+	testPreset := &preset.Preset{
+		Name:  "codellama-preset",
+		Model: "h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M", // HF format in preset
+		Host:  "127.0.0.1",
+		Port:  8080,
+	}
+
+	presets := &stubPresetLoader{
+		presets: map[string]*preset.Preset{
+			"codellama-preset": testPreset,
+		},
+	}
+	models := &stubModelManager{
+		filePath: "/models/codellama.gguf",
+	}
+	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	userCfg := config.DefaultConfig()
+
+	d := New(cfg, presets, models, userCfg)
+
+	// Mock dependencies
+	mockProc := &mockProcess{}
+	d.newProcess = func(path string) llamaProcess {
+		return mockProc
+	}
+	d.waitForReady = mockHealthChecker(nil)
+
+	// Act
+	err := d.Run(context.Background(), "p:codellama-preset")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if d.State() != StateRunning {
+		t.Errorf("State() = %q, want %q", d.State(), StateRunning)
+	}
+
+	// Verify that the preset's HF model was resolved to a file path
+	loadedPreset := d.CurrentPreset()
+	if loadedPreset == nil {
+		t.Fatal("CurrentPreset() should not be nil")
+	}
+	// The model field should be resolved from h: to f:
+	if loadedPreset.Model != "f:/models/codellama.gguf" {
+		t.Errorf("Preset.Model = %q, want %q", loadedPreset.Model, "f:/models/codellama.gguf")
+	}
+}
+
+func TestDaemonRun_PresetWithHFModelNotFound(t *testing.T) {
+	// Arrange - Preset with HF model that doesn't exist
+	testPreset := &preset.Preset{
+		Name:  "missing-preset",
+		Model: "h:unknown/repo:Q4_K_M",
+		Host:  "127.0.0.1",
+		Port:  8080,
+	}
+
+	presets := &stubPresetLoader{
+		presets: map[string]*preset.Preset{
+			"missing-preset": testPreset,
+		},
+	}
+	models := &stubModelManager{
+		err: fmt.Errorf("model not found"),
+	}
+	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	userCfg := config.DefaultConfig()
+
+	d := New(cfg, presets, models, userCfg)
+
+	// Mock dependencies
+	mockProc := &mockProcess{}
+	d.newProcess = func(path string) llamaProcess {
+		return mockProc
+	}
+	d.waitForReady = mockHealthChecker(nil)
+
+	// Act
+	err := d.Run(context.Background(), "p:missing-preset")
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error when preset's HF model not found, got nil")
+	}
+	if d.State() != StateIdle {
+		t.Errorf("State() = %q, want %q on error", d.State(), StateIdle)
+	}
+	if mockProc.startCalled {
+		t.Error("Process.Start() should not be called when model resolution fails")
+	}
+}
+
+func TestDaemonRun_FailsToStopExistingModel(t *testing.T) {
+	// Arrange
+	firstPreset := &preset.Preset{
+		Name:  "first-preset",
+		Model: "f:/path/to/first.gguf",
+		Host:  "127.0.0.1",
+		Port:  8080,
+	}
+	secondPreset := &preset.Preset{
+		Name:  "second-preset",
+		Model: "f:/path/to/second.gguf",
+		Host:  "127.0.0.1",
+		Port:  8080,
+	}
+
+	presets := &stubPresetLoader{
+		presets: map[string]*preset.Preset{
+			"first-preset":  firstPreset,
+			"second-preset": secondPreset,
+		},
+	}
+	models := &stubModelManager{}
+	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	userCfg := config.DefaultConfig()
+
+	d := New(cfg, presets, models, userCfg)
+
+	// Mock dependencies
+	firstMockProc := &mockProcess{
+		stopErr: fmt.Errorf("failed to stop"),
+	}
+	callCount := 0
+	d.newProcess = func(path string) llamaProcess {
+		callCount++
+		if callCount == 1 {
+			return firstMockProc
+		}
+		return &mockProcess{}
+	}
+	d.waitForReady = mockHealthChecker(nil)
+
+	// Act
+	// Load first model
+	err := d.Run(context.Background(), "p:first-preset")
+	if err != nil {
+		t.Fatalf("first Run() failed: %v", err)
+	}
+
+	// Try to load second model (should fail to stop first)
+	err = d.Run(context.Background(), "p:second-preset")
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error when stopping existing model fails, got nil")
+	}
+	if d.State() != StateRunning {
+		t.Errorf("State() = %q, want %q (should remain in previous state)", d.State(), StateRunning)
+	}
+	if d.CurrentPreset() != firstPreset {
+		t.Error("CurrentPreset() should still be first preset after failed stop")
+	}
+}
+
+func TestDaemonRun_ContextCancelledDuringHealthCheck(t *testing.T) {
+	// Arrange
+	testPreset := &preset.Preset{
+		Name:  "test-preset",
+		Model: "f:/path/to/model.gguf",
+		Host:  "127.0.0.1",
+		Port:  8080,
+	}
+
+	presets := &stubPresetLoader{
+		presets: map[string]*preset.Preset{
+			"test-preset": testPreset,
+		},
+	}
+	models := &stubModelManager{}
+	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	userCfg := config.DefaultConfig()
+
+	d := New(cfg, presets, models, userCfg)
+
+	// Mock dependencies
+	mockProc := &mockProcess{}
+	d.newProcess = func(path string) llamaProcess {
+		return mockProc
+	}
+	d.waitForReady = mockHealthChecker(context.Canceled)
+
+	// Act
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+	err := d.Run(ctx, "p:test-preset")
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error when context is cancelled, got nil")
+	}
+	if d.State() != StateIdle {
+		t.Errorf("State() = %q, want %q after context cancellation", d.State(), StateIdle)
+	}
+	if d.CurrentPreset() != nil {
+		t.Error("CurrentPreset() should be nil after context cancellation")
+	}
+	if mockProc.stopCalled {
+		t.Log("Process.Stop() was called for cleanup (acceptable)")
+	}
 }

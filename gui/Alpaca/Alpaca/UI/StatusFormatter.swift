@@ -53,7 +53,11 @@ struct StatusFormatter {
             result.append(subtitleAttr)
 
         case .loading(let preset):
-            result.append(NSAttributedString(string: "\n", attributes: [.paragraphStyle: paragraphStyle]))
+            // Add spacing using a small font line
+            result.append(NSAttributedString(
+                string: "\n \n",
+                attributes: [.font: NSFont.systemFont(ofSize: 4), .paragraphStyle: paragraphStyle]
+            ))
             let subtitleAttr = NSAttributedString(
                 string: preset,
                 attributes: [

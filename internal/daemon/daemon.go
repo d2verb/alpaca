@@ -27,6 +27,16 @@ type modelManager interface {
 	GetFilePath(ctx context.Context, repo, quant string) (string, error)
 }
 
+// llamaProcess manages llama-server process lifecycle.
+type llamaProcess interface {
+	Start(ctx context.Context, args []string) error
+	Stop(ctx context.Context) error
+	SetLogWriter(w io.Writer)
+}
+
+// healthChecker waits for llama-server to become ready.
+type healthChecker func(ctx context.Context, endpoint string) error
+
 // State represents the daemon state.
 type State string
 
@@ -49,13 +59,17 @@ type Daemon struct {
 	state  atomic.Value                  // holds State
 	preset atomic.Pointer[preset.Preset] // holds *preset.Preset
 
-	process *llama.Process // protected by mu
+	process llamaProcess // protected by mu
 
 	presets        presetLoader
 	models         modelManager
 	userConfig     *config.Config
 	config         *Config
 	llamaLogWriter io.Writer
+
+	// Test hooks (optional, defaults to real implementations)
+	newProcess    func(path string) llamaProcess
+	waitForReady  healthChecker
 }
 
 // Config holds daemon configuration.
@@ -73,6 +87,11 @@ func New(cfg *Config, presets presetLoader, models modelManager, userConfig *con
 		userConfig:     userConfig,
 		config:         cfg,
 		llamaLogWriter: cfg.LlamaLogWriter,
+		// Default implementations (can be overridden in tests)
+		newProcess: func(path string) llamaProcess {
+			return llama.NewProcess(path)
+		},
+		waitForReady: llama.WaitForReady,
 	}
 	d.state.Store(StateIdle)
 	return d
@@ -200,7 +219,7 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 	d.preset.Store(p)
 
 	// Start llama-server
-	proc := llama.NewProcess(d.config.LlamaServerPath)
+	proc := d.newProcess(d.config.LlamaServerPath)
 	if d.llamaLogWriter != nil {
 		proc.SetLogWriter(d.llamaLogWriter)
 	}
@@ -212,7 +231,7 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 	d.process = proc
 
 	// Wait for llama-server to become ready
-	if err := llama.WaitForReady(ctx, p.Endpoint()); err != nil {
+	if err := d.waitForReady(ctx, p.Endpoint()); err != nil {
 		// Cleanup on failure
 		d.process.Stop(ctx)
 		d.process = nil
