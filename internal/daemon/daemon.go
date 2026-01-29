@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 
 	"github.com/d2verb/alpaca/internal/config"
 	"github.com/d2verb/alpaca/internal/identifier"
@@ -37,10 +38,18 @@ const (
 
 // Daemon manages llama-server lifecycle.
 type Daemon struct {
-	mu      sync.RWMutex
-	state   State
-	preset  *preset.Preset
-	process *llama.Process
+	// mu protects the process field and serializes Run/Kill operations.
+	// Note: Changed from RWMutex to Mutex because state and preset are now
+	// accessed atomically, eliminating the need for concurrent read locks.
+	mu sync.Mutex
+
+	// state and preset are accessed atomically for lock-free reads.
+	// This allows State() and CurrentPreset() to return immediately
+	// even while Run() is waiting for llama-server to become ready.
+	state  atomic.Value                  // holds State
+	preset atomic.Pointer[preset.Preset] // holds *preset.Preset
+
+	process *llama.Process // protected by mu
 
 	presets        presetLoader
 	models         modelManager
@@ -58,28 +67,27 @@ type Config struct {
 
 // New creates a new daemon instance.
 func New(cfg *Config, presets presetLoader, models modelManager, userConfig *config.Config) *Daemon {
-	return &Daemon{
-		state:          StateIdle,
+	d := &Daemon{
 		presets:        presets,
 		models:         models,
 		userConfig:     userConfig,
 		config:         cfg,
 		llamaLogWriter: cfg.LlamaLogWriter,
 	}
+	d.state.Store(StateIdle)
+	return d
 }
 
 // State returns the current daemon state.
+// This method is lock-free and returns immediately.
 func (d *Daemon) State() State {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-	return d.state
+	return d.state.Load().(State)
 }
 
 // CurrentPreset returns the currently loaded preset, if any.
+// This method is lock-free and returns immediately.
 func (d *Daemon) CurrentPreset() *preset.Preset {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-	return d.preset
+	return d.preset.Load()
 }
 
 // ListPresets returns all available preset names.
@@ -188,8 +196,8 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 		return fmt.Errorf("unknown identifier type")
 	}
 
-	d.state = StateLoading
-	d.preset = p
+	d.state.Store(StateLoading)
+	d.preset.Store(p)
 
 	// Start llama-server
 	proc := llama.NewProcess(d.config.LlamaServerPath)
@@ -197,8 +205,8 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 		proc.SetLogWriter(d.llamaLogWriter)
 	}
 	if err := proc.Start(ctx, p.BuildArgs()); err != nil {
-		d.state = StateIdle
-		d.preset = nil
+		d.state.Store(StateIdle)
+		d.preset.Store(nil)
 		return fmt.Errorf("start llama-server: %w", err)
 	}
 	d.process = proc
@@ -208,12 +216,12 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 		// Cleanup on failure
 		d.process.Stop(ctx)
 		d.process = nil
-		d.preset = nil
-		d.state = StateIdle
+		d.preset.Store(nil)
+		d.state.Store(StateIdle)
 		return fmt.Errorf("wait for llama-server ready: %w", err)
 	}
 
-	d.state = StateRunning
+	d.state.Store(StateRunning)
 	return nil
 }
 
@@ -234,7 +242,7 @@ func (d *Daemon) stopLocked(ctx context.Context) error {
 	}
 
 	d.process = nil
-	d.preset = nil
-	d.state = StateIdle
+	d.preset.Store(nil)
+	d.state.Store(StateIdle)
 	return nil
 }
