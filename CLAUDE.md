@@ -7,6 +7,7 @@ Guidance for Claude Code when working in this repository.
 Alpaca is a lightweight wrapper around `llama-server` (from llama.cpp) for macOS. It provides CLI and GUI interfaces, similar to Ollama, but with full access to llama-server's options and better performance.
 
 **Key Goals:**
+
 - Thin wrapper (proxy tool approach, not a new inference engine)
 - Preset system for model + argument combinations
 - Smooth model switching without manual server restarts
@@ -23,10 +24,10 @@ Alpaca is a lightweight wrapper around `llama-server` (from llama.cpp) for macOS
 
 ```bash
 task build      # Build CLI binary
-task test       # Run tests with coverage
+task test       # Run golang tests with coverage
+task gui:test   # Run swift tests with coverage
 task lint       # Run golangci-lint
 task check      # Run fmt + lint + test
-task gui:open   # Open Xcode project
 ```
 
 ## Design Documents
@@ -58,16 +59,19 @@ See `architecture.md` for full protocol specification including error codes.
 ## Model Management
 
 **Model Switching:**
+
 1. Send SIGTERM to current llama-server
 2. Wait for graceful shutdown (max 10s, then SIGKILL)
 3. Start llama-server with new model/preset
 4. Wait for /health to report ready
 
 **Preset Loading:**
+
 - Presets are YAML files in `~/.alpaca/presets/`
 - `extra_args` field passes arbitrary flags to llama-server
 
 **HuggingFace Models:**
+
 - Format: `h:org/repo:quant` (e.g., `h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M`)
 - Downloaded to `~/.alpaca/models/`
 - Metadata stored in `.metadata.json` (repo, quant, filename, size)
@@ -82,12 +86,14 @@ See `architecture.md` for full protocol specification including error codes.
 ## Scope Boundaries
 
 **Do:**
+
 - Keep it simple (thin wrapper)
 - Use system-installed llama-server
 - Rely on llama-server's /health for health checks
 - Write tests before implementing new features (TDD approach)
 
 **Do Not:**
+
 - Add llama.cpp version management
 - Implement custom inference
 - Over-engineer
