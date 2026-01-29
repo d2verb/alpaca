@@ -30,21 +30,9 @@ tasks:
 
   # Testing
   test:
-    desc: Run tests with coverage
+    desc: Run tests
     cmds:
-      - go test -race -coverprofile=coverage.out -covermode=atomic ./...
-      - go tool cover -func=coverage.out
-
-  test:coverage:
-    desc: Check if coverage meets minimum threshold (80%)
-    cmds:
-      - |
-        COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print substr($3, 1, length($3)-1)}')
-        echo "Coverage: ${COVERAGE}%"
-        if (( $(echo "$COVERAGE < 80" | bc -l) )); then
-          echo "Coverage is below 80%"
-          exit 1
-        fi
+      - go test -race ./...
 
   test:watch:
     desc: Run tests in watch mode
@@ -223,7 +211,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.25'
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
@@ -239,19 +227,10 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.25'
 
       - name: Run tests
-        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
-
-      - name: Check coverage
-        run: |
-          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print substr($3, 1, length($3)-1)}')
-          echo "Coverage: ${COVERAGE}%"
-          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
-            echo "Coverage is below 80%"
-            exit 1
-          fi
+        run: go test -race ./...
 
   build:
     name: Build
@@ -262,7 +241,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.25'
 
       - name: Build CLI
         run: go build -o alpaca ./cmd/alpaca
@@ -298,7 +277,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.25'
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6

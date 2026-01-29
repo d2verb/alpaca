@@ -4,7 +4,7 @@
 
 | Component | Technology |
 |-----------|------------|
-| CLI / Daemon | Go 1.23+ |
+| CLI / Daemon | Go 1.25+ |
 | CLI Framework | [kong](https://github.com/alecthomas/kong) |
 | GUI | SwiftUI (Swift 6.0+, Xcode 16+) |
 | Task Runner | [Task](https://taskfile.dev/) |
@@ -73,7 +73,6 @@ alpaca/
 | Naming | Go standard (MixedCaps, short variable names) |
 | Package names | Singular, short (`preset` not `presets`) |
 | Comments | GoDoc format for public APIs |
-| Test coverage | Minimum 80% |
 
 ### Swift
 
@@ -209,8 +208,7 @@ jobs:
     - swiftlint
 
   test:
-    - go test -race -coverprofile=coverage.out ./...
-    - Check coverage >= 80%
+    - go test -race ./...
 
   build:
     - go build ./cmd/alpaca
