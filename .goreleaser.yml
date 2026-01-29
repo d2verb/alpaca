@@ -45,6 +45,7 @@ brews:
     repository:
       owner: d2verb
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     homepage: https://github.com/d2verb/alpaca
     description: Lightweight llama-server wrapper for macOS
     license: MIT
