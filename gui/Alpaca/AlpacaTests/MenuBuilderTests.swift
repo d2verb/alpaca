@@ -38,13 +38,13 @@ struct MenuBuilderPresetsSubmenuTests {
         #expect(submenu.items[0].title == "Downloaded Models")
         #expect(submenu.items[0].isEnabled == false)
 
-        // Second item should be first model
-        #expect(submenu.items[1].title == "TheBloke/CodeLlama-7B-GGUF:Q4_K_M")
+        // Second item should be first model (displayName format: "ModelName (Quant)")
+        #expect(submenu.items[1].title == "CodeLlama-7B (Q4_K_M)")
         #expect(submenu.items[1].representedObject as? String == "h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M")
         #expect(submenu.items[1].state == .off)
 
         // Third item should be second model
-        #expect(submenu.items[2].title == "TheBloke/Mistral-7B-GGUF:Q5_K_M")
+        #expect(submenu.items[2].title == "Mistral-7B (Q5_K_M)")
         #expect(submenu.items[2].representedObject as? String == "h:TheBloke/Mistral-7B-GGUF:Q5_K_M")
     }
 

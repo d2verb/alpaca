@@ -170,8 +170,8 @@ struct StatusFormatterFormatTests {
         let result = StatusFormatter.format(state: .loading(preset: ""))
         let string = result.string
 
-        // Should still format correctly even with empty preset
-        #expect(string.contains("Loading..."))
+        // Should still format correctly even with empty preset (note space before ...)
+        #expect(string.contains("Loading ..."))
     }
 
     @Test("Format handles very long preset name")
