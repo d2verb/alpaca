@@ -25,9 +25,10 @@ builds:
 
 archives:
   - id: alpaca
-    builds:
+    ids:
       - alpaca
-    format: tar.gz
+    formats:
+      - tar.gz
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
@@ -36,8 +37,9 @@ checksum:
 changelog:
   use: github-native
 
-brews:
+homebrew_casks:
   - name: alpaca
+    directory: Casks
     repository:
       owner: d2verb
       name: homebrew-tap
@@ -45,5 +47,3 @@ brews:
     homepage: https://github.com/d2verb/alpaca
     description: Lightweight llama-server wrapper for macOS
     license: MIT
-    install: |
-      bin.install "alpaca"
