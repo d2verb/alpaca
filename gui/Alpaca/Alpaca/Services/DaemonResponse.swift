@@ -45,4 +45,18 @@ struct ModelsResponse: Decodable, Sendable {
 struct GenericResponse: Decodable, Sendable {
     let status: String
     let error: String?
+    let errorCode: String?
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case error
+        case errorCode = "error_code"
+    }
+}
+
+/// Error codes returned by the daemon.
+enum DaemonErrorCode: String {
+    case presetNotFound = "preset_not_found"
+    case modelNotFound = "model_not_found"
+    case serverFailed = "server_failed"
 }

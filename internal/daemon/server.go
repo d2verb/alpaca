@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/d2verb/alpaca/internal/protocol"
 )
@@ -120,13 +121,30 @@ func (s *Server) handleLoad(ctx context.Context, req *protocol.Request) *protoco
 	}
 
 	if err := s.daemon.Run(ctx, identifier); err != nil {
-		return protocol.NewErrorResponse(err.Error())
+		code, msg := classifyLoadError(err)
+		return protocol.NewErrorResponseWithCode(code, msg)
 	}
 
 	preset := s.daemon.CurrentPreset()
 	return protocol.NewOKResponse(map[string]any{
 		"endpoint": preset.Endpoint(),
 	})
+}
+
+// classifyLoadError determines the error code based on the error message.
+func classifyLoadError(err error) (code, message string) {
+	msg := err.Error()
+
+	switch {
+	case strings.Contains(msg, "load preset") && strings.Contains(msg, "no such file"):
+		return protocol.ErrCodePresetNotFound, msg
+	case strings.Contains(msg, "not found in metadata"):
+		return protocol.ErrCodeModelNotFound, msg
+	case strings.Contains(msg, "start llama-server") || strings.Contains(msg, "wait for llama-server"):
+		return protocol.ErrCodeServerFailed, msg
+	default:
+		return "", msg
+	}
 }
 
 func (s *Server) handleUnload(ctx context.Context) *protocol.Response {

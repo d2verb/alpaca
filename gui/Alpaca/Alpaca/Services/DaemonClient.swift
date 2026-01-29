@@ -56,7 +56,7 @@ final class DaemonClient: DaemonClientProtocol, Sendable {
         let response: GenericResponse = try await sendRequest(Request(command: "load", args: ["identifier": identifier]))
 
         if response.status != "ok" {
-            throw DaemonError.protocolError(response.error ?? "Failed to load model")
+            throw DaemonError.fromCode(response.errorCode, message: response.error ?? "Failed to load model")
         }
     }
 

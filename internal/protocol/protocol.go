@@ -53,10 +53,19 @@ func NewOKResponse(data map[string]any) *Response {
 	}
 }
 
-// NewErrorResponse creates an error response.
+// NewErrorResponse creates an error response without a code.
 func NewErrorResponse(err string) *Response {
 	return &Response{
 		Status: StatusError,
 		Error:  err,
+	}
+}
+
+// NewErrorResponseWithCode creates an error response with a structured code.
+func NewErrorResponseWithCode(code, message string) *Response {
+	return &Response{
+		Status:    StatusError,
+		Error:     message,
+		ErrorCode: code,
 	}
 }

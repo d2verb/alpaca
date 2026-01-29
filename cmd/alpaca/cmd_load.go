@@ -7,6 +7,7 @@ import (
 
 	"github.com/d2verb/alpaca/internal/identifier"
 	"github.com/d2verb/alpaca/internal/model"
+	"github.com/d2verb/alpaca/internal/protocol"
 	"github.com/d2verb/alpaca/internal/ui"
 )
 
@@ -64,7 +65,7 @@ func (c *LoadCmd) Run() error {
 	}
 
 	if resp.Status == "error" {
-		return parseLoadError(resp.Error, id)
+		return handleLoadError(resp.ErrorCode, resp.Error, id)
 	}
 
 	endpoint, _ := resp.Data["endpoint"].(string)
@@ -72,24 +73,22 @@ func (c *LoadCmd) Run() error {
 	return nil
 }
 
-// parseLoadError converts daemon error messages into user-friendly errors.
-func parseLoadError(errMsg string, id *identifier.Identifier) error {
-	isNotFound := strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "no such file")
+// handleLoadError converts daemon error codes into user-friendly errors.
+func handleLoadError(code, message string, id *identifier.Identifier) error {
+	switch code {
+	case protocol.ErrCodePresetNotFound:
+		return errPresetNotFound(id.PresetName)
 
-	if id.Type == identifier.TypePresetName {
-		// Preset file itself not found
-		if strings.Contains(errMsg, "load preset") && strings.Contains(errMsg, "no such file") {
-			return errPresetNotFound(id.PresetName)
-		}
-		// Model referenced by preset not found
-		if isNotFound {
+	case protocol.ErrCodeModelNotFound:
+		if id.Type == identifier.TypePresetName {
 			return fmt.Errorf("model in preset '%s' not downloaded\nRun: alpaca model pull <model>", id.PresetName)
 		}
-	}
-
-	if isNotFound {
 		return errModelNotFound(id.Raw)
-	}
 
-	return fmt.Errorf("%s", errMsg)
+	case protocol.ErrCodeServerFailed:
+		return fmt.Errorf("failed to start server: %s", message)
+
+	default:
+		return fmt.Errorf("%s", message)
+	}
 }
