@@ -5,7 +5,6 @@
 
   [![CI](https://github.com/d2verb/alpaca/actions/workflows/ci.yml/badge.svg)](https://github.com/d2verb/alpaca/actions/workflows/ci.yml)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-  [![Go Version](https://img.shields.io/github/go-mod/go-version/d2verb/alpaca)](https://go.dev/)
 </div>
 
 ## Why Alpaca?
