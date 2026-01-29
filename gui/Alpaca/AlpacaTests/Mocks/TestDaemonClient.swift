@@ -7,15 +7,17 @@ actor TestDaemonClient: DaemonClientProtocol {
     var presetsToReturn: [Preset] = []
     var modelsToReturn: [Model] = []
     var errorToThrow: Error?
+    var loadErrorToThrow: Error?
     var loadModelCalled = false
     var stopModelCalled = false
     var lastLoadedIdentifier: String?
 
-    func configure(status: DaemonState = .idle, presets: [Preset] = [], models: [Model] = [], error: Error? = nil) {
+    func configure(status: DaemonState = .idle, presets: [Preset] = [], models: [Model] = [], error: Error? = nil, loadError: Error? = nil) {
         statusToReturn = status
         presetsToReturn = presets
         modelsToReturn = models
         errorToThrow = error
+        loadErrorToThrow = loadError
     }
 
     func getStatus() async throws -> DaemonState {
@@ -28,6 +30,9 @@ actor TestDaemonClient: DaemonClientProtocol {
     func loadModel(identifier: String) async throws {
         loadModelCalled = true
         lastLoadedIdentifier = identifier
+        if let error = loadErrorToThrow {
+            throw error
+        }
         if let error = errorToThrow {
             throw error
         }

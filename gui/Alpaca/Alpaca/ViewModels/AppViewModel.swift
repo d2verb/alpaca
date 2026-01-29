@@ -27,13 +27,16 @@ final class AppViewModel {
     func refreshStatus() async {
         do {
             state = try await client.getStatus()
-            errorMessage = nil
         } catch DaemonError.notRunning {
             state = .notRunning
-            errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Clear any displayed error message.
+    func clearError() {
+        errorMessage = nil
     }
 
     /// Load the list of available presets.
@@ -56,6 +59,7 @@ final class AppViewModel {
 
     /// Load a model with the specified identifier (h:org/repo:quant or p:preset-name).
     func loadModel(identifier: String) async {
+        clearError()
         state = .loading(preset: identifier)
         do {
             try await client.loadModel(identifier: identifier)
@@ -68,6 +72,7 @@ final class AppViewModel {
 
     /// Stop the currently running model.
     func stopModel() async {
+        clearError()
         do {
             try await client.stopModel()
             await refreshStatus()

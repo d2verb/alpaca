@@ -200,6 +200,50 @@ struct AppViewModelTests {
         #expect(stopModelCalled)
         #expect(viewModel.state == .idle)
     }
+
+    @Test("LoadModel keeps error message after subsequent refresh")
+    @MainActor
+    func loadModelKeepsErrorAfterRefresh() async {
+        let client = TestDaemonClient()
+        await client.configure(status: .idle, loadError: DaemonError.presetNotFound("test error"))
+        let viewModel = AppViewModel(client: client)
+
+        // Load model fails and sets error
+        await viewModel.loadModel(identifier: "p:nonexistent")
+        #expect(viewModel.errorMessage != nil)
+        let errorBeforeRefresh = viewModel.errorMessage
+
+        // Clear load error for next refresh
+        await client.configure(status: .idle)
+
+        // Refresh status should NOT clear the error
+        await viewModel.refreshStatus()
+
+        #expect(viewModel.errorMessage == errorBeforeRefresh)
+        #expect(viewModel.errorMessage != nil)
+    }
+
+    @Test("LoadModel clears previous error before starting")
+    @MainActor
+    func loadModelClearsPreviousError() async {
+        let client = TestDaemonClient()
+        await client.configure(
+            status: .idle,
+            loadError: DaemonError.presetNotFound("first error")
+        )
+        let viewModel = AppViewModel(client: client)
+
+        // First load fails and sets error
+        await viewModel.loadModel(identifier: "p:bad")
+        #expect(viewModel.errorMessage != nil)
+
+        // Configure for successful second load
+        await client.configure(status: .running(preset: "test", endpoint: "localhost:8080"))
+
+        // Second load succeeds - previous error should be cleared
+        await viewModel.loadModel(identifier: "p:test")
+        #expect(viewModel.errorMessage == nil)
+    }
 }
 
 // MARK: - DaemonError Tests
@@ -222,5 +266,32 @@ struct DaemonErrorTests {
     func invalidResponseDescription() {
         let error = DaemonError.invalidResponse("Bad data")
         #expect(error.errorDescription == "Invalid response: Bad data")
+    }
+
+    @Test("PresetNotFound error description")
+    func presetNotFoundDescription() {
+        let error = DaemonError.presetNotFound("my-preset")
+        #expect(error.errorDescription == "Preset not found: my-preset")
+    }
+
+    @Test("ModelNotFound error description")
+    func modelNotFoundDescription() {
+        let error = DaemonError.modelNotFound("h:org/repo:Q4")
+        #expect(error.errorDescription == "Model not found: h:org/repo:Q4")
+    }
+
+    @Test("fromCode creates correct error types")
+    func fromCodeCreatesCorrectTypes() {
+        let presetError = DaemonError.fromCode("preset_not_found", message: "test")
+        let modelError = DaemonError.fromCode("model_not_found", message: "test")
+        let serverError = DaemonError.fromCode("server_failed", message: "test")
+        let unknownError = DaemonError.fromCode("unknown_code", message: "test")
+        let nilCodeError = DaemonError.fromCode(nil, message: "test")
+
+        if case .presetNotFound = presetError {} else { Issue.record("Expected presetNotFound") }
+        if case .modelNotFound = modelError {} else { Issue.record("Expected modelNotFound") }
+        if case .serverFailed = serverError {} else { Issue.record("Expected serverFailed") }
+        if case .protocolError = unknownError {} else { Issue.record("Expected protocolError for unknown code") }
+        if case .protocolError = nilCodeError {} else { Issue.record("Expected protocolError for nil code") }
     }
 }
