@@ -22,10 +22,7 @@
 ## Installation
 
 ```bash
-# Install via Homebrew (coming soon)
-brew install d2verb/tap/alpaca
-
-# Or build from source
+# Build from source
 # Requires Go 1.23+ and Task (https://taskfile.dev)
 task build
 # Binary will be at ./build/alpaca
