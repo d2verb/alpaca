@@ -1,7 +1,7 @@
 <div align="center">
   <img src="alpaca-icon.png" alt="Alpaca Logo" width="200"/>
   <h1>Alpaca</h1>
-  <p>A lightweight wrapper around <a href="https://github.com/ggerganov/llama.cpp">llama-server</a> for macOS</p>
+  <p>A lightweight wrapper around <a href="https://github.com/ggerganov/llama.cpp">llama-server</a></p>
 
   [![CI](https://github.com/d2verb/alpaca/actions/workflows/ci.yml/badge.svg)](https://github.com/d2verb/alpaca/actions/workflows/ci.yml)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -15,7 +15,7 @@
 - **Full llama-server options**: Access all llama-server arguments via `extra_args`
 - **Model management**: Download, list, and remove HuggingFace models
 - **Log viewing**: View daemon and server logs with follow mode (`alpaca logs -f`)
-- **CLI + GUI**: Command-line interface and macOS menu bar app
+- **CLI + GUI**: Command-line interface (macOS/Linux) and macOS menu bar app
 - **Automatic log rotation**: Logs rotate at 50MB with compression
 
 ## Installation
@@ -111,7 +111,8 @@ For detailed command documentation, see [`docs/design/cli.md`](docs/design/cli.m
 
 ## Requirements
 
-- **macOS** (primary platform)
+- **CLI**: macOS, Linux (amd64, arm64)
+- **GUI**: macOS only
 - **Go 1.25+** (for building from source)
 - **[llama-server](https://github.com/ggerganov/llama.cpp)** installed and available in PATH
 

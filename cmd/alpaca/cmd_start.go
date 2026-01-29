@@ -67,7 +67,7 @@ func (c *StartCmd) startBackground(paths *config.Paths) error {
 	cmd := exec.Command(os.Args[0], "start", "--foreground")
 	cmd.Env = os.Environ()
 
-	// Detach from controlling terminal (Unix/macOS only)
+	// Detach from controlling terminal (Unix-like systems)
 	cmd.Stdin = nil
 	cmd.Stdout = nil
 	cmd.Stderr = nil

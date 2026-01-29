@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"syscall"
 )
 
@@ -35,10 +36,10 @@ func (c *LogsCmd) Run() error {
 	}
 	args = append(args, logPath)
 
-	// Find tail binary
-	tailPath := "/usr/bin/tail"
-	if _, err := os.Stat(tailPath); os.IsNotExist(err) {
-		return fmt.Errorf("tail command not found at %s", tailPath)
+	// Find tail binary in PATH
+	tailPath, err := exec.LookPath("tail")
+	if err != nil {
+		return fmt.Errorf("tail command not found in PATH (install coreutils or similar)")
 	}
 
 	// Replace current process with tail
