@@ -22,7 +22,7 @@
 
 ```bash
 # Build from source
-# Requires Go 1.23+ and Task (https://taskfile.dev)
+# Requires Go 1.25+ and Task (https://taskfile.dev)
 task build
 # Binary will be at ./build/alpaca
 ```
@@ -112,7 +112,7 @@ For detailed command documentation, see [`docs/design/cli.md`](docs/design/cli.m
 ## Requirements
 
 - **macOS** (primary platform)
-- **Go 1.23+** (for building from source)
+- **Go 1.25+** (for building from source)
 - **[llama-server](https://github.com/ggerganov/llama.cpp)** installed and available in PATH
 
 ## Documentation
