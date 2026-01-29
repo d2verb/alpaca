@@ -11,6 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // Menu items that need dynamic updates
     private var statusMenuItem: NSMenuItem!
     private var errorMenuItem: NSMenuItem!
+    private var browserSeparator: NSMenuItem!
+    private var openInBrowserItem: NSMenuItem!
     private var actionSeparator: NSMenuItem!
     private var loadModelItem: NSMenuItem!
     private var stopItem: NSMenuItem!
@@ -46,6 +48,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         errorMenuItem = NSMenuItem()
         errorMenuItem.isHidden = true
         menu.addItem(errorMenuItem)
+
+        // Separator before browser action
+        browserSeparator = NSMenuItem.separator()
+        menu.addItem(browserSeparator)
+
+        // Open in Browser
+        openInBrowserItem = NSMenuItem(title: "Open in Browser", action: #selector(openInBrowser), keyEquivalent: "")
+        openInBrowserItem.target = self
+        openInBrowserItem.image = NSImage(systemSymbolName: "safari.fill", accessibilityDescription: nil)
+        menu.addItem(openInBrowserItem)
 
         // Separator before actions
         actionSeparator = NSMenuItem.separator()
@@ -128,6 +140,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Update menu visibility based on state
         menuBuilder.updateMenuVisibility(
             state: viewModel.state,
+            browserSeparator: browserSeparator,
+            openInBrowserItem: openInBrowserItem,
             loadModelItem: loadModelItem,
             stopItem: stopItem,
             cancelItem: cancelItem,
@@ -148,6 +162,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             await viewModel.stopModel()
             updateMenu()
         }
+    }
+
+    @objc private func openInBrowser() {
+        guard case .running(_, let endpoint) = viewModel.state else { return }
+        guard let url = URL(string: endpoint) else { return }
+        NSWorkspace.shared.open(url)
     }
 
     @objc private func statusItemClicked() {

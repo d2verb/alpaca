@@ -66,6 +66,8 @@ final class MenuBuilder {
     /// Updates menu item visibility based on daemon state.
     func updateMenuVisibility(
         state: DaemonState,
+        browserSeparator: NSMenuItem,
+        openInBrowserItem: NSMenuItem,
         loadModelItem: NSMenuItem,
         stopItem: NSMenuItem,
         cancelItem: NSMenuItem,
@@ -73,12 +75,16 @@ final class MenuBuilder {
     ) {
         switch state {
         case .notRunning:
+            browserSeparator.isHidden = true
+            openInBrowserItem.isHidden = true
             loadModelItem.isHidden = true
             stopItem.isHidden = true
             cancelItem.isHidden = true
             actionSeparator.isHidden = true
 
         case .idle:
+            browserSeparator.isHidden = true
+            openInBrowserItem.isHidden = true
             loadModelItem.isHidden = false
             loadModelItem.title = "Load Model..."
             loadModelItem.image = NSImage(systemSymbolName: "play.fill", accessibilityDescription: nil)
@@ -87,12 +93,16 @@ final class MenuBuilder {
             actionSeparator.isHidden = false
 
         case .loading:
+            browserSeparator.isHidden = true
+            openInBrowserItem.isHidden = true
             loadModelItem.isHidden = true
             stopItem.isHidden = true
             cancelItem.isHidden = false
             actionSeparator.isHidden = false
 
         case .running:
+            browserSeparator.isHidden = false
+            openInBrowserItem.isHidden = false
             loadModelItem.isHidden = false
             loadModelItem.title = "Switch Model..."
             loadModelItem.image = NSImage(systemSymbolName: "play.fill", accessibilityDescription: nil)

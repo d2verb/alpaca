@@ -56,6 +56,8 @@ Icon options:
 │  codellama-7b-q4                │  ← Current preset name
 │  localhost:8080                 │  ← Endpoint
 ├─────────────────────────────────┤
+│  🌐 Open in Browser             │  ← Opens endpoint in browser
+├─────────────────────────────────┤
 │  ▶ Switch Model...              │  → Preset submenu
 │  ■ Stop                         │
 ├─────────────────────────────────┤
@@ -66,6 +68,7 @@ Icon options:
 
 - Green status indicator
 - Current preset name and endpoint displayed
+- "Open in Browser" opens the llama-server web UI
 - "Switch Model..." for quick switching
 - "Stop" to unload model
 
@@ -144,6 +147,13 @@ Note: Preset management is done via CLI or direct YAML editing.
 5. UI updates to "Running" when ready
 
 No confirmation dialog - switch is immediate.
+
+### Open in Browser
+
+In "Model Running" state:
+- Click opens the llama-server endpoint in default browser
+- Provides access to llama-server's built-in web UI
+- Only visible when a model is actively running
 
 ### Copy Command Button
 
