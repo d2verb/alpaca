@@ -60,7 +60,8 @@ struct PresetTests {
     func presetInit() {
         let preset = Preset(name: "test-model")
         #expect(preset.name == "test-model")
-        #expect(preset.id == "test-model")
+        #expect(preset.id == "p:test-model")
+        #expect(preset.identifier == "p:test-model")
     }
 
     @Test("Preset equality")
@@ -71,6 +72,30 @@ struct PresetTests {
 
         #expect(preset1 == preset2)
         #expect(preset1 != preset3)
+    }
+}
+
+@Suite("Model Tests")
+struct ModelTests {
+    @Test("Model initialization")
+    func modelInit() {
+        let model = Model(repo: "unsloth/gemma3", quant: "Q4_K_M", size: 1024)
+        #expect(model.repo == "unsloth/gemma3")
+        #expect(model.quant == "Q4_K_M")
+        #expect(model.id == "h:unsloth/gemma3:Q4_K_M")
+        #expect(model.identifier == "h:unsloth/gemma3:Q4_K_M")
+    }
+
+    @Test("Model display name formatting")
+    func modelDisplayName() {
+        let model = Model(repo: "TheBloke/CodeLlama-7B-GGUF", quant: "Q4_K_M", size: 1024)
+        #expect(model.displayName == "CodeLlama-7B (Q4_K_M)")
+    }
+
+    @Test("Model size string formatting")
+    func modelSizeString() {
+        let model = Model(repo: "test/repo", quant: "Q4_K_M", size: 1073741824) // 1 GB
+        #expect(model.sizeString.contains("GB"))
     }
 }
 

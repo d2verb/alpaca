@@ -45,8 +45,8 @@ final class MenuBuilder {
             for preset in presets {
                 let item = NSMenuItem(title: preset.name, action: #selector(AppDelegate.selectModel(_:)), keyEquivalent: "")
                 item.target = target
-                item.representedObject = preset.name
-                if currentPreset == preset.name {
+                item.representedObject = preset.identifier
+                if currentPreset == preset.identifier {
                     item.state = .on
                 }
                 submenu.addItem(item)

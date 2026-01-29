@@ -54,7 +54,7 @@ final class AppViewModel {
         }
     }
 
-    /// Load a model with the specified identifier (preset name or repo:quant).
+    /// Load a model with the specified identifier (h:org/repo:quant or p:preset-name).
     func loadModel(identifier: String) async {
         state = .loading(preset: identifier)
         do {

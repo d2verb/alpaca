@@ -72,34 +72,69 @@ Run: alpaca start
 
 ### Model Management
 
-#### `alpaca load <preset|repo:quant>`
+#### `alpaca load <identifier>`
 
-Load a model using a preset or HuggingFace repository.
+Load a model using an explicit identifier with prefix.
+
+**Identifier Format:**
+All identifiers must use an explicit prefix:
+- `h:org/repo:quant` - HuggingFace model (auto-download if not present)
+- `p:preset-name` - Preset
+- `f:/path/to/file` - File path (uses default settings)
 
 **Using preset:**
 ```bash
-$ alpaca load codellama-7b-q4
-Loading codellama-7b-q4...
+$ alpaca load p:codellama-7b-q4
+Loading p:codellama-7b-q4...
 Model ready at http://localhost:8080
 ```
 
 **Using HuggingFace format (auto-download if not present):**
 ```bash
-$ alpaca load unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
+$ alpaca load h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
 Model not found. Downloading...
 Fetching file list...
 Downloading qwen3-coder-30b-a3b-instruct.Q4_K_M.gguf (16.0 GB)...
 [████████████████████████████████████████] 100.0% (16.0 GB / 16.0 GB)
 Saved to: /Users/username/.alpaca/models/qwen3-coder-30b-a3b-instruct.Q4_K_M.gguf
-Loading unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M...
+Loading h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M...
 Model ready at http://localhost:8080
 ```
 
-If another model is running, it will be stopped first automatically.
+**Using file path (with default settings):**
+```bash
+$ alpaca load f:~/models/my-model.gguf
+Loading f:~/models/my-model.gguf...
+Model ready at http://localhost:8080
 
-**Argument resolution:**
-- Contains `:` → HuggingFace format (`<repo>:<quant>`)
-- Otherwise → Preset name
+$ alpaca load f:./model.gguf
+Loading f:./model.gguf...
+Model ready at http://localhost:8080
+```
+
+File paths are loaded with default settings from `~/.alpaca/config.yaml`:
+- `default_host`: 127.0.0.1
+- `default_port`: 8080
+- `default_ctx_size`: 4096
+- `default_gpu_layers`: -1
+
+For custom settings, create a preset instead.
+
+**Error handling:**
+```bash
+# Missing prefix
+$ alpaca load my-preset
+Error: invalid identifier format 'my-preset'
+Expected: h:org/repo:quant, p:preset-name, or f:/path/to/file
+Examples: alpaca load p:my-preset
+
+# Missing quant in HuggingFace
+$ alpaca load h:unsloth/gemma3
+Error: missing quant specifier in HuggingFace identifier
+Expected format: h:org/repo:quant (e.g., h:unsloth/gemma3:Q4_K_M)
+```
+
+If another model is running, it will be stopped first automatically
 
 **Default settings for HuggingFace models:**
 When loading a model without a preset, the following defaults are used:
@@ -174,65 +209,73 @@ List downloaded models.
 ```bash
 $ alpaca model list
 Downloaded models:
-  - unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M (16.0 GB)
-  - TheBloke/CodeLlama-7B-GGUF:Q4_K_M (4.1 GB)
-  - TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M (4.8 GB)
+  - h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M (16.0 GB)
+  - h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M (4.1 GB)
+  - h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M (4.8 GB)
 ```
 
 When no models are downloaded:
 ```bash
 $ alpaca model list
 No models downloaded.
-Run: alpaca model pull <repo>:<quant>
+Run: alpaca model pull h:org/repo:quant
 ```
 
 Model information is stored in `~/.alpaca/models/.metadata.json`.
 
-#### `alpaca model pull <repo:quant>`
+#### `alpaca model pull h:org/repo:quant`
 
 Download a model from HuggingFace.
 
 ```bash
-$ alpaca model pull TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+$ alpaca model pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 Fetching file list...
 Downloading codellama-7b.Q4_K_M.gguf (4.1 GB)...
 [████████████████████████████████████████] 100.0% (4.1 GB / 4.1 GB)
 Saved to: /Users/username/.alpaca/models/codellama-7b.Q4_K_M.gguf
 ```
 
-**Format**: `<organization>/<repository>:<quantization>`
+**Format**: `h:<organization>/<repository>:<quantization>`
 
 **Examples**:
 ```bash
-alpaca model pull TheBloke/CodeLlama-7B-GGUF:Q4_K_M
-alpaca model pull TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M
-alpaca model pull unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
+alpaca model pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+alpaca model pull h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M
+alpaca model pull h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
 ```
 
 **Errors**:
 
-Invalid format:
+Missing h: prefix:
 ```bash
-$ alpaca model pull TheBloke/CodeLlama-7B-GGUF
-Error: invalid model spec: format must be <repo>:<quant>
-Format: alpaca model pull <org>/<repo>:<quant>
-Example: alpaca model pull TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+$ alpaca model pull TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+Error: model pull only supports HuggingFace models
+Format: alpaca model pull h:org/repo:quant
+Example: alpaca model pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 ```
 
-#### `alpaca model rm <repo:quant>`
+Missing quant:
+```bash
+$ alpaca model pull h:TheBloke/CodeLlama-7B-GGUF
+Error: missing quant specifier
+Format: alpaca model pull h:org/repo:quant
+Example: alpaca model pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+```
+
+#### `alpaca model rm h:org/repo:quant`
 
 Remove a downloaded model.
 
 ```bash
-$ alpaca model rm unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
-Delete model 'unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M'? (y/N): y
-Model 'unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M' removed.
+$ alpaca model rm h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
+Delete model 'h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M'? (y/N): y
+Model 'h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M' removed.
 ```
 
 If model doesn't exist:
 ```bash
-$ alpaca model rm nonexistent:Q4_K_M
-Model 'nonexistent:Q4_K_M' not found.
+$ alpaca model rm h:nonexistent:Q4_K_M
+Model 'h:nonexistent:Q4_K_M' not found.
 ```
 
 This removes both the model file and its metadata entry.
@@ -256,10 +299,10 @@ Model metadata is stored in `~/.alpaca/models/.metadata.json`:
 ```
 
 This metadata is:
-- Created/updated when `alpaca model pull` is run
+- Created/updated when `alpaca model pull h:<repo>:<quant>` is run
 - Read by `alpaca model list` to display HuggingFace format
-- Used by `alpaca load` to resolve `<repo:quant>` to filenames
-- Removed when `alpaca model rm` is run
+- Used by `alpaca load h:<repo>:<quant>` to resolve identifiers to filenames
+- Removed when `alpaca model rm h:<repo>:<quant>` is run
 
 ## Daemon Behavior
 

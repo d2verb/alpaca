@@ -26,23 +26,23 @@ go build -o alpaca ./cmd/alpaca
 alpaca start
 
 # Download a model
-alpaca pull TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q4_K_M
+alpaca model pull h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q4_K_M
 
 # Create a preset (~/.alpaca/presets/mistral.yaml)
 cat <<EOF > ~/.alpaca/presets/mistral.yaml
-model: ~/.alpaca/models/mistral-7b-instruct-v0.2.Q4_K_M.gguf
+model: f:~/.alpaca/models/mistral-7b-instruct-v0.2.Q4_K_M.gguf
 context_size: 4096
 gpu_layers: 35
 EOF
 
-# Run the model
-alpaca run mistral
+# Load the model
+alpaca load p:mistral
 
 # Check status
 alpaca status
 
 # Stop the model
-alpaca kill
+alpaca unload
 
 # Stop the daemon
 alpaca stop
@@ -51,7 +51,8 @@ alpaca stop
 ## Preset Format
 
 ```yaml
-model: ~/.alpaca/models/your-model.gguf
+# File path
+model: f:~/.alpaca/models/your-model.gguf
 context_size: 4096
 gpu_layers: 35
 threads: 8
@@ -59,6 +60,11 @@ port: 8080
 extra_args:
   - "--flash-attn"
   - "--cont-batching"
+
+# Or HuggingFace format (auto-resolved)
+model: h:TheBloke/Mistral-7B-GGUF:Q4_K_M
+context_size: 4096
+gpu_layers: 35
 ```
 
 ## Requirements

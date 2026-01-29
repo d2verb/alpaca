@@ -5,14 +5,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 	"sync"
 
 	"github.com/d2verb/alpaca/internal/config"
+	"github.com/d2verb/alpaca/internal/identifier"
 	"github.com/d2verb/alpaca/internal/llama"
 	"github.com/d2verb/alpaca/internal/metadata"
 	"github.com/d2verb/alpaca/internal/preset"
-	"github.com/d2verb/alpaca/internal/pull"
 )
 
 // presetLoader loads and lists presets.
@@ -113,7 +112,7 @@ func (d *Daemon) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	return models, nil
 }
 
-// resolveHFPreset creates a preset from HuggingFace format (repo:quant).
+// resolveHFPreset creates a preset from HuggingFace format (h:repo:quant).
 func resolveHFPreset(ctx context.Context, models modelManager, cfg *config.Config, repo, quant string) (*preset.Preset, error) {
 	// Get model file path from metadata
 	modelPath, err := models.GetFilePath(ctx, repo, quant)
@@ -121,10 +120,10 @@ func resolveHFPreset(ctx context.Context, models modelManager, cfg *config.Confi
 		return nil, err
 	}
 
-	// Create preset with defaults from userConfig
+	// Create preset with defaults from userConfig (with f: prefix)
 	return &preset.Preset{
-		Name:        fmt.Sprintf("%s:%s", repo, quant),
-		Model:       modelPath,
+		Name:        fmt.Sprintf("h:%s:%s", repo, quant),
+		Model:       "f:" + modelPath,
 		Host:        cfg.DefaultHost,
 		Port:        cfg.DefaultPort,
 		ContextSize: cfg.DefaultCtxSize,
@@ -132,8 +131,8 @@ func resolveHFPreset(ctx context.Context, models modelManager, cfg *config.Confi
 	}, nil
 }
 
-// Run loads and runs a model (preset name or HuggingFace format).
-func (d *Daemon) Run(ctx context.Context, identifier string) error {
+// Run loads and runs a model (preset name, file path, or HuggingFace format).
+func (d *Daemon) Run(ctx context.Context, input string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -144,24 +143,49 @@ func (d *Daemon) Run(ctx context.Context, identifier string) error {
 		}
 	}
 
-	// Determine if identifier is HuggingFace format or preset name
-	var p *preset.Preset
-	var err error
-
-	if strings.Contains(identifier, ":") {
-		// HuggingFace format (repo:quant)
-		repo, quant, parseErr := pull.ParseModelSpec(identifier)
-		if parseErr != nil {
-			return parseErr
-		}
-		p, err = resolveHFPreset(ctx, d.models, d.userConfig, repo, quant)
-	} else {
-		// Preset name
-		p, err = d.presets.Load(identifier)
+	// Parse identifier
+	id, err := identifier.Parse(input)
+	if err != nil {
+		return fmt.Errorf("parse identifier: %w", err)
 	}
 
-	if err != nil {
-		return err
+	// Load preset based on identifier type
+	var p *preset.Preset
+
+	switch id.Type {
+	case identifier.TypePresetName:
+		// Load preset from presets directory
+		p, err = d.presets.Load(id.PresetName)
+		if err != nil {
+			return fmt.Errorf("load preset: %w", err)
+		}
+
+		// Resolve model field if it's HF format
+		p, err = preset.ResolveModel(ctx, p, d.models)
+		if err != nil {
+			return err
+		}
+
+	case identifier.TypeFilePath:
+		// Create dynamic preset from file path with default settings
+		p = &preset.Preset{
+			Name:        id.FilePath,
+			Model:       input, // Keep f: prefix for consistency
+			Host:        d.userConfig.DefaultHost,
+			Port:        d.userConfig.DefaultPort,
+			ContextSize: d.userConfig.DefaultCtxSize,
+			GPULayers:   d.userConfig.DefaultGPULayers,
+		}
+
+	case identifier.TypeHuggingFace:
+		// Create preset from HF format
+		p, err = resolveHFPreset(ctx, d.models, d.userConfig, id.Repo, id.Quant)
+		if err != nil {
+			return fmt.Errorf("resolve HuggingFace model: %w", err)
+		}
+
+	default:
+		return fmt.Errorf("unknown identifier type")
 	}
 
 	d.state = StateLoading

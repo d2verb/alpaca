@@ -2,8 +2,12 @@
 package preset
 
 import (
+	"context"
 	"fmt"
 	"strconv"
+	"strings"
+
+	"github.com/d2verb/alpaca/internal/identifier"
 )
 
 const (
@@ -48,8 +52,14 @@ func (p *Preset) Endpoint() string {
 
 // BuildArgs builds the command-line arguments for llama-server.
 func (p *Preset) BuildArgs() []string {
+	// Extract actual file path from f: prefix if present
+	modelPath := p.Model
+	if strings.HasPrefix(modelPath, "f:") {
+		modelPath = strings.TrimPrefix(modelPath, "f:")
+	}
+
 	args := []string{
-		"-m", p.Model,
+		"-m", modelPath,
 	}
 
 	if p.ContextSize > 0 {
@@ -68,4 +78,33 @@ func (p *Preset) BuildArgs() []string {
 
 	args = append(args, p.ExtraArgs...)
 	return args
+}
+
+// ModelResolver resolves HuggingFace model identifiers to file paths.
+type ModelResolver interface {
+	GetFilePath(ctx context.Context, repo, quant string) (string, error)
+}
+
+// ResolveModel resolves the model field in a preset if it's HuggingFace format.
+// Returns a new preset with the resolved model path without mutating the original.
+func ResolveModel(ctx context.Context, p *Preset, resolver ModelResolver) (*Preset, error) {
+	id, err := identifier.Parse(p.Model)
+	if err != nil {
+		return nil, fmt.Errorf("invalid model field in preset: %w", err)
+	}
+
+	if id.Type == identifier.TypeHuggingFace {
+		// Resolve HF identifier to file path
+		modelPath, err := resolver.GetFilePath(ctx, id.Repo, id.Quant)
+		if err != nil {
+			return nil, fmt.Errorf("resolve model %s:%s: %w", id.Repo, id.Quant, err)
+		}
+		// Create new preset with resolved path (with f: prefix, don't mutate original)
+		resolved := *p
+		resolved.Model = "f:" + modelPath
+		return &resolved, nil
+	}
+
+	// Already a file path (f:...), return as-is
+	return p, nil
 }

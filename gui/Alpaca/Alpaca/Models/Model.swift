@@ -7,9 +7,9 @@ struct Model: Identifiable, Equatable {
     let quant: String
     let size: Int64
 
-    /// Returns the identifier in HuggingFace format (repo:quant).
+    /// Returns the identifier in HuggingFace format (h:repo:quant).
     var identifier: String {
-        "\(repo):\(quant)"
+        "h:\(repo):\(quant)"
     }
 
     /// Returns a formatted display name.
@@ -29,7 +29,7 @@ struct Model: Identifiable, Equatable {
     }
 
     init(repo: String, quant: String, size: Int64) {
-        self.id = "\(repo):\(quant)"
+        self.id = "h:\(repo):\(quant)"
         self.repo = repo
         self.quant = quant
         self.size = size

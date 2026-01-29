@@ -98,7 +98,7 @@ JSON-based request/response protocol over Unix socket. Messages are newline-deli
 {
   "command": "load",
   "args": {
-    "identifier": "codellama-7b"
+    "identifier": "p:codellama-7b"
   }
 }
 ```
@@ -123,7 +123,7 @@ JSON-based request/response protocol over Unix socket. Messages are newline-deli
 
 **Available Commands:**
 - `status` - Get current daemon state (idle/loading/running) and loaded preset info
-- `load` - Load a model (preset name or HuggingFace format `repo:quant`)
+- `load` - Load a model (format: `h:org/repo:quant`, `p:preset-name`, or `f:/path/to/file`)
 - `unload` - Stop the currently running model
 - `list_presets` - List all available presets
 - `list_models` - List all downloaded models
@@ -184,15 +184,21 @@ Models can be loaded in two ways:
 
 **1. Via Preset:**
 ```bash
-$ alpaca load my-preset
+$ alpaca load p:my-preset
 ```
 Loads model using settings from `~/.alpaca/presets/my-preset.yaml`.
 
 **2. Via HuggingFace Format:**
 ```bash
-$ alpaca load TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+$ alpaca load h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 ```
 Loads model using metadata from `~/.alpaca/models/.metadata.json`. If not downloaded, auto-pulls first.
+
+**3. Via File Path:**
+```bash
+$ alpaca load f:~/models/my-model.gguf
+```
+Loads model file directly with default settings from `~/.alpaca/config.yaml`.
 
 ### Model Switching Flow
 

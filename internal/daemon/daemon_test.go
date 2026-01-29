@@ -58,11 +58,11 @@ func TestResolveHFPresetSuccess(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if p.Name != "TheBloke/CodeLlama-7B-GGUF:Q4_K_M" {
-		t.Errorf("Name = %q, want %q", p.Name, "TheBloke/CodeLlama-7B-GGUF:Q4_K_M")
+	if p.Name != "h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M" {
+		t.Errorf("Name = %q, want %q", p.Name, "h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M")
 	}
-	if p.Model != "/path/to/model.gguf" {
-		t.Errorf("Model = %q, want %q", p.Model, "/path/to/model.gguf")
+	if p.Model != "f:/path/to/model.gguf" {
+		t.Errorf("Model = %q, want %q", p.Model, "f:/path/to/model.gguf")
 	}
 	if p.Host != "127.0.0.1" {
 		t.Errorf("Host = %q, want %q", p.Host, "127.0.0.1")
@@ -148,3 +148,4 @@ func TestListModelsViaInterface(t *testing.T) {
 		t.Errorf("Repo = %q, want %q", infos[0].Repo, "TheBloke/CodeLlama-7B-GGUF")
 	}
 }
+

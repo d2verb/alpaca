@@ -41,7 +41,7 @@ extra_args:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `model` | string | Path to GGUF model file. Supports `~` expansion. |
+| `model` | string | Model identifier with explicit prefix: `h:org/repo:quant` (HuggingFace) or `f:/path/to/file` (file path). |
 
 ### Optional Fields (Common)
 
@@ -69,18 +69,44 @@ extra_args:
 
 ## Examples
 
-### Basic Preset
+### Basic Preset (File Path)
 
 ```yaml
-model: ~/.alpaca/models/mistral-7b-instruct-v0.2.Q4_K_M.gguf
+# Absolute path
+model: "f:/Users/username/.alpaca/models/mistral-7b.Q4_K_M.gguf"
 context_size: 4096
 gpu_layers: 35
 ```
 
+```yaml
+# Home directory
+model: "f:~/.alpaca/models/mistral-7b.Q4_K_M.gguf"
+context_size: 4096
+gpu_layers: 35
+```
+
+```yaml
+# Relative to preset file
+model: "f:./models/codellama.gguf"
+context_size: 4096
+gpu_layers: 35
+```
+
+### Preset with HuggingFace Model Reference
+
+```yaml
+# HuggingFace format (auto-resolved at runtime)
+model: "h:unsloth/gemma3-4b-it-GGUF:Q4_K_M"
+context_size: 4096
+gpu_layers: 35
+```
+
+**Note:** HuggingFace models must be downloaded first with `alpaca model pull h:org/repo:quant`. The model field will be automatically resolved to `f:/path/to/downloaded/file.gguf` at runtime.
+
 ### Full-Featured Preset
 
 ```yaml
-model: ~/.alpaca/models/codellama-34b-instruct.Q4_K_M.gguf
+model: "f:~/.alpaca/models/codellama-34b-instruct.Q4_K_M.gguf"
 context_size: 8192
 gpu_layers: 50
 threads: 12
@@ -95,12 +121,48 @@ extra_args:
 ### Preset with Custom Host
 
 ```yaml
-model: ~/.alpaca/models/llama3-8b.Q4_K_M.gguf
+model: "f:~/.alpaca/models/llama3-8b.Q4_K_M.gguf"
 host: "0.0.0.0"  # Listen on all interfaces
 port: 8080
 context_size: 4096
 gpu_layers: 35
 ```
+
+## Model Field Resolution
+
+The `model` field requires an explicit prefix to indicate the identifier type:
+
+### 1. File Paths (`f:`)
+
+File paths must use the `f:` prefix and support absolute, home, and relative paths:
+
+```yaml
+model: "f:/abs/path/model.gguf"        # Absolute path
+model: "f:~/models/model.gguf"         # Home directory expansion
+model: "f:./model.gguf"                # Relative to preset file directory
+model: "f:../shared/model.gguf"        # Parent directory
+```
+
+The `f:` prefix is stripped when passing the path to llama-server.
+
+### 2. HuggingFace Format (`h:`)
+
+HuggingFace models must use the `h:` prefix:
+
+```yaml
+model: "h:unsloth/gemma3-4b-it-GGUF:Q4_K_M"
+model: "h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M"
+```
+
+**Resolution process:**
+1. Model must be downloaded first with `alpaca model pull h:org/repo:quant`
+2. At runtime, `h:org/repo:quant` is resolved to `f:/path/to/downloaded/file.gguf`
+3. The `f:` prefix is stripped when starting llama-server
+
+**Error handling:**
+- Missing prefix → Parse error with clear message
+- HuggingFace model not downloaded → Error with suggestion to run `alpaca model pull`
+- File path doesn't exist → Error when starting llama-server
 
 ## Design Decisions
 
