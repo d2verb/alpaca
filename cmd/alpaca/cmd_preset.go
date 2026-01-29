@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/d2verb/alpaca/internal/preset"
 	"github.com/d2verb/alpaca/internal/ui"
 )
 
 type PresetCmd struct {
 	List   PresetListCmd `cmd:"" name:"ls" help:"List available presets"`
+	Show   PresetShowCmd `cmd:"" help:"Show preset details"`
 	Remove PresetRmCmd   `cmd:"" name:"rm" help:"Remove a preset"`
 }
 
@@ -46,6 +48,36 @@ func (c *PresetListCmd) Run() error {
 		}
 		ui.PrintInfo(fmt.Sprintf("Add presets to: %s", paths.Presets))
 	}
+
+	return nil
+}
+
+type PresetShowCmd struct {
+	Name string `arg:"" help:"Preset name to show"`
+}
+
+func (c *PresetShowCmd) Run() error {
+	paths, err := getPaths()
+	if err != nil {
+		return err
+	}
+
+	loader := preset.NewLoader(paths.Presets)
+	p, err := loader.Load(c.Name)
+	if err != nil {
+		return errPresetNotFound(c.Name)
+	}
+
+	ui.PrintPresetDetails(ui.PresetDetails{
+		Name:        p.Name,
+		Model:       p.Model,
+		ContextSize: p.ContextSize,
+		GPULayers:   p.GPULayers,
+		Threads:     p.Threads,
+		Host:        p.GetHost(),
+		Port:        p.GetPort(),
+		ExtraArgs:   p.ExtraArgs,
+	})
 
 	return nil
 }

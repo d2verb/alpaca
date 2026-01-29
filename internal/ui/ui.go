@@ -110,3 +110,37 @@ func PrintWarning(message string) {
 func PrintInfo(message string) {
 	fmt.Fprintf(Output, "%s %s\n", Blue("•"), message)
 }
+
+// PresetDetails contains preset information for display.
+type PresetDetails struct {
+	Name        string
+	Model       string
+	ContextSize int
+	GPULayers   int
+	Threads     int
+	Host        string
+	Port        int
+	ExtraArgs   []string
+}
+
+// PrintPresetDetails prints preset details in a formatted style.
+func PrintPresetDetails(p PresetDetails) {
+	fmt.Fprintf(Output, "%s %s\n", Bold("Name:"), Cyan(p.Name))
+	fmt.Fprintf(Output, "%s %s\n", Bold("Model:"), p.Model)
+
+	if p.ContextSize > 0 {
+		fmt.Fprintf(Output, "%s %d\n", Bold("Context Size:"), p.ContextSize)
+	}
+	if p.GPULayers != 0 {
+		fmt.Fprintf(Output, "%s %d\n", Bold("GPU Layers:"), p.GPULayers)
+	}
+	if p.Threads > 0 {
+		fmt.Fprintf(Output, "%s %d\n", Bold("Threads:"), p.Threads)
+	}
+
+	fmt.Fprintf(Output, "%s %s:%d\n", Bold("Endpoint:"), p.Host, p.Port)
+
+	if len(p.ExtraArgs) > 0 {
+		fmt.Fprintf(Output, "%s %v\n", Bold("Extra Args:"), p.ExtraArgs)
+	}
+}
