@@ -19,17 +19,14 @@ Icon options:
 ```
 ┌─────────────────────────────────┐
 │  ○ Daemon not running           │
-│                                 │
-│  $ alpaca start              📋 │  ← Copy button
 ├─────────────────────────────────┤
-│  ⚙ Preferences...               │
 │  ⌘ Quit Alpaca                  │
 └─────────────────────────────────┘
 ```
 
 - Gray status indicator
-- Command to start daemon with copy button
-- Access to preferences and quit
+- Minimal menu with only quit option
+- User must start daemon via CLI: `alpaca start`
 
 ### State 2: Daemon Running, No Model Loaded (Idle)
 
@@ -40,13 +37,13 @@ Icon options:
 ├─────────────────────────────────┤
 │  ▶ Load Model...                │  → Preset submenu
 ├─────────────────────────────────┤
-│  ⚙ Preferences...               │
 │  ⌘ Quit Alpaca                  │
 └─────────────────────────────────┘
 ```
 
 - Yellow status indicator
 - "Load Model..." opens preset selection submenu
+- Quit option
 
 ### State 3: Model Running
 
@@ -61,7 +58,6 @@ Icon options:
 │  ▶ Switch Model...              │  → Preset submenu
 │  ■ Stop                         │
 ├─────────────────────────────────┤
-│  ⚙ Preferences...               │
 │  ⌘ Quit Alpaca                  │
 └─────────────────────────────────┘
 ```
@@ -71,6 +67,7 @@ Icon options:
 - "Open in Browser" opens the llama-server web UI
 - "Switch Model..." for quick switching
 - "Stop" to unload model
+- Quit option
 
 ### State 4: Loading/Switching Model
 
@@ -81,7 +78,6 @@ Icon options:
 ├─────────────────────────────────┤
 │  ✕ Cancel                       │
 ├─────────────────────────────────┤
-│  ⚙ Preferences...               │
 │  ⌘ Quit Alpaca                  │
 └─────────────────────────────────┘
 ```
@@ -89,6 +85,7 @@ Icon options:
 - Animated loading indicator
 - Shows target preset name
 - Cancel option to abort loading
+- Quit option
 
 ## Preset Submenu
 
@@ -106,35 +103,6 @@ When "Load Model..." or "Switch Model..." is clicked:
 - Lists all available presets
 - Checkmark on currently loaded preset
 - Click to switch immediately (no confirmation)
-
-## Preferences Window
-
-Minimal settings window accessible from "Preferences...":
-
-```
-┌─────────────────────────────────────────────┐
-│  Alpaca Preferences                    [x]  │
-├─────────────────────────────────────────────┤
-│                                             │
-│  llama-server path:                         │
-│  ┌─────────────────────────────────┐        │
-│  │ /usr/local/bin/llama-server    │ [...]  │
-│  └─────────────────────────────────┘        │
-│                                             │
-│  Default port:                              │
-│  ┌─────────────────────────────────┐        │
-│  │ 8080                            │        │
-│  └─────────────────────────────────┘        │
-│                                             │
-│                            [Cancel] [Save]  │
-└─────────────────────────────────────────────┘
-```
-
-Settings:
-- Path to llama-server binary
-- Default port for llama-server
-
-Note: Preset management is done via CLI or direct YAML editing.
 
 ## Interaction Behaviors
 
@@ -155,14 +123,7 @@ In "Model Running" state:
 - Provides access to llama-server's built-in web UI
 - Only visible when a model is actively running
 
-### Copy Command Button
-
-In "Daemon not running" state:
-- Click copies `alpaca start` to clipboard
-- Brief visual feedback (button text changes to "Copied!")
-
 ### Quit Alpaca
 
-- If model is running, stop it first
 - Close GUI application
-- Note: Does NOT stop the daemon (daemon runs independently)
+- Note: Does NOT stop the daemon or running models (daemon runs independently)
