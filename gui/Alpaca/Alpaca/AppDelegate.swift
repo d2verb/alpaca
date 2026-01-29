@@ -30,7 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "hare.fill", accessibilityDescription: "Alpaca")
+            button.image = NSImage(systemSymbolName: "brain", accessibilityDescription: "Alpaca")
         }
     }
 

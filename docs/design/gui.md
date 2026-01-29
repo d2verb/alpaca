@@ -8,9 +8,10 @@ The GUI is a macOS menu bar app built with SwiftUI. It provides quick access to 
 
 Location: macOS menu bar (top-right area)
 
-Icon options:
-- Alpaca emoji or simple alpaca icon
-- Could indicate status with color overlay
+Icon: SF Symbol `brain`
+- Represents AI/ML processing
+- Monochrome, adapts to light/dark mode
+- Could indicate status with color overlay in future
 
 ## Popover States
 
