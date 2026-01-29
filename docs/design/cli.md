@@ -70,6 +70,48 @@ Daemon is not running.
 Run: alpaca start
 ```
 
+#### `alpaca logs`
+
+View daemon or llama-server logs.
+
+```bash
+# View daemon logs (default)
+$ alpaca logs
+[2026-01-29 10:30:00] INFO daemon starting
+[2026-01-29 10:30:01] INFO server listening on /Users/username/.alpaca/alpaca.sock
+[2026-01-29 10:30:15] INFO loading model p:codellama-7b
+```
+
+**Flags:**
+- `-f, --follow`: Follow log output in real-time (like `tail -f`)
+- `-d, --daemon`: Show daemon logs (default)
+- `-s, --server`: Show llama-server logs
+
+**Examples:**
+
+Follow daemon logs in real-time:
+```bash
+$ alpaca logs --follow
+# or
+$ alpaca logs -f
+```
+
+View llama-server output:
+```bash
+$ alpaca logs --server
+# or
+$ alpaca logs -s
+```
+
+Follow llama-server logs:
+```bash
+$ alpaca logs -f -s
+```
+
+**Note:** This command uses `/usr/bin/tail` under the hood. Log files are located at:
+- Daemon: `~/.alpaca/logs/daemon.log`
+- llama-server: `~/.alpaca/logs/llama.log`
+
 ### Model Management
 
 #### `alpaca load <identifier>`
@@ -183,6 +225,47 @@ $ alpaca preset list
 No presets available.
 Add presets to: /Users/username/.alpaca/presets
 ```
+
+#### `alpaca preset show <name>`
+
+Show detailed configuration of a preset.
+
+```bash
+$ alpaca preset show codellama-7b-q4
+Preset: codellama-7b-q4
+Model: f:/Users/username/.alpaca/models/codellama-7b.Q4_K_M.gguf
+Context Size: 4096
+GPU Layers: -1
+Host: 127.0.0.1
+Port: 8080
+```
+
+If preset doesn't exist:
+```bash
+$ alpaca preset show nonexistent
+Preset 'nonexistent' not found.
+```
+
+#### `alpaca preset new`
+
+Create a new preset interactively.
+
+```bash
+$ alpaca preset new
+Preset name: my-model
+Model path (with prefix, e.g., f:/path/to/model.gguf): f:~/models/my-model.gguf
+Context size (default: 4096): 8192
+GPU layers (default: -1): 35
+Created preset 'my-model' at /Users/username/.alpaca/presets/my-model.yaml
+```
+
+The command will prompt for:
+- **Preset name**: Name for the preset file (without .yaml extension)
+- **Model path**: Model identifier (must include `f:` or `h:` prefix)
+- **Context size**: Context window size (default: 4096)
+- **GPU layers**: Number of layers to offload to GPU (default: -1 for all)
+
+Additional settings (host, port, threads, extra_args) can be added by editing the generated YAML file.
 
 #### `alpaca preset rm <name>`
 
@@ -316,6 +399,17 @@ Logs are rotated automatically (50MB max size, 3 backups, 7 days retention, gzip
 
 Use `--foreground` flag to run in foreground for debugging.
 
+## Other Commands
+
+### `alpaca version`
+
+Show version information.
+
+```bash
+$ alpaca version
+alpaca version 0.1.0
+```
+
 ## Exit Codes
 
 | Code | Meaning |
@@ -331,8 +425,7 @@ Use `--foreground` flag to run in foreground for debugging.
 
 | Flag | Description |
 |------|-------------|
-| `--help`, `-h` | Show help |
-| `--version`, `-v` | Show version |
+| `--help`, `-h` | Show help for any command |
 
 ## Environment Variables
 

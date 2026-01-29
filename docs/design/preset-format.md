@@ -18,8 +18,8 @@ Preset name is derived from the filename (without `.yaml` extension).
 ## Format
 
 ```yaml
-# Required: path to the model file
-model: ~/.alpaca/models/codellama-7b-Q4_K_M.gguf
+# Required: model identifier with explicit prefix
+model: "f:~/.alpaca/models/codellama-7b-Q4_K_M.gguf"
 
 # Common options (mapped to llama-server arguments)
 context_size: 4096      # --ctx-size
@@ -47,11 +47,13 @@ extra_args:
 
 | Field | Type | Default | llama-server flag |
 |-------|------|---------|-------------------|
-| `context_size` | int | 2048 | `--ctx-size` |
-| `gpu_layers` | int | 0 | `--n-gpu-layers` |
-| `threads` | int | (auto) | `--threads` |
+| `context_size` | int | (omit flag, llama-server decides) | `--ctx-size` |
+| `gpu_layers` | int | 0 (omit flag) | `--n-gpu-layers` |
+| `threads` | int | 0 (omit flag, llama-server decides) | `--threads` |
 | `port` | int | 8080 | `--port` |
 | `host` | string | "127.0.0.1" | `--host` |
+
+**Note on defaults:** When a field is omitted or set to 0 (for numeric fields), the corresponding llama-server flag is not passed, allowing llama-server to use its own defaults. Only `host` and `port` have explicit defaults applied by Alpaca.
 
 ### Extra Arguments
 
@@ -139,9 +141,11 @@ File paths must use the `f:` prefix and support absolute, home, and relative pat
 ```yaml
 model: "f:/abs/path/model.gguf"        # Absolute path
 model: "f:~/models/model.gguf"         # Home directory expansion
-model: "f:./model.gguf"                # Relative to preset file directory
-model: "f:../shared/model.gguf"        # Parent directory
+model: "f:./model.gguf"                # Relative to current working directory
+model: "f:../shared/model.gguf"        # Parent of current working directory
 ```
+
+**Important:** Relative paths are resolved from the current working directory when `alpaca load` is executed, NOT from the preset file's directory. It's recommended to use absolute paths or home directory paths (`~/`) for clarity.
 
 The `f:` prefix is stripped when passing the path to llama-server.
 

@@ -53,6 +53,8 @@ CLI/GUI communicate with daemon via Unix socket (`~/.alpaca/alpaca.sock`).
 
 Commands: `status`, `load`, `unload`, `list_presets`, `list_models`
 
+See `architecture.md` for full protocol specification including error codes.
+
 ## Model Management
 
 **Model Switching:**

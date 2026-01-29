@@ -47,10 +47,11 @@ Command-line interface written in Go. Communicates with the daemon via Unix sock
 
 Primary interface for:
 - Starting/stopping the daemon (`alpaca start`, `alpaca stop`)
-- Managing presets (list, delete)
-- Downloading models (`alpaca model pull`)
+- Managing presets (list, show, new, delete)
+- Downloading models (`alpaca model pull`, `alpaca model ls`, `alpaca model rm`)
 - Loading/unloading models (`alpaca load`, `alpaca unload`)
-- Viewing status (`alpaca status`)
+- Viewing status and logs (`alpaca status`, `alpaca logs`)
+- Version information (`alpaca version`)
 
 ### Daemon
 
@@ -117,16 +118,103 @@ JSON-based request/response protocol over Unix socket. Messages are newline-deli
 ```json
 {
   "status": "error",
-  "error": "model not found"
+  "error": "model not found",
+  "error_code": "model_not_found"
 }
 ```
 
+**Error Codes:**
+Error responses include an `error_code` field for programmatic error handling:
+- `preset_not_found` - Requested preset does not exist
+- `model_not_found` - Model file not found or HuggingFace model not downloaded
+- `server_failed` - llama-server failed to start or health check timed out
+
 **Available Commands:**
-- `status` - Get current daemon state (idle/loading/running) and loaded preset info
-- `load` - Load a model (format: `h:org/repo:quant`, `p:preset-name`, or `f:/path/to/file`)
-- `unload` - Stop the currently running model
-- `list_presets` - List all available presets
-- `list_models` - List all downloaded models
+
+**`status`** - Get current daemon state and loaded model info
+
+Response (when running):
+```json
+{
+  "status": "ok",
+  "data": {
+    "state": "running",
+    "preset": "codellama-7b",
+    "endpoint": "http://127.0.0.1:8080"
+  }
+}
+```
+
+Response (when idle):
+```json
+{
+  "status": "ok",
+  "data": {
+    "state": "idle"
+  }
+}
+```
+
+**`load`** - Load a model (format: `h:org/repo:quant`, `p:preset-name`, or `f:/path/to/file`)
+
+Request:
+```json
+{
+  "command": "load",
+  "args": {
+    "identifier": "p:codellama-7b"
+  }
+}
+```
+
+Response:
+```json
+{
+  "status": "ok",
+  "data": {
+    "endpoint": "http://127.0.0.1:8080"
+  }
+}
+```
+
+**`unload`** - Stop the currently running model
+
+Response:
+```json
+{
+  "status": "ok"
+}
+```
+
+**`list_presets`** - List all available presets
+
+Response:
+```json
+{
+  "status": "ok",
+  "data": {
+    "presets": ["codellama-7b", "mistral-7b", "llama2-13b"]
+  }
+}
+```
+
+**`list_models`** - List all downloaded models
+
+Response:
+```json
+{
+  "status": "ok",
+  "data": {
+    "models": [
+      {
+        "repo": "TheBloke/CodeLlama-7B-GGUF",
+        "quant": "Q4_K_M",
+        "size": 4368438272
+      }
+    ]
+  }
+}
+```
 
 ## Daemon Lifecycle
 
@@ -228,6 +316,15 @@ idle → loading → running
 - **idle**: No model loaded
 - **loading**: Model is starting (llama-server not ready)
 - **running**: Model is ready and serving
+
+**Concurrency and Lock-Free Reads:**
+
+State and preset information are managed using atomic operations (`atomic.Value` and `atomic.Pointer`), enabling lock-free concurrent reads. This design ensures that:
+- CLI `status` commands return immediately without blocking
+- GUI can poll status frequently without timeout issues
+- State queries never wait for model loading operations
+
+The `Run()` method acquires a mutex to serialize model loading operations, but state reads via `State()` and `CurrentPreset()` methods remain lock-free and return instantly, even during long model loading operations (e.g., large models taking >30 seconds to initialize).
 
 ## File System Layout
 
