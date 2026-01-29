@@ -16,17 +16,21 @@ import (
 type stubPresetLoader struct {
 	presets map[string]*preset.Preset
 	names   []string
+	listErr error
 }
 
 func (s *stubPresetLoader) Load(name string) (*preset.Preset, error) {
 	p, ok := s.presets[name]
 	if !ok {
-		return nil, fmt.Errorf("preset %s not found", name)
+		return nil, fmt.Errorf("open %s.yaml: no such file or directory", name)
 	}
 	return p, nil
 }
 
 func (s *stubPresetLoader) List() ([]string, error) {
+	if s.listErr != nil {
+		return nil, s.listErr
+	}
 	return s.names, nil
 }
 

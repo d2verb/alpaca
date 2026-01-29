@@ -15,7 +15,7 @@ Start the Alpaca daemon in the background.
 ```bash
 $ alpaca start
 Daemon started (PID: 12345)
-Logs: /Users/username/.alpaca/daemon.log
+Logs: /Users/username/.alpaca/logs/daemon.log
 ```
 
 If already running:
@@ -53,14 +53,14 @@ $ alpaca status
 Status: running
 Preset: qwen3-coder-30b
 Endpoint: http://localhost:8080
-Logs: /Users/username/.alpaca/daemon.log
+Logs: /Users/username/.alpaca/logs/
 ```
 
 When no model is loaded:
 ```bash
 $ alpaca status
 Status: idle
-Logs: /Users/username/.alpaca/daemon.log
+Logs: /Users/username/.alpaca/logs/
 ```
 
 When daemon is not running:
@@ -307,10 +307,12 @@ This metadata is:
 ## Daemon Behavior
 
 The daemon runs in the background by default:
-- Logs to `~/.alpaca/daemon.log` (daemon operations)
-- Logs to `~/.alpaca/llama.log` (llama-server output)
+- Logs to `~/.alpaca/logs/daemon.log` (daemon operations)
+- Logs to `~/.alpaca/logs/llama.log` (llama-server output)
 - Unix socket at `~/.alpaca/alpaca.sock`
 - PID file at `~/.alpaca/alpaca.pid`
+
+Logs are rotated automatically (50MB max size, 3 backups, 7 days retention, gzip compressed).
 
 Use `--foreground` flag to run in foreground for debugging.
 
