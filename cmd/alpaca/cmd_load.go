@@ -7,6 +7,7 @@ import (
 
 	"github.com/d2verb/alpaca/internal/identifier"
 	"github.com/d2verb/alpaca/internal/model"
+	"github.com/d2verb/alpaca/internal/ui"
 )
 
 type LoadCmd struct {
@@ -45,7 +46,7 @@ func (c *LoadCmd) Run() error {
 			return fmt.Errorf("check model: %w", err)
 		}
 		if !exists {
-			fmt.Println("Model not found. Downloading...")
+			ui.PrintInfo("Model not found. Downloading...")
 			if err := pullModel(id.Repo, id.Quant, paths.Models); err != nil {
 				return errDownloadFailed()
 			}
@@ -53,7 +54,7 @@ func (c *LoadCmd) Run() error {
 	}
 
 	// Load model
-	fmt.Printf("Loading %s...\n", c.Identifier)
+	ui.PrintInfo(fmt.Sprintf("Loading %s...", c.Identifier))
 	resp, err := cl.Load(c.Identifier)
 	if err != nil {
 		if strings.Contains(err.Error(), "connect") {
@@ -70,6 +71,6 @@ func (c *LoadCmd) Run() error {
 	}
 
 	endpoint, _ := resp.Data["endpoint"].(string)
-	fmt.Printf("Model ready at %s\n", endpoint)
+	ui.PrintSuccess(fmt.Sprintf("Model ready at %s", ui.Blue(endpoint)))
 	return nil
 }

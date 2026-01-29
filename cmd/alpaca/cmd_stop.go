@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/d2verb/alpaca/internal/daemon"
+	"github.com/d2verb/alpaca/internal/ui"
 )
 
 type StopCmd struct{}
@@ -30,7 +31,7 @@ func (c *StopCmd) Run() error {
 	}
 
 	if !status.Running {
-		fmt.Println("Daemon is not running.")
+		ui.PrintInfo("Daemon is not running")
 		// Clean up stale files
 		daemon.RemovePIDFile(paths.PID)
 		if status.SocketExists {
@@ -45,7 +46,7 @@ func (c *StopCmd) Run() error {
 		return fmt.Errorf("find process: %w", err)
 	}
 
-	fmt.Println("Stopping daemon...")
+	ui.PrintInfo("Stopping daemon...")
 	if err := process.Signal(syscall.SIGTERM); err != nil {
 		return fmt.Errorf("send SIGTERM: %w", err)
 	}
@@ -58,19 +59,19 @@ func (c *StopCmd) Run() error {
 			return fmt.Errorf("check process: %w", err)
 		}
 		if !running {
-			fmt.Println("Daemon stopped.")
+			ui.PrintSuccess("Daemon stopped")
 			daemon.RemovePIDFile(paths.PID)
 			return nil
 		}
 	}
 
 	// Force kill if still running
-	fmt.Println("Daemon did not stop gracefully, forcing...")
+	ui.PrintWarning("Daemon did not stop gracefully, forcing...")
 	if err := process.Kill(); err != nil {
 		return fmt.Errorf("kill daemon: %w", err)
 	}
 
 	daemon.RemovePIDFile(paths.PID)
-	fmt.Println("Daemon stopped.")
+	ui.PrintSuccess("Daemon stopped")
 	return nil
 }

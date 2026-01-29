@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/d2verb/alpaca/internal/ui"
 )
 
 type PresetCmd struct {
@@ -28,20 +30,23 @@ func (c *PresetListCmd) Run() error {
 	}
 
 	presets, _ := resp.Data["presets"].([]any)
-	if len(presets) == 0 {
-		fmt.Println("No presets available.")
+
+	// Convert to string slice
+	presetNames := make([]string, len(presets))
+	for i, p := range presets {
+		presetNames[i] = p.(string)
+	}
+
+	ui.PrintPresetList(presetNames)
+
+	if len(presetNames) == 0 {
 		paths, err := getPaths()
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Add presets to: %s\n", paths.Presets)
-		return nil
+		ui.PrintInfo(fmt.Sprintf("Add presets to: %s", paths.Presets))
 	}
 
-	fmt.Println("Available presets:")
-	for _, p := range presets {
-		fmt.Printf("  - %s\n", p.(string))
-	}
 	return nil
 }
 

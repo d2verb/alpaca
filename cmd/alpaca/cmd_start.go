@@ -15,6 +15,7 @@ import (
 	"github.com/d2verb/alpaca/internal/logging"
 	"github.com/d2verb/alpaca/internal/model"
 	"github.com/d2verb/alpaca/internal/preset"
+	"github.com/d2verb/alpaca/internal/ui"
 )
 
 type StartCmd struct {
@@ -34,13 +35,13 @@ func (c *StartCmd) Run() error {
 	}
 
 	if status.Running {
-		fmt.Printf("Daemon is already running (PID: %d).\n", status.PID)
+		ui.PrintInfo(fmt.Sprintf("Daemon is already running (PID: %d)", status.PID))
 		return nil
 	}
 
 	// Clean up stale files if any
 	if status.SocketExists && !status.Running {
-		fmt.Println("Cleaning up stale socket...")
+		ui.PrintWarning("Cleaning up stale socket...")
 		os.Remove(paths.Socket)
 	}
 	if status.PID > 0 && !status.Running {
@@ -83,8 +84,8 @@ func (c *StartCmd) startBackground(paths *config.Paths) error {
 		time.Sleep(100 * time.Millisecond)
 		if daemon.IsSocketAvailable(paths.Socket) {
 			// User-facing output (not logged)
-			fmt.Printf("Daemon started (PID: %d)\n", cmd.Process.Pid)
-			fmt.Printf("Logs: %s\n", paths.DaemonLog)
+			ui.PrintSuccess(fmt.Sprintf("Daemon started (PID: %d)", cmd.Process.Pid))
+			ui.PrintInfo(fmt.Sprintf("Logs: %s", paths.DaemonLog))
 			return nil
 		}
 	}

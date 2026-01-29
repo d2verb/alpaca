@@ -1,6 +1,6 @@
 package main
 
-import "fmt"
+import "github.com/d2verb/alpaca/internal/ui"
 
 type StatusCmd struct{}
 
@@ -21,15 +21,10 @@ func (c *StatusCmd) Run() error {
 	}
 
 	state, _ := resp.Data["state"].(string)
-	fmt.Printf("Status: %s\n", state)
+	preset, _ := resp.Data["preset"].(string)
+	endpoint, _ := resp.Data["endpoint"].(string)
 
-	if presetName, ok := resp.Data["preset"].(string); ok {
-		fmt.Printf("Preset: %s\n", presetName)
-	}
-	if endpoint, ok := resp.Data["endpoint"].(string); ok {
-		fmt.Printf("Endpoint: %s\n", endpoint)
-	}
-	fmt.Printf("Logs: %s\n", paths.DaemonLog)
+	ui.PrintStatus(state, preset, endpoint, paths.DaemonLog)
 
 	return nil
 }

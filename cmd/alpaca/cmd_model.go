@@ -6,6 +6,7 @@ import (
 
 	"github.com/d2verb/alpaca/internal/identifier"
 	"github.com/d2verb/alpaca/internal/model"
+	"github.com/d2verb/alpaca/internal/ui"
 )
 
 type ModelCmd struct {
@@ -30,16 +31,22 @@ func (c *ModelListCmd) Run() error {
 		return fmt.Errorf("list models: %w", err)
 	}
 
-	if len(entries) == 0 {
-		fmt.Println("No models downloaded.")
-		fmt.Println("Run: alpaca model pull h:org/repo:quant")
-		return nil
+	// Convert to UI model format
+	models := make([]ui.ModelInfo, len(entries))
+	for i, entry := range entries {
+		models[i] = ui.ModelInfo{
+			Repo:       entry.Repo,
+			Quant:      entry.Quant,
+			SizeString: formatSize(entry.Size),
+		}
 	}
 
-	fmt.Println("Downloaded models:")
-	for _, entry := range entries {
-		fmt.Printf("  - h:%s:%s (%s)\n", entry.Repo, entry.Quant, formatSize(entry.Size))
+	ui.PrintModelList(models)
+
+	if len(models) == 0 {
+		ui.PrintInfo("Run: alpaca model pull h:org/repo:quant")
 	}
+
 	return nil
 }
 

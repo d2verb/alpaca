@@ -1,6 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/d2verb/alpaca/internal/ui"
+)
 
 type UnloadCmd struct{}
 
@@ -19,6 +23,6 @@ func (c *UnloadCmd) Run() error {
 		return fmt.Errorf("%s", resp.Error)
 	}
 
-	fmt.Println("Model stopped.")
+	ui.PrintSuccess("Model stopped")
 	return nil
 }
