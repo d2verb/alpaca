@@ -111,10 +111,7 @@ func (c *ModelRmCmd) Run() error {
 	}
 
 	// Confirmation prompt
-	fmt.Printf("Delete model 'h:%s:%s'? (y/N): ", id.Repo, id.Quant)
-	var response string
-	fmt.Scanln(&response)
-	if response != "y" && response != "Y" {
+	if !promptConfirm(fmt.Sprintf("Delete model 'h:%s:%s'?", id.Repo, id.Quant)) {
 		fmt.Println("Cancelled.")
 		return nil
 	}

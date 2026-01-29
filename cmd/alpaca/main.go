@@ -14,7 +14,7 @@ type CLI struct {
 	Start   StartCmd   `cmd:"" help:"Start the daemon"`
 	Stop    StopCmd    `cmd:"" help:"Stop the daemon"`
 	Status  StatusCmd  `cmd:"" help:"Show current status"`
-	Load    LoadCmd    `cmd:"" help:"Load a model (preset or HuggingFace format)"`
+	Load    LoadCmd    `cmd:"" help:"Load a preset, model, or file"`
 	Unload  UnloadCmd  `cmd:"" help:"Stop the currently running model"`
 	Logs    LogsCmd    `cmd:"" help:"Show logs (daemon or server)"`
 	Preset  PresetCmd  `cmd:"" help:"Manage presets"`

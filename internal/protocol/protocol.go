@@ -9,9 +9,10 @@ type Request struct {
 
 // Response represents a response from the daemon.
 type Response struct {
-	Status string         `json:"status"` // "ok" or "error"
-	Data   map[string]any `json:"data,omitempty"`
-	Error  string         `json:"error,omitempty"`
+	Status    string         `json:"status"` // "ok" or "error"
+	Data      map[string]any `json:"data,omitempty"`
+	Error     string         `json:"error,omitempty"`
+	ErrorCode string         `json:"error_code,omitempty"`
 }
 
 // Command names
@@ -27,6 +28,13 @@ const (
 const (
 	StatusOK    = "ok"
 	StatusError = "error"
+)
+
+// Error codes for structured error handling
+const (
+	ErrCodePresetNotFound = "preset_not_found"
+	ErrCodeModelNotFound  = "model_not_found"
+	ErrCodeServerFailed   = "server_failed"
 )
 
 // NewRequest creates a new request with the given command and args.

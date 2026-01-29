@@ -45,7 +45,7 @@ CLI/GUI communicate with daemon via Unix socket (`~/.alpaca/alpaca.sock`).
 
 ```json
 // Request
-{"command": "load", "args": {"identifier": "codellama-7b"}}
+{"command": "load", "args": {"identifier": "p:codellama-7b"}}
 
 // Response
 {"status": "ok", "data": {"endpoint": "http://localhost:8080"}}
@@ -66,10 +66,10 @@ Commands: `status`, `load`, `unload`, `list_presets`, `list_models`
 - `extra_args` field passes arbitrary flags to llama-server
 
 **HuggingFace Models:**
-- Format: `org/repo:quant` (e.g., `TheBloke/CodeLlama-7B-GGUF:Q4_K_M`)
-- Downloaded to `~/.alpaca/models/<org>/<repo>/`
+- Format: `h:org/repo:quant` (e.g., `h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M`)
+- Downloaded to `~/.alpaca/models/`
 - Metadata stored in `.metadata.json` (repo, quant, filename, size)
-- Auto-pull on `load` if not already downloaded
+- Auto-pull on `alpaca load h:org/repo:quant` if not already downloaded
 
 ## Logging
 

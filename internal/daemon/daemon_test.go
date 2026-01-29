@@ -148,4 +148,3 @@ func TestListModelsViaInterface(t *testing.T) {
 		t.Errorf("Repo = %q, want %q", infos[0].Repo, "TheBloke/CodeLlama-7B-GGUF")
 	}
 }
-

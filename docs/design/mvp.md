@@ -13,10 +13,10 @@ This document defines the Minimum Viable Product (MVP) scope for Alpaca.
 | `alpaca start` | Start the daemon |
 | `alpaca stop` | Stop the daemon |
 | `alpaca status` | Show current status |
-| `alpaca run <preset>` | Load a model with the specified preset |
-| `alpaca kill` | Stop the currently running model |
+| `alpaca load p:<preset>` | Load a model with the specified preset |
+| `alpaca unload` | Stop the currently running model |
 | `alpaca preset list` | List available presets |
-| `alpaca pull <repo>:<quant>` | Download model from HuggingFace |
+| `alpaca model pull h:<repo>:<quant>` | Download model from HuggingFace |
 
 ### Daemon
 

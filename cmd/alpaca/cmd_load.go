@@ -11,7 +11,7 @@ import (
 )
 
 type LoadCmd struct {
-	Identifier string `arg:"" help:"Model identifier (h:org/repo:quant, p:preset-name, or f:/path/to/file)"`
+	Identifier string `arg:"" help:"Identifier (p:preset, h:org/repo:quant, or f:/path/to/file)"`
 }
 
 func (c *LoadCmd) Run() error {
@@ -64,13 +64,32 @@ func (c *LoadCmd) Run() error {
 	}
 
 	if resp.Status == "error" {
-		if strings.Contains(resp.Error, "not found") {
-			return errModelNotFound(c.Identifier)
-		}
-		return fmt.Errorf("%s", resp.Error)
+		return parseLoadError(resp.Error, id)
 	}
 
 	endpoint, _ := resp.Data["endpoint"].(string)
 	ui.PrintSuccess(fmt.Sprintf("Model ready at %s", ui.Blue(endpoint)))
 	return nil
+}
+
+// parseLoadError converts daemon error messages into user-friendly errors.
+func parseLoadError(errMsg string, id *identifier.Identifier) error {
+	isNotFound := strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "no such file")
+
+	if id.Type == identifier.TypePresetName {
+		// Preset file itself not found
+		if strings.Contains(errMsg, "load preset") && strings.Contains(errMsg, "no such file") {
+			return errPresetNotFound(id.PresetName)
+		}
+		// Model referenced by preset not found
+		if isNotFound {
+			return fmt.Errorf("model in preset '%s' not downloaded\nRun: alpaca model pull <model>", id.PresetName)
+		}
+	}
+
+	if isNotFound {
+		return errModelNotFound(id.Raw)
+	}
+
+	return fmt.Errorf("%s", errMsg)
 }

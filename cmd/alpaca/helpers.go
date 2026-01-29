@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -10,6 +11,40 @@ import (
 	"github.com/d2verb/alpaca/internal/config"
 	"github.com/d2verb/alpaca/internal/pull"
 )
+
+// stdin is the input source for prompts. Can be replaced for testing.
+var stdin = bufio.NewReader(os.Stdin)
+
+// promptLine prompts the user for input and returns the trimmed response.
+// If defaultVal is provided, it's shown in brackets and returned if input is empty.
+func promptLine(label, defaultVal string) (string, error) {
+	if defaultVal != "" {
+		fmt.Printf("%s [%s]: ", label, defaultVal)
+	} else {
+		fmt.Printf("%s: ", label)
+	}
+	input, err := stdin.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return defaultVal, nil
+	}
+	return input, nil
+}
+
+// promptConfirm prompts the user for a yes/no confirmation.
+// Returns true only if user enters "y" or "Y".
+func promptConfirm(message string) bool {
+	fmt.Printf("%s (y/N): ", message)
+	input, err := stdin.ReadString('\n')
+	if err != nil {
+		return false
+	}
+	input = strings.TrimSpace(input)
+	return input == "y" || input == "Y"
+}
 
 func getPaths() (*config.Paths, error) {
 	paths, err := config.GetPaths()
