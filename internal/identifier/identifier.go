@@ -2,7 +2,6 @@ package identifier
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 )
 
@@ -85,47 +84,5 @@ func Parse(input string) (*Identifier, error) {
 
 	default:
 		return nil, fmt.Errorf("unknown prefix '%c:'\nExpected: h: (HuggingFace), p: (preset), or f: (file path)", prefix)
-	}
-}
-
-// ExpandFilePath expands ~ prefix and converts to absolute path.
-func (id *Identifier) ExpandFilePath(homeDir string) (string, error) {
-	if id.Type != TypeFilePath {
-		return "", fmt.Errorf("cannot expand non-filepath identifier")
-	}
-
-	path := id.FilePath
-
-	// Expand ~ prefix
-	if strings.HasPrefix(path, "~/") {
-		path = filepath.Join(homeDir, path[2:])
-	}
-
-	// Convert relative to absolute
-	if !filepath.IsAbs(path) {
-		absPath, err := filepath.Abs(path)
-		if err != nil {
-			return "", fmt.Errorf("resolve absolute path: %w", err)
-		}
-		path = absPath
-	}
-
-	return path, nil
-}
-
-// String returns a human-readable description.
-func (id *Identifier) String() string {
-	switch id.Type {
-	case TypeFilePath:
-		return fmt.Sprintf("file path: f:%s", id.FilePath)
-	case TypeHuggingFace:
-		if id.Quant != "" {
-			return fmt.Sprintf("HuggingFace: h:%s:%s", id.Repo, id.Quant)
-		}
-		return fmt.Sprintf("HuggingFace: h:%s", id.Repo)
-	case TypePresetName:
-		return fmt.Sprintf("preset: p:%s", id.PresetName)
-	default:
-		return "unknown"
 	}
 }
