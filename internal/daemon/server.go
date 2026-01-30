@@ -39,6 +39,12 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 	s.listener = listener
 
+	// Set socket permissions to owner-only (0600)
+	if err := os.Chmod(s.socketPath, 0600); err != nil {
+		listener.Close()
+		return err
+	}
+
 	go s.acceptLoop(ctx)
 	return nil
 }
