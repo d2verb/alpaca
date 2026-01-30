@@ -24,8 +24,8 @@ func (c *StopCmd) Run() error {
 	if err != nil && !errors.Is(err, daemon.ErrPIDFileNotFound) {
 		// If there's an error but socket exists, try to clean up
 		if status.SocketExists {
-			fmt.Println("Warning: stale daemon state detected")
-			fmt.Printf("Manual cleanup may be needed: rm %s\n", paths.Socket)
+			ui.PrintWarning("Stale daemon state detected")
+			ui.PrintInfo(fmt.Sprintf("Manual cleanup: rm %s", paths.Socket))
 		}
 		return fmt.Errorf("check daemon status: %w", err)
 	}

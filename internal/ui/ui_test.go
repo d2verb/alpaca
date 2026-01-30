@@ -413,3 +413,99 @@ func TestPrintPresetDetails_Minimal(t *testing.T) {
 		t.Error("Output should not contain 'Extra Args:' when empty")
 	}
 }
+
+func TestFormatSize(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	// Act
+	result := FormatSize("2.5 GB")
+
+	// Assert
+	if !strings.Contains(result, "2.5 GB") {
+		t.Errorf("FormatSize should contain the size string, got: %q", result)
+	}
+}
+
+func TestFormatEndpoint(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	// Act
+	result := FormatEndpoint("http://localhost:8080")
+
+	// Assert
+	if !strings.Contains(result, "http://localhost:8080") {
+		t.Errorf("FormatEndpoint should contain the endpoint, got: %q", result)
+	}
+}
+
+func TestPrintModelDetails(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	// Arrange
+	var buf bytes.Buffer
+	Output = &buf
+	defer func() { Output = nil }()
+
+	model := ModelDetails{
+		Repo:         "org/model",
+		Quant:        "Q4_K_M",
+		Filename:     "model.Q4_K_M.gguf",
+		Path:         "/path/to/model.gguf",
+		Size:         "4.2 GB",
+		DownloadedAt: "2024-01-15 10:30:00",
+	}
+
+	// Act
+	PrintModelDetails(model)
+
+	// Assert
+	output := buf.String()
+	if !strings.Contains(output, "Repository:") {
+		t.Error("Output should contain 'Repository:'")
+	}
+	if !strings.Contains(output, "org/model") {
+		t.Error("Output should contain repo")
+	}
+	if !strings.Contains(output, "Quantization:") {
+		t.Error("Output should contain 'Quantization:'")
+	}
+	if !strings.Contains(output, "Q4_K_M") {
+		t.Error("Output should contain quant")
+	}
+	if !strings.Contains(output, "Filename:") {
+		t.Error("Output should contain 'Filename:'")
+	}
+	if !strings.Contains(output, "model.Q4_K_M.gguf") {
+		t.Error("Output should contain filename")
+	}
+	if !strings.Contains(output, "Path:") {
+		t.Error("Output should contain 'Path:'")
+	}
+	if !strings.Contains(output, "/path/to/model.gguf") {
+		t.Error("Output should contain path")
+	}
+	if !strings.Contains(output, "Size:") {
+		t.Error("Output should contain 'Size:'")
+	}
+	if !strings.Contains(output, "4.2 GB") {
+		t.Error("Output should contain size")
+	}
+	if !strings.Contains(output, "Downloaded:") {
+		t.Error("Output should contain 'Downloaded:'")
+	}
+	if !strings.Contains(output, "2024-01-15 10:30:00") {
+		t.Error("Output should contain download time")
+	}
+	if !strings.Contains(output, "Status:") {
+		t.Error("Output should contain 'Status:'")
+	}
+	if !strings.Contains(output, "✓ Downloaded") {
+		t.Error("Output should contain status")
+	}
+}

@@ -230,36 +230,64 @@ No presets available.
 
 No models downloaded.
 
-• Create preset: alpaca preset new
+• Create preset: alpaca new
 • Download model: alpaca pull h:org/repo:quant
 ```
 
-#### `alpaca preset show <name>`
+#### `alpaca show <identifier>`
 
-Show detailed configuration of a preset.
+Show detailed information for a preset or model.
 
+**Show preset details:**
 ```bash
-$ alpaca preset show codellama-7b-q4
-Preset: codellama-7b-q4
+$ alpaca show p:codellama-7b-q4
+Name: codellama-7b-q4
 Model: f:/Users/username/.alpaca/models/codellama-7b.Q4_K_M.gguf
 Context Size: 4096
 GPU Layers: -1
-Host: 127.0.0.1
-Port: 8080
+Endpoint: 127.0.0.1:8080
 ```
+
+**Show model details:**
+```bash
+$ alpaca show h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+Repository: TheBloke/CodeLlama-7B-GGUF
+Quantization: Q4_K_M
+Filename: codellama-7b.Q4_K_M.gguf
+Path: /Users/username/.alpaca/models/codellama-7b.Q4_K_M.gguf
+Size: 4.1 GB
+Downloaded: 2026-01-28 10:30:00
+Status: ✓ Downloaded
+```
+
+**Error cases:**
 
 If preset doesn't exist:
 ```bash
-$ alpaca preset show nonexistent
+$ alpaca show p:nonexistent
 Preset 'nonexistent' not found.
 ```
 
-#### `alpaca preset new`
+If model not downloaded:
+```bash
+$ alpaca show h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+✗ Model 'h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M' not downloaded
+• Run: alpaca pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+```
+
+File paths cannot be shown:
+```bash
+$ alpaca show f:/path/to/model.gguf
+Error: cannot show file details
+Use: alpaca show p:name or alpaca show h:org/repo:quant
+```
+
+#### `alpaca new`
 
 Create a new preset interactively.
 
 ```bash
-$ alpaca preset new
+$ alpaca new
 Preset name: my-model
 Model path (with prefix, e.g., f:/path/to/model.gguf): f:~/models/my-model.gguf
 Context size (default: 4096): 8192

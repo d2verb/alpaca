@@ -8,6 +8,7 @@ import (
 
 	"github.com/d2verb/alpaca/internal/identifier"
 	"github.com/d2verb/alpaca/internal/model"
+	"github.com/d2verb/alpaca/internal/ui"
 )
 
 type RemoveCmd struct {
@@ -50,7 +51,7 @@ func (c *RemoveCmd) removePreset(name, presetsDir string) error {
 
 	// Confirmation prompt
 	if !promptConfirm(fmt.Sprintf("Delete preset '%s'?", name)) {
-		fmt.Println("Cancelled.")
+		ui.PrintInfo("Cancelled")
 		return nil
 	}
 
@@ -59,7 +60,7 @@ func (c *RemoveCmd) removePreset(name, presetsDir string) error {
 		return fmt.Errorf("remove preset: %w", err)
 	}
 
-	fmt.Printf("Preset '%s' removed.\n", name)
+	ui.PrintSuccess(fmt.Sprintf("Preset '%s' removed", name))
 	return nil
 }
 
@@ -78,7 +79,7 @@ func (c *RemoveCmd) removeModel(id *identifier.Identifier, modelsDir string) err
 
 	// Confirmation prompt
 	if !promptConfirm(fmt.Sprintf("Delete model 'h:%s:%s'?", id.Repo, id.Quant)) {
-		fmt.Println("Cancelled.")
+		ui.PrintInfo("Cancelled")
 		return nil
 	}
 
@@ -87,6 +88,6 @@ func (c *RemoveCmd) removeModel(id *identifier.Identifier, modelsDir string) err
 		return fmt.Errorf("remove model: %w", err)
 	}
 
-	fmt.Printf("Model 'h:%s:%s' removed.\n", id.Repo, id.Quant)
+	ui.PrintSuccess(fmt.Sprintf("Model 'h:%s:%s' removed", id.Repo, id.Quant))
 	return nil
 }

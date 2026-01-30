@@ -10,7 +10,7 @@
 ## Why Alpaca?
 
 - **Preset system**: Save model + argument combinations as presets
-- **Interactive preset creation**: Create presets with guided prompts (`alpaca preset new`)
+- **Interactive preset creation**: Create presets with guided prompts (`alpaca new`)
 - **Easy model switching**: Switch models without manually restarting servers
 - **Full llama-server options**: Access all llama-server arguments via `extra_args`
 - **Model management**: Download, list, and remove HuggingFace models
@@ -44,7 +44,7 @@ alpaca start
 alpaca pull h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q4_K_M
 
 # Create a preset interactively
-alpaca preset new
+alpaca new
 # Or create manually (~/.alpaca/presets/mistral.yaml)
 cat <<EOF > ~/.alpaca/presets/mistral.yaml
 model: f:~/.alpaca/models/mistral-7b-instruct-v0.2.Q4_K_M.gguf
@@ -53,7 +53,7 @@ gpu_layers: 35
 EOF
 
 # View preset details
-alpaca preset show mistral
+alpaca show p:mistral
 
 # Load the model
 alpaca load p:mistral
@@ -106,8 +106,8 @@ gpu_layers: 35
 - `alpaca rm <identifier>` - Remove a preset or model
 
 ### Preset Management
-- `alpaca preset show <name>` - Show preset details
-- `alpaca preset new` - Create preset interactively
+- `alpaca show <identifier>` - Show preset or model details
+- `alpaca new` - Create preset interactively
 
 ### Other
 - `alpaca version` - Show version information

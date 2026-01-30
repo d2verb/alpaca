@@ -10,6 +10,7 @@ import (
 	"github.com/d2verb/alpaca/internal/client"
 	"github.com/d2verb/alpaca/internal/config"
 	"github.com/d2verb/alpaca/internal/pull"
+	"github.com/d2verb/alpaca/internal/ui"
 )
 
 // stdin is the input source for prompts. Can be replaced for testing.
@@ -76,14 +77,14 @@ func pullModel(repo, quant, modelsDir string) error {
 	puller := pull.NewPuller(modelsDir)
 
 	// Get file info first
-	fmt.Println("Fetching file list...")
+	ui.PrintInfo("Fetching file list...")
 	filename, size, err := puller.GetFileInfo(context.Background(), repo, quant)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
 
-	fmt.Printf("Downloading %s (%s)...\n", filename, formatSize(size))
+	ui.PrintInfo(fmt.Sprintf("Downloading %s (%s)...", filename, formatSize(size)))
 
 	// Set up progress reporting
 	puller.SetProgressFunc(func(downloaded, total int64) {
@@ -101,7 +102,8 @@ func pullModel(repo, quant, modelsDir string) error {
 	if result.Size > 0 {
 		printProgress(result.Size, result.Size)
 	}
-	fmt.Printf("\nSaved to: %s\n", result.Path)
+	fmt.Println() // New line after progress bar
+	ui.PrintSuccess(fmt.Sprintf("Saved to: %s", result.Path))
 	return nil
 }
 

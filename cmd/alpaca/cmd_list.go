@@ -51,7 +51,7 @@ func (c *ListCmd) Run() error {
 
 	// Print help message if both are empty
 	if len(presetNames) == 0 && len(models) == 0 {
-		ui.PrintInfo("Create preset: alpaca preset new")
+		ui.PrintInfo("Create preset: alpaca new")
 		ui.PrintInfo("Download model: alpaca pull h:org/repo:quant")
 	}
 

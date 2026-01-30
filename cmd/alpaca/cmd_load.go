@@ -69,7 +69,7 @@ func (c *LoadCmd) Run() error {
 	}
 
 	endpoint, _ := resp.Data["endpoint"].(string)
-	ui.PrintSuccess(fmt.Sprintf("Model ready at %s", ui.Blue(endpoint)))
+	ui.PrintSuccess(fmt.Sprintf("Model ready at %s", ui.FormatEndpoint(endpoint)))
 	return nil
 }
 

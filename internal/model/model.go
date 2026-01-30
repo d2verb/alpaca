@@ -77,3 +77,17 @@ func (m *Manager) GetFilePath(ctx context.Context, repo, quant string) (string, 
 
 	return m.metadata.GetFilePath(m.modelsDir, repo, quant)
 }
+
+// GetDetails returns detailed information about a model.
+func (m *Manager) GetDetails(ctx context.Context, repo, quant string) (*metadata.ModelEntry, error) {
+	if err := m.metadata.Load(ctx); err != nil {
+		return nil, fmt.Errorf("load metadata: %w", err)
+	}
+
+	entry := m.metadata.Find(repo, quant)
+	if entry == nil {
+		return nil, fmt.Errorf("model not found")
+	}
+
+	return entry, nil
+}

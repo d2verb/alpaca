@@ -24,6 +24,16 @@ var (
 // Defaults to os.Stdout but can be overridden for testing.
 var Output io.Writer = os.Stdout
 
+// FormatSize formats size string with dim color.
+func FormatSize(size string) string {
+	return Dim(size)
+}
+
+// FormatEndpoint formats endpoint with blue color.
+func FormatEndpoint(endpoint string) string {
+	return Blue(endpoint)
+}
+
 // StatusBadge returns a colored status indicator with label.
 func StatusBadge(state string) string {
 	switch state {
@@ -64,9 +74,9 @@ func PrintModelList(models []ModelInfo) {
 	for _, m := range models {
 		// Format: repo:quant (size)
 		fmt.Fprintf(Output, "  %s:%s %s\n",
-			m.Repo,
+			Cyan(m.Repo),
 			Yellow(m.Quant),
-			fmt.Sprintf("(%s)", m.SizeString),
+			Dim(fmt.Sprintf("(%s)", m.SizeString)),
 		)
 	}
 }
@@ -123,6 +133,16 @@ type PresetDetails struct {
 	ExtraArgs   []string
 }
 
+// ModelDetails contains model metadata for display.
+type ModelDetails struct {
+	Repo         string
+	Quant        string
+	Filename     string
+	Path         string
+	Size         string
+	DownloadedAt string
+}
+
 // PrintPresetDetails prints preset details in a formatted style.
 func PrintPresetDetails(p PresetDetails) {
 	fmt.Fprintf(Output, "%s %s\n", Bold("Name:"), Cyan(p.Name))
@@ -138,9 +158,20 @@ func PrintPresetDetails(p PresetDetails) {
 		fmt.Fprintf(Output, "%s %d\n", Bold("Threads:"), p.Threads)
 	}
 
-	fmt.Fprintf(Output, "%s %s:%d\n", Bold("Endpoint:"), p.Host, p.Port)
+	fmt.Fprintf(Output, "%s %s\n", Bold("Endpoint:"), Blue(fmt.Sprintf("%s:%d", p.Host, p.Port)))
 
 	if len(p.ExtraArgs) > 0 {
 		fmt.Fprintf(Output, "%s %v\n", Bold("Extra Args:"), p.ExtraArgs)
 	}
+}
+
+// PrintModelDetails prints model metadata in a formatted style.
+func PrintModelDetails(m ModelDetails) {
+	fmt.Fprintf(Output, "%s %s\n", Bold("Repository:"), Cyan(m.Repo))
+	fmt.Fprintf(Output, "%s %s\n", Bold("Quantization:"), Yellow(m.Quant))
+	fmt.Fprintf(Output, "%s %s\n", Bold("Filename:"), m.Filename)
+	fmt.Fprintf(Output, "%s %s\n", Bold("Path:"), Blue(m.Path))
+	fmt.Fprintf(Output, "%s %s\n", Bold("Size:"), m.Size)
+	fmt.Fprintf(Output, "%s %s\n", Bold("Downloaded:"), m.DownloadedAt)
+	fmt.Fprintf(Output, "%s %s\n", Bold("Status:"), Green("✓ Downloaded"))
 }

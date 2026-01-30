@@ -7,48 +7,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/d2verb/alpaca/internal/preset"
 	"github.com/d2verb/alpaca/internal/ui"
 )
 
-type PresetCmd struct {
-	Show PresetShowCmd `cmd:"" help:"Show preset details"`
-	New  PresetNewCmd  `cmd:"" help:"Create a new preset interactively"`
-}
+type NewCmd struct{}
 
-type PresetShowCmd struct {
-	Name string `arg:"" help:"Preset name to show"`
-}
-
-func (c *PresetShowCmd) Run() error {
-	paths, err := getPaths()
-	if err != nil {
-		return err
-	}
-
-	loader := preset.NewLoader(paths.Presets)
-	p, err := loader.Load(c.Name)
-	if err != nil {
-		return errPresetNotFound(c.Name)
-	}
-
-	ui.PrintPresetDetails(ui.PresetDetails{
-		Name:        p.Name,
-		Model:       p.Model,
-		ContextSize: p.ContextSize,
-		GPULayers:   p.GPULayers,
-		Threads:     p.Threads,
-		Host:        p.GetHost(),
-		Port:        p.GetPort(),
-		ExtraArgs:   p.ExtraArgs,
-	})
-
-	return nil
-}
-
-type PresetNewCmd struct{}
-
-func (c *PresetNewCmd) Run() error {
+func (c *NewCmd) Run() error {
 	paths, err := getPaths()
 	if err != nil {
 		return err
