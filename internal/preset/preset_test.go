@@ -151,6 +151,32 @@ func TestPreset_BuildArgs(t *testing.T) {
 			},
 		},
 		{
+			name: "with space-separated extra args",
+			preset: Preset{
+				Model:     "/path/to/model.gguf",
+				ExtraArgs: []string{"-b 2048", "-ub 2048", "--jinja"},
+			},
+			want: []string{
+				"-m", "/path/to/model.gguf",
+				"--port", "8080",
+				"--host", "127.0.0.1",
+				"-b", "2048", "-ub", "2048", "--jinja",
+			},
+		},
+		{
+			name: "with mixed extra args formats",
+			preset: Preset{
+				Model:     "/path/to/model.gguf",
+				ExtraArgs: []string{"-b", "2048", "--temp 0.7", "--jinja"},
+			},
+			want: []string{
+				"-m", "/path/to/model.gguf",
+				"--port", "8080",
+				"--host", "127.0.0.1",
+				"-b", "2048", "--temp", "0.7", "--jinja",
+			},
+		},
+		{
 			name: "full preset",
 			preset: Preset{
 				Model:       "/path/to/model.gguf",

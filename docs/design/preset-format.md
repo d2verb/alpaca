@@ -59,15 +59,30 @@ extra_args:
 
 The `extra_args` field accepts a list of strings that are passed directly to llama-server. This allows using any llama-server option, including new options from future llama.cpp releases.
 
+Each element can contain space-separated flag and value pairs for convenience:
+
 ```yaml
+# Recommended: space-separated format (more readable)
 extra_args:
-  - "--flash-attn"
-  - "--cont-batching"
-  - "--rope-scaling"
-  - "linear"
-  - "--rope-freq-base"
-  - "10000"
+  - "-b 2048"
+  - "-ub 2048"
+  - "--temp 0.7"
+  - "--jinja"
+  - "--parallel 1"
+
+# Also supported: separate elements (legacy format)
+extra_args:
+  - "-b"
+  - "2048"
+  - "--jinja"
+
+# Mixed format works too
+extra_args:
+  - "-b 2048"
+  - "--jinja"
 ```
+
+**Limitation:** Values containing spaces are not supported in the space-separated format. For such cases, use the separate elements format or consider alternative approaches (e.g., file-based templates for `--chat-template`).
 
 ## Examples
 
