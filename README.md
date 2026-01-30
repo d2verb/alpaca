@@ -80,7 +80,10 @@ context_size: 4096
 gpu_layers: 35
 threads: 8
 port: 8080
+# Extra arguments (space-separated format supported)
 extra_args:
+  - "-b 2048"
+  - "--temp 0.7"
   - "--flash-attn"
   - "--cont-batching"
 
@@ -106,7 +109,7 @@ gpu_layers: 35
 - `alpaca rm <identifier>` - Remove a preset or model
 
 ### Preset Management
-- `alpaca show <identifier>` - Show preset or model details
+- `alpaca show <identifier>` - Show details (`p:name` for presets, `h:org/repo:quant` for models)
 - `alpaca new` - Create preset interactively
 
 ### Other
