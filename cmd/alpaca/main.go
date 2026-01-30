@@ -20,8 +20,10 @@ type CLI struct {
 	Load    LoadCmd    `cmd:"" help:"Load a preset, model, or file"`
 	Unload  UnloadCmd  `cmd:"" help:"Stop the currently running model"`
 	Logs    LogsCmd    `cmd:"" help:"Show logs (daemon or server)"`
+	List    ListCmd    `cmd:"" name:"ls" help:"List presets and models"`
+	Remove  RemoveCmd  `cmd:"" name:"rm" help:"Remove a preset or model"`
+	Pull    PullCmd    `cmd:"" help:"Download a model"`
 	Preset  PresetCmd  `cmd:"" help:"Manage presets"`
-	Model   ModelCmd   `cmd:"" help:"Manage models"`
 	Version VersionCmd `cmd:"" help:"Show version"`
 }
 

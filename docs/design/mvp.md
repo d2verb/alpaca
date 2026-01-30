@@ -15,8 +15,8 @@ This document defines the Minimum Viable Product (MVP) scope for Alpaca.
 | `alpaca status` | Show current status |
 | `alpaca load p:<preset>` | Load a model with the specified preset |
 | `alpaca unload` | Stop the currently running model |
-| `alpaca preset list` | List available presets |
-| `alpaca model pull h:<repo>:<quant>` | Download model from HuggingFace |
+| `alpaca ls` | List presets and models |
+| `alpaca pull h:<repo>:<quant>` | Download model from HuggingFace |
 
 ### Daemon
 
@@ -41,10 +41,7 @@ This document defines the Minimum Viable Product (MVP) scope for Alpaca.
 ## Out of Scope (Phase 2+)
 
 ### CLI
-- `alpaca preset create` - Interactive preset creation
 - `alpaca preset edit` - Edit existing preset
-- `alpaca preset delete` - Delete preset
-- `alpaca model list` - List downloaded models
 
 ### GUI
 - Preferences window (llama-server path, default port settings)

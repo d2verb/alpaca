@@ -47,8 +47,10 @@ Command-line interface written in Go. Communicates with the daemon via Unix sock
 
 Primary interface for:
 - Starting/stopping the daemon (`alpaca start`, `alpaca stop`)
-- Managing presets (list, show, new, delete)
-- Downloading models (`alpaca model pull`, `alpaca model ls`, `alpaca model rm`)
+- Managing presets (show, new)
+- Listing resources (`alpaca ls`)
+- Downloading models (`alpaca pull`)
+- Removing resources (`alpaca rm`)
 - Loading/unloading models (`alpaca load`, `alpaca unload`)
 - Viewing status and logs (`alpaca status`, `alpaca logs`)
 - Version information (`alpaca version`)
@@ -361,7 +363,7 @@ Both logs use `lumberjack` for rotation and compression.
 
 ### Model Metadata System
 
-Models downloaded via `alpaca model pull` are tracked in `~/.alpaca/models/.metadata.json`:
+Models downloaded via `alpaca pull` are tracked in `~/.alpaca/models/.metadata.json`:
 
 ```json
 {
@@ -379,7 +381,7 @@ Models downloaded via `alpaca model pull` are tracked in `~/.alpaca/models/.meta
 
 This metadata enables:
 - Loading models via `repo:quant` identifier
-- Listing downloaded models with `alpaca model ls`
+- Listing downloaded models with `alpaca ls`
 - Tracking download history
 
 ## Cross-Platform Considerations

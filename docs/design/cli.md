@@ -207,23 +207,31 @@ Model stopped.
 
 ### Preset Management
 
-#### `alpaca preset list` (or `alpaca preset ls`)
+#### `alpaca ls`
 
-List available presets.
+List available presets and downloaded models.
 
 ```bash
-$ alpaca preset list
+$ alpaca ls
 Available presets:
-  - codellama-7b-q4
-  - mistral-7b
-  - deepseek-coder
+  codellama-7b-q4
+  mistral-7b
+  deepseek-coder
+
+Downloaded models:
+  TheBloke/CodeLlama-7B-GGUF:Q4_K_M (4.1 GB)
+  TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M (4.8 GB)
 ```
 
-When no presets exist:
+When no presets or models exist:
 ```bash
-$ alpaca preset list
+$ alpaca ls
 No presets available.
-Add presets to: /Users/username/.alpaca/presets
+
+No models downloaded.
+
+• Create preset: alpaca preset new
+• Download model: alpaca pull h:org/repo:quant
 ```
 
 #### `alpaca preset show <name>`
@@ -267,51 +275,34 @@ The command will prompt for:
 
 Additional settings (host, port, threads, extra_args) can be added by editing the generated YAML file.
 
-#### `alpaca preset rm <name>`
+#### `alpaca rm p:<name>`
 
 Remove a preset.
 
 ```bash
-$ alpaca preset rm codellama-7b-q4
+$ alpaca rm p:codellama-7b-q4
 Delete preset 'codellama-7b-q4'? (y/N): y
 Preset 'codellama-7b-q4' removed.
 ```
 
 If preset doesn't exist:
 ```bash
-$ alpaca preset rm nonexistent
+$ alpaca rm p:nonexistent
 Preset 'nonexistent' not found.
 ```
 
 ### Model File Management
 
-#### `alpaca model list` (or `alpaca model ls`)
-
-List downloaded models.
-
-```bash
-$ alpaca model list
-Downloaded models:
-  - h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M (16.0 GB)
-  - h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M (4.1 GB)
-  - h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M (4.8 GB)
-```
-
-When no models are downloaded:
-```bash
-$ alpaca model list
-No models downloaded.
-Run: alpaca model pull h:org/repo:quant
-```
+See `alpaca ls` above for listing models.
 
 Model information is stored in `~/.alpaca/models/.metadata.json`.
 
-#### `alpaca model pull h:org/repo:quant`
+#### `alpaca pull h:org/repo:quant`
 
 Download a model from HuggingFace.
 
 ```bash
-$ alpaca model pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+$ alpaca pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 Fetching file list...
 Downloading codellama-7b.Q4_K_M.gguf (4.1 GB)...
 [████████████████████████████████████████] 100.0% (4.1 GB / 4.1 GB)
@@ -322,42 +313,42 @@ Saved to: /Users/username/.alpaca/models/codellama-7b.Q4_K_M.gguf
 
 **Examples**:
 ```bash
-alpaca model pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
-alpaca model pull h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M
-alpaca model pull h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
+alpaca pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+alpaca pull h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M
+alpaca pull h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
 ```
 
 **Errors**:
 
 Missing h: prefix:
 ```bash
-$ alpaca model pull TheBloke/CodeLlama-7B-GGUF:Q4_K_M
-Error: model pull only supports HuggingFace models
-Format: alpaca model pull h:org/repo:quant
-Example: alpaca model pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+$ alpaca pull TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+Error: pull only supports HuggingFace models
+Format: alpaca pull h:org/repo:quant
+Example: alpaca pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 ```
 
 Missing quant:
 ```bash
-$ alpaca model pull h:TheBloke/CodeLlama-7B-GGUF
+$ alpaca pull h:TheBloke/CodeLlama-7B-GGUF
 Error: missing quant specifier
-Format: alpaca model pull h:org/repo:quant
-Example: alpaca model pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+Format: alpaca pull h:org/repo:quant
+Example: alpaca pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 ```
 
-#### `alpaca model rm h:org/repo:quant`
+#### `alpaca rm h:org/repo:quant`
 
 Remove a downloaded model.
 
 ```bash
-$ alpaca model rm h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
+$ alpaca rm h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
 Delete model 'h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M'? (y/N): y
 Model 'h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M' removed.
 ```
 
 If model doesn't exist:
 ```bash
-$ alpaca model rm h:nonexistent:Q4_K_M
+$ alpaca rm h:nonexistent:Q4_K_M
 Model 'h:nonexistent:Q4_K_M' not found.
 ```
 
@@ -382,10 +373,10 @@ Model metadata is stored in `~/.alpaca/models/.metadata.json`:
 ```
 
 This metadata is:
-- Created/updated when `alpaca model pull h:<repo>:<quant>` is run
-- Read by `alpaca model list` to display HuggingFace format
+- Created/updated when `alpaca pull h:<repo>:<quant>` is run
+- Read by `alpaca ls` to display HuggingFace format
 - Used by `alpaca load h:<repo>:<quant>` to resolve identifiers to filenames
-- Removed when `alpaca model rm h:<repo>:<quant>` is run
+- Removed when `alpaca rm h:<repo>:<quant>` is run
 
 ## Daemon Behavior
 

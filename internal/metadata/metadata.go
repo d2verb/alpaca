@@ -180,7 +180,7 @@ func (m *Manager) GetFilePath(modelsDir, repo, quant string) (string, error) {
 	// Verify file exists
 	if _, err := os.Stat(filePath); err != nil {
 		if os.IsNotExist(err) {
-			return "", fmt.Errorf("model file not found: %s (try running 'alpaca model list' and cleanup)", filePath)
+			return "", fmt.Errorf("model file not found: %s (try running 'alpaca ls' and cleanup)", filePath)
 		}
 		return "", fmt.Errorf("check model file: %w", err)
 	}

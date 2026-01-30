@@ -81,7 +81,7 @@ func handleLoadError(code, message string, id *identifier.Identifier) error {
 
 	case protocol.ErrCodeModelNotFound:
 		if id.Type == identifier.TypePresetName {
-			return fmt.Errorf("model in preset '%s' not downloaded\nRun: alpaca model pull <model>", id.PresetName)
+			return fmt.Errorf("model in preset '%s' not downloaded\nRun: alpaca pull <model>", id.PresetName)
 		}
 		return errModelNotFound(id.Raw)
 

@@ -12,33 +12,8 @@ import (
 )
 
 type PresetCmd struct {
-	List   PresetListCmd `cmd:"" name:"ls" help:"List available presets"`
-	Show   PresetShowCmd `cmd:"" help:"Show preset details"`
-	New    PresetNewCmd  `cmd:"" help:"Create a new preset interactively"`
-	Remove PresetRmCmd   `cmd:"" name:"rm" help:"Remove a preset"`
-}
-
-type PresetListCmd struct{}
-
-func (c *PresetListCmd) Run() error {
-	paths, err := getPaths()
-	if err != nil {
-		return err
-	}
-
-	loader := preset.NewLoader(paths.Presets)
-	presetNames, err := loader.List()
-	if err != nil {
-		return fmt.Errorf("list presets: %w", err)
-	}
-
-	ui.PrintPresetList(presetNames)
-
-	if len(presetNames) == 0 {
-		ui.PrintInfo(fmt.Sprintf("Add presets to: %s", paths.Presets))
-	}
-
-	return nil
+	Show PresetShowCmd `cmd:"" help:"Show preset details"`
+	New  PresetNewCmd  `cmd:"" help:"Create a new preset interactively"`
 }
 
 type PresetShowCmd struct {
@@ -123,37 +98,5 @@ func (c *PresetNewCmd) Run() error {
 	}
 
 	ui.PrintSuccess(fmt.Sprintf("Preset '%s' created", name))
-	return nil
-}
-
-type PresetRmCmd struct {
-	Name string `arg:"" help:"Preset name to remove"`
-}
-
-func (c *PresetRmCmd) Run() error {
-	paths, err := getPaths()
-	if err != nil {
-		return err
-	}
-
-	presetPath := filepath.Join(paths.Presets, c.Name+".yaml")
-
-	// Check if preset exists
-	if _, err := os.Stat(presetPath); os.IsNotExist(err) {
-		return errPresetNotFound(c.Name)
-	}
-
-	// Confirmation prompt
-	if !promptConfirm(fmt.Sprintf("Delete preset '%s'?", c.Name)) {
-		fmt.Println("Cancelled.")
-		return nil
-	}
-
-	// Delete file
-	if err := os.Remove(presetPath); err != nil {
-		return fmt.Errorf("remove preset: %w", err)
-	}
-
-	fmt.Printf("Preset '%s' removed.\n", c.Name)
 	return nil
 }

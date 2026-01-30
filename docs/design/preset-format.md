@@ -118,7 +118,7 @@ context_size: 4096
 gpu_layers: 35
 ```
 
-**Note:** HuggingFace models must be downloaded first with `alpaca model pull h:org/repo:quant`. The model field will be automatically resolved to `f:/path/to/downloaded/file.gguf` at runtime.
+**Note:** HuggingFace models must be downloaded first with `alpaca pull h:org/repo:quant`. The model field will be automatically resolved to `f:/path/to/downloaded/file.gguf` at runtime.
 
 ### Full-Featured Preset
 
@@ -174,13 +174,13 @@ model: "h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M"
 ```
 
 **Resolution process:**
-1. Model must be downloaded first with `alpaca model pull h:org/repo:quant`
+1. Model must be downloaded first with `alpaca pull h:org/repo:quant`
 2. At runtime, `h:org/repo:quant` is resolved to `f:/path/to/downloaded/file.gguf`
 3. The `f:` prefix is stripped when starting llama-server
 
 **Error handling:**
 - Missing prefix → Parse error with clear message
-- HuggingFace model not downloaded → Error with suggestion to run `alpaca model pull`
+- HuggingFace model not downloaded → Error with suggestion to run `alpaca pull`
 - File path doesn't exist → Error when starting llama-server
 
 ## Design Decisions

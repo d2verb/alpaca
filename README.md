@@ -41,7 +41,7 @@ task build
 alpaca start
 
 # Download a model
-alpaca model pull h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q4_K_M
+alpaca pull h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q4_K_M
 
 # Create a preset interactively
 alpaca preset new
@@ -101,15 +101,13 @@ gpu_layers: 35
 ### Model Management
 - `alpaca load <identifier>` - Load a model (`h:`, `p:`, or `f:` prefix)
 - `alpaca unload` - Stop the current model
-- `alpaca model pull h:org/repo:quant` - Download a model
-- `alpaca model ls` - List downloaded models
-- `alpaca model rm h:org/repo:quant` - Remove a model
+- `alpaca pull h:org/repo:quant` - Download a model
+- `alpaca ls` - List presets and models
+- `alpaca rm <identifier>` - Remove a preset or model
 
 ### Preset Management
-- `alpaca preset ls` - List presets
 - `alpaca preset show <name>` - Show preset details
 - `alpaca preset new` - Create preset interactively
-- `alpaca preset rm <name>` - Remove a preset
 
 ### Other
 - `alpaca version` - Show version information
