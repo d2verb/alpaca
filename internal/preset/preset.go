@@ -73,7 +73,10 @@ func (p *Preset) BuildArgs() []string {
 	args = append(args, "--port", strconv.Itoa(p.GetPort()))
 	args = append(args, "--host", p.GetHost())
 
-	args = append(args, p.ExtraArgs...)
+	// Expand extra args (split each element by whitespace)
+	for _, arg := range p.ExtraArgs {
+		args = append(args, strings.Fields(arg)...)
+	}
 	return args
 }
 
