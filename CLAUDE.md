@@ -31,8 +31,8 @@ Temporary design/implementation memos go in `docs/wip/`.
 
 ## After Every Change
 
-1. Update related docs (`docs/design/`, `README.md`)
-2. Run `task check`
+1. Run `task check`
+2. Update related docs (`docs/design/`, `README.md`)
 
 ## Scope Boundaries
 
