@@ -25,10 +25,16 @@
 
 ## Installation
 
-### Homebrew (macOS/Linux)
+### Homebrew (macOS)
 
 ```bash
 brew install d2verb/tap/alpaca
+```
+
+### Shell script (Linux/macOS)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/d2verb/alpaca/main/install.sh | sh
 ```
 
 ### Build from source
