@@ -1,100 +1,41 @@
 # CLAUDE.md
 
-Guidance for Claude Code when working in this repository.
-
 ## Project Overview
 
-Alpaca is a lightweight wrapper around `llama-server` (from llama.cpp) for macOS. It provides CLI and GUI interfaces, similar to Ollama, but with full access to llama-server's options and better performance.
+Alpaca: lightweight wrapper around `llama-server` (llama.cpp) for macOS with CLI/GUI interfaces.
 
-**Key Goals:**
-
-- Thin wrapper (proxy tool approach, not a new inference engine)
-- Preset system for model + argument combinations
-- Smooth model switching without manual server restarts
-- Full llama-server option support
+**Core Principle:** Thin proxy wrapper, not a new inference engine.
 
 ## Tech Stack
 
-- CLI / Daemon: Go 1.23+, kong (CLI framework)
-- GUI: SwiftUI (Swift 6.0+, macOS menu bar app)
-- Communication: Unix socket with JSON protocol
-- Task Runner: Task (Taskfile.yml)
+- CLI/Daemon: Go, kong
+- GUI: SwiftUI (macOS menu bar app)
+- Communication: Unix socket (`~/.alpaca/alpaca.sock`) + JSON protocol
+- Task Runner: Taskfile.yml
 
-## Common Commands
+## Commands
 
 ```bash
-task build      # Build CLI binary
-task test       # Run golang tests with coverage
-task gui:test   # Run swift tests with coverage
-task lint       # Run golangci-lint
-task check      # Run fmt + lint + test
+task build      # Build CLI
+task test       # Go tests + coverage
+task gui:test   # Swift tests + coverage
+task lint       # golangci-lint + deadcode
+task check      # fmt + lint + test
 ```
 
 ## Design Documents
 
-Detailed specifications are in `docs/design/`. **Read before implementing:**
+Detailed specs in `docs/design/`. **Read before implementing.**
 
-- `architecture.md` - Component architecture, daemon lifecycle
-- `cli.md` - CLI command reference
-- `gui.md` - GUI layouts and states
-- `preset-format.md` - Preset YAML schema
-- `mvp.md` - MVP scope definition
+Temporary design/implementation memos go in `docs/wip/`.
 
-## Daemon Protocol
+## After Every Change
 
-CLI/GUI communicate with daemon via Unix socket (`~/.alpaca/alpaca.sock`).
-
-```json
-// Request
-{"command": "load", "args": {"identifier": "p:codellama-7b"}}
-
-// Response
-{"status": "ok", "data": {"endpoint": "http://localhost:8080"}}
-```
-
-Commands: `status`, `load`, `unload`, `list_presets`, `list_models`
-
-See `architecture.md` for full protocol specification including error codes.
-
-## Model Management
-
-**Model Switching:**
-
-1. Send SIGTERM to current llama-server
-2. Wait for graceful shutdown (max 10s, then SIGKILL)
-3. Start llama-server with new model/preset
-4. Wait for /health to report ready
-
-**Preset Loading:**
-
-- Presets are YAML files in `~/.alpaca/presets/`
-- `extra_args` field passes arbitrary flags to llama-server
-
-**HuggingFace Models:**
-
-- Format: `h:org/repo:quant` (e.g., `h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M`)
-- Downloaded to `~/.alpaca/models/`
-- Metadata stored in `.metadata.json` (repo, quant, filename, size)
-- Auto-pull on `alpaca load h:org/repo:quant` if not already downloaded
-
-## Logging
-
-- Daemon log: `~/.alpaca/logs/daemon.log` (structured logging with slog)
-- llama-server output: `~/.alpaca/logs/llama.log`
-- Both use log rotation (50MB max, 3 backups, 7 days retention, compressed)
+1. Update related docs (`docs/design/`, `README.md`)
+2. Run `task check`
 
 ## Scope Boundaries
 
-**Do:**
+**Do:** TDD, keep it simple, use system-installed llama-server, rely on llama-server's /health
 
-- Keep it simple (thin wrapper)
-- Use system-installed llama-server
-- Rely on llama-server's /health for health checks
-- Write tests before implementing new features (TDD approach)
-
-**Do Not:**
-
-- Add llama.cpp version management
-- Implement custom inference
-- Over-engineer
-- Implement features that are not needed right now (YAGNI)
+**Don't:** llama.cpp version management, custom inference, over-engineering, YAGNI violations

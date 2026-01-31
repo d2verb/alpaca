@@ -98,125 +98,26 @@ JSON-based request/response protocol over Unix socket. Messages are newline-deli
 
 **Request Format:**
 ```json
-{
-  "command": "load",
-  "args": {
-    "identifier": "p:codellama-7b"
-  }
-}
+{"command": "<command>", "args": {...}}
 ```
 
 **Response Format:**
 ```json
-{
-  "status": "ok",
-  "data": {
-    "endpoint": "http://127.0.0.1:8080"
-  }
-}
+{"status": "ok", "data": {...}}
+{"status": "error", "error": "<message>", "error_code": "<code>"}
 ```
-
-**Error Response:**
-```json
-{
-  "status": "error",
-  "error": "model not found",
-  "error_code": "model_not_found"
-}
-```
-
-**Error Codes:**
-Error responses include an `error_code` field for programmatic error handling:
-- `preset_not_found` - Requested preset does not exist
-- `model_not_found` - Model file not found or HuggingFace model not downloaded
-- `server_failed` - llama-server failed to start or health check timed out
 
 **Available Commands:**
+- `status` - Get daemon state and loaded model info
+- `load` - Load a model (`h:org/repo:quant`, `p:preset-name`, or `f:/path`)
+- `unload` - Stop the currently running model
+- `list_presets` - List available presets
+- `list_models` - List downloaded models
 
-**`status`** - Get current daemon state and loaded model info
-
-Response (when running):
-```json
-{
-  "status": "ok",
-  "data": {
-    "state": "running",
-    "preset": "codellama-7b",
-    "endpoint": "http://127.0.0.1:8080"
-  }
-}
-```
-
-Response (when idle):
-```json
-{
-  "status": "ok",
-  "data": {
-    "state": "idle"
-  }
-}
-```
-
-**`load`** - Load a model (format: `h:org/repo:quant`, `p:preset-name`, or `f:/path/to/file`)
-
-Request:
-```json
-{
-  "command": "load",
-  "args": {
-    "identifier": "p:codellama-7b"
-  }
-}
-```
-
-Response:
-```json
-{
-  "status": "ok",
-  "data": {
-    "endpoint": "http://127.0.0.1:8080"
-  }
-}
-```
-
-**`unload`** - Stop the currently running model
-
-Response:
-```json
-{
-  "status": "ok"
-}
-```
-
-**`list_presets`** - List all available presets
-
-Response:
-```json
-{
-  "status": "ok",
-  "data": {
-    "presets": ["codellama-7b", "mistral-7b", "llama2-13b"]
-  }
-}
-```
-
-**`list_models`** - List all downloaded models
-
-Response:
-```json
-{
-  "status": "ok",
-  "data": {
-    "models": [
-      {
-        "repo": "TheBloke/CodeLlama-7B-GGUF",
-        "quant": "Q4_K_M",
-        "size": 4368438272
-      }
-    ]
-  }
-}
-```
+**Error Codes:**
+- `preset_not_found` - Requested preset does not exist
+- `model_not_found` - Model file not found
+- `server_failed` - llama-server failed to start
 
 ## Daemon Lifecycle
 
@@ -318,71 +219,6 @@ idle → loading → running
 - **idle**: No model loaded
 - **loading**: Model is starting (llama-server not ready)
 - **running**: Model is ready and serving
-
-**Concurrency and Lock-Free Reads:**
-
-State and preset information are managed using atomic operations (`atomic.Value` and `atomic.Pointer`), enabling lock-free concurrent reads. This design ensures that:
-- CLI `status` commands return immediately without blocking
-- GUI can poll status frequently without timeout issues
-- State queries never wait for model loading operations
-
-The `Run()` method acquires a mutex to serialize model loading operations, but state reads via `State()` and `CurrentPreset()` methods remain lock-free and return instantly, even during long model loading operations (e.g., large models taking >30 seconds to initialize).
-
-## File System Layout
-
-```
-~/.alpaca/
-├── config.yaml              # User configuration
-├── alpaca.sock              # Unix socket for IPC
-├── alpaca.pid               # Daemon PID file
-├── presets/                 # Preset YAML files
-│   ├── codellama-7b.yaml
-│   └── llama2-13b.yaml
-├── models/                  # Downloaded GGUF files
-│   ├── .metadata.json       # Model metadata database
-│   ├── codellama-7b-instruct.Q4_K_M.gguf
-│   └── llama-2-13b-chat.Q5_K_M.gguf
-└── logs/                    # Log files
-    ├── daemon.log           # Daemon log (with rotation)
-    └── llama.log            # llama-server output (with rotation)
-```
-
-### Logging System
-
-Alpaca uses structured logging with automatic rotation:
-
-- **daemon.log**: Daemon lifecycle events (startup, shutdown, errors)
-  - Format: Structured text logs (slog)
-  - Rotation: 50MB max size, 3 backups, 7 days retention
-
-- **llama.log**: llama-server stdout/stderr
-  - Format: Raw llama-server output
-  - Rotation: Same as daemon.log
-
-Both logs use `lumberjack` for rotation and compression.
-
-### Model Metadata System
-
-Models downloaded via `alpaca pull` are tracked in `~/.alpaca/models/.metadata.json`:
-
-```json
-{
-  "models": [
-    {
-      "repo": "TheBloke/CodeLlama-7B-GGUF",
-      "quant": "Q4_K_M",
-      "filename": "codellama-7b.Q4_K_M.gguf",
-      "size": 4368438272,
-      "downloaded_at": "2024-01-15T10:30:00Z"
-    }
-  ]
-}
-```
-
-This metadata enables:
-- Loading models via `repo:quant` identifier
-- Listing downloaded models with `alpaca ls`
-- Tracking download history
 
 ## Cross-Platform Considerations
 

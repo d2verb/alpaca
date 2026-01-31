@@ -388,30 +388,6 @@ $ alpaca rm h:nonexistent:Q4_K_M
 
 This removes both the model file and its metadata entry.
 
-## Metadata Management
-
-Model metadata is stored in `~/.alpaca/models/.metadata.json`:
-
-```json
-{
-  "models": [
-    {
-      "repo": "unsloth/qwen3-coder-30b-a3b-instruct",
-      "quant": "Q4_K_M",
-      "filename": "qwen3-coder-30b-a3b-instruct.Q4_K_M.gguf",
-      "size": 17179869184,
-      "downloaded_at": "2026-01-28T10:30:00Z"
-    }
-  ]
-}
-```
-
-This metadata is:
-- Created/updated when `alpaca pull h:<repo>:<quant>` is run
-- Read by `alpaca ls` to display HuggingFace format
-- Used by `alpaca load h:<repo>:<quant>` to resolve identifiers to filenames
-- Removed when `alpaca rm h:<repo>:<quant>` is run
-
 ## Daemon Behavior
 
 The daemon runs in the background by default:

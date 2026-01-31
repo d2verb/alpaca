@@ -39,3 +39,6 @@ vendor/
 *.log
 
 /alpaca
+
+docs/wip/**/*
+!docs/wip/.gitkeep

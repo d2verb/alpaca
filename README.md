@@ -9,14 +9,28 @@
 
 ## Why Alpaca?
 
-- **Preset system**: Save model + argument combinations as presets
-- **Interactive preset creation**: Create presets with guided prompts (`alpaca new`)
+- **Preset system**: Save model + argument combinations as reusable presets
 - **Easy model switching**: Switch models without manually restarting servers
-- **Full llama-server options**: Access all llama-server arguments via `extra_args`
-- **Model management**: Download, list, and remove HuggingFace models
-- **Log viewing**: View daemon and server logs with follow mode (`alpaca logs -f`)
-- **CLI + GUI**: Command-line interface (macOS/Linux) and macOS menu bar app
-- **Automatic log rotation**: Logs rotate at 50MB with compression
+- **Full llama-server options**: Pass any llama-server argument via `extra_args`
+- **HuggingFace integration**: Download models directly with `alpaca pull`
+
+## Quick Start
+
+```bash
+# Start the daemon
+alpaca start
+
+# Download and load a model
+alpaca pull h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q4_K_M
+alpaca load h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q4_K_M
+
+# Check status
+alpaca status
+# → Running at http://localhost:8080
+
+# Create a preset for repeated use
+alpaca new
+```
 
 ## Installation
 
@@ -34,102 +48,34 @@ task build
 # Binary will be at ./build/alpaca
 ```
 
-## Quick Start
-
-```bash
-# Start the daemon
-alpaca start
-
-# Download a model
-alpaca pull h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q4_K_M
-
-# Create a preset interactively
-alpaca new
-# Or create manually (~/.alpaca/presets/mistral.yaml)
-cat <<EOF > ~/.alpaca/presets/mistral.yaml
-model: f:~/.alpaca/models/mistral-7b-instruct-v0.2.Q4_K_M.gguf
-context_size: 4096
-gpu_layers: 35
-EOF
-
-# View preset details
-alpaca show p:mistral
-
-# Load the model
-alpaca load p:mistral
-
-# Check status
-alpaca status
-
-# View logs (follow mode)
-alpaca logs -f
-
-# Stop the model
-alpaca unload
-
-# Stop the daemon
-alpaca stop
-```
-
-## Preset Format
-
-```yaml
-# File path
-model: f:~/.alpaca/models/your-model.gguf
-context_size: 4096
-gpu_layers: 35
-threads: 8
-port: 8080
-# Extra arguments (space-separated format supported)
-extra_args:
-  - "-b 2048"
-  - "--temp 0.7"
-  - "--flash-attn"
-  - "--cont-batching"
-
-# Or HuggingFace format (auto-resolved)
-model: h:TheBloke/Mistral-7B-GGUF:Q4_K_M
-context_size: 4096
-gpu_layers: 35
-```
-
 ## Commands
 
-### Daemon Management
+### Daemon
 - `alpaca start [--foreground]` - Start the daemon
 - `alpaca stop` - Stop the daemon
 - `alpaca status` - Show current status
-- `alpaca logs [-f] [-d|-s]` - View daemon or server logs
+- `alpaca logs [-f] [-s]` - View logs (`-f` follow, `-s` server logs)
+- `alpaca version` - Show version
 
-### Model Management
-- `alpaca load <identifier>` - Load a model (`h:`, `p:`, or `f:` prefix)
+### Models
+- `alpaca load <identifier>` - Load a model (`p:preset`, `h:org/repo:quant`, `f:path`)
 - `alpaca unload` - Stop the current model
 - `alpaca pull h:org/repo:quant` - Download a model
 - `alpaca ls` - List presets and models
+- `alpaca show <identifier>` - Show preset or model details
 - `alpaca rm <identifier>` - Remove a preset or model
-
-### Preset Management
-- `alpaca show <identifier>` - Show details (`p:name` for presets, `h:org/repo:quant` for models)
-- `alpaca new` - Create preset interactively
-
-### Other
-- `alpaca version` - Show version information
-
-For detailed command documentation, see [`docs/design/cli.md`](docs/design/cli.md).
+- `alpaca new` - Create a preset interactively
 
 ## Requirements
 
-- **CLI**: macOS, Linux (amd64, arm64)
-- **GUI**: macOS only
-- **Go 1.25+** (for building from source)
-- **[llama-server](https://github.com/ggerganov/llama.cpp)** installed and available in PATH
+- **llama-server** installed and available in PATH
+- **macOS or Linux** (GUI is macOS only)
 
 ## Documentation
 
-- [Architecture Overview](docs/design/architecture.md)
-- [CLI Command Reference](docs/design/cli.md)
+- [CLI Reference](docs/design/cli.md)
 - [Preset Format](docs/design/preset-format.md)
-- [GUI Documentation](docs/design/gui.md)
+- [Architecture](docs/design/architecture.md)
 
 ## License
 
