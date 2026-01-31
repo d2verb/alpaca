@@ -47,13 +47,15 @@ extra_args:
 
 | Field | Type | Default | llama-server flag |
 |-------|------|---------|-------------------|
-| `context_size` | int | (omit flag, llama-server decides) | `--ctx-size` |
-| `gpu_layers` | int | 0 (omit flag) | `--n-gpu-layers` |
+| `context_size` | int | 2048 | `--ctx-size` |
+| `gpu_layers` | int | -1 (all layers) | `--n-gpu-layers` |
 | `threads` | int | 0 (omit flag, llama-server decides) | `--threads` |
 | `port` | int | 8080 | `--port` |
 | `host` | string | "127.0.0.1" | `--host` |
 
-**Note on defaults:** When a field is omitted or set to 0 (for numeric fields), the corresponding llama-server flag is not passed, allowing llama-server to use its own defaults. Only `host` and `port` have explicit defaults applied by Alpaca.
+**Note on defaults:** Alpaca applies explicit defaults for `context_size`, `gpu_layers`, `host`, and `port`. When these fields are omitted from the YAML, the defaults are still passed to llama-server. Only `threads` omits the flag when not specified, allowing llama-server to decide.
+
+**Special case for `gpu_layers`:** Setting `gpu_layers: 0` in YAML will use 0 GPU layers (CPU-only mode). However, due to YAML's zero-value behavior, omitting the field also results in 0, which gets replaced with the default (-1). To explicitly use CPU-only mode, add `--n-gpu-layers 0` to `extra_args`.
 
 ### Extra Arguments
 

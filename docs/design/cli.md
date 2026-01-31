@@ -156,13 +156,13 @@ $ alpaca load f:./model.gguf
 ✓ Model ready at http://localhost:8080
 ```
 
-File paths are loaded with default settings from `~/.alpaca/config.yaml`:
-- `default_host`: 127.0.0.1
-- `default_port`: 8080
-- `default_ctx_size`: 4096
-- `default_gpu_layers`: -1
+File paths are loaded with default settings:
+- `host`: 127.0.0.1
+- `port`: 8080
+- `context_size`: 2048
+- `gpu_layers`: -1 (all layers)
 
-For custom settings, create a preset instead.
+These defaults are defined in the preset package. For custom settings, create a preset instead.
 
 **Error handling:**
 ```bash
@@ -185,18 +185,11 @@ When loading a model without a preset, the following defaults are used:
 ```yaml
 host: 127.0.0.1
 port: 8080
-ctx_size: 4096
-n_gpu_layers: -1  # Use all GPU layers
+context_size: 2048
+gpu_layers: -1  # Use all GPU layers
 ```
 
-These can be overridden in `~/.alpaca/config.yaml`:
-```yaml
-llama_server_path: llama-server
-default_port: 8080
-default_host: 127.0.0.1
-default_ctx_size: 4096
-default_gpu_layers: -1
-```
+These defaults are defined in the preset package constants and cannot be changed without modifying the code.
 
 #### `alpaca unload`
 
@@ -294,20 +287,28 @@ Create a new preset interactively.
 
 ```bash
 $ alpaca new
-Preset name: my-model
-Model path (with prefix, e.g., f:/path/to/model.gguf): f:~/models/my-model.gguf
-Context size (default: 4096): 8192
-GPU layers (default: -1): 35
-✓ Created preset 'my-model' at /Users/username/.alpaca/presets/my-model.yaml
+📦 Create Preset
+Name: my-model
+Model: h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+Host [127.0.0.1]:
+Port [8080]:
+Context [2048]: 8192
+GPU Layers [-1]: 35
+✅ Created 'my-model'
+💡 alpaca load p:my-model
 ```
 
 The command will prompt for:
-- **Preset name**: Name for the preset file (without .yaml extension)
-- **Model path**: Model identifier (must include `f:` or `h:` prefix)
-- **Context size**: Context window size (default: 4096)
-- **GPU layers**: Number of layers to offload to GPU (default: -1 for all)
+- **Name**: Name for the preset file (without .yaml extension) - **required**
+- **Model**: Model identifier (must include `f:` or `h:` prefix) - **required**
+- **Host**: Server host address (default: 127.0.0.1)
+- **Port**: Server port (default: 8080)
+- **Context**: Context window size (default: 2048)
+- **GPU Layers**: Number of layers to offload to GPU (default: -1 for all)
 
-Additional settings (host, port, threads, extra_args) can be added by editing the generated YAML file.
+Press Enter to accept default values (shown in brackets). Only non-default values are written to the YAML file.
+
+Additional settings (threads, extra_args) can be added by editing the generated YAML file.
 
 #### `alpaca rm p:<name>`
 
