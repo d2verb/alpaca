@@ -36,16 +36,17 @@ func (c *ListCmd) Run() error {
 	models := make([]ui.ModelInfo, len(entries))
 	for i, entry := range entries {
 		models[i] = ui.ModelInfo{
-			Repo:       entry.Repo,
-			Quant:      entry.Quant,
-			SizeString: formatSize(entry.Size),
+			Repo:         entry.Repo,
+			Quant:        entry.Quant,
+			SizeString:   formatSize(entry.Size),
+			DownloadedAt: entry.DownloadedAt.Format("2006-01-02"),
 		}
 	}
 
 	// Print both lists
 	ui.PrintPresetList(presetNames)
 	if len(presetNames) > 0 && len(models) > 0 {
-		fmt.Fprintln(ui.Output, "")
+		fmt.Fprintln(ui.Output) // Single blank line between sections
 	}
 	ui.PrintModelList(models)
 

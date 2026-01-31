@@ -14,14 +14,14 @@ Start the Alpaca daemon in the background.
 
 ```bash
 $ alpaca start
-Daemon started (PID: 12345)
-Logs: /Users/username/.alpaca/logs/daemon.log
+✓ Daemon started (PID: 12345)
+ℹ Logs: /Users/username/.alpaca/logs/daemon.log
 ```
 
 If already running:
 ```bash
 $ alpaca start
-Daemon is already running (PID: 12345).
+ℹ Daemon is already running (PID: 12345).
 ```
 
 **Flags:**
@@ -38,8 +38,8 @@ Stop the Alpaca daemon.
 
 ```bash
 $ alpaca stop
-Stopping daemon...
-Daemon stopped.
+ℹ Stopping daemon...
+✓ Daemon stopped.
 ```
 
 This will also stop any running llama-server process.
@@ -50,24 +50,26 @@ Show current status.
 
 ```bash
 $ alpaca status
-Status: running
-Preset: qwen3-coder-30b
-Endpoint: http://localhost:8080
-Logs: /Users/username/.alpaca/logs/
+🚀 Status
+  State      ● Running
+  Preset     p:qwen3-coder-30b
+  Endpoint   http://localhost:8080
+  Logs       /Users/username/.alpaca/logs/daemon.log
 ```
 
 When no model is loaded:
 ```bash
 $ alpaca status
-Status: idle
-Logs: /Users/username/.alpaca/logs/
+🚀 Status
+  State      ○ Idle
+  Logs       /Users/username/.alpaca/logs/daemon.log
 ```
 
 When daemon is not running:
 ```bash
 $ alpaca status
-Daemon is not running.
-Run: alpaca start
+✗ Daemon is not running.
+ℹ Run: alpaca start
 ```
 
 #### `alpaca logs`
@@ -127,31 +129,31 @@ All identifiers must use an explicit prefix:
 **Using preset:**
 ```bash
 $ alpaca load p:codellama-7b-q4
-Loading p:codellama-7b-q4...
-Model ready at http://localhost:8080
+ℹ Loading p:codellama-7b-q4...
+✓ Model ready at http://localhost:8080
 ```
 
 **Using HuggingFace format (auto-download if not present):**
 ```bash
 $ alpaca load h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
-Model not found. Downloading...
-Fetching file list...
-Downloading qwen3-coder-30b-a3b-instruct.Q4_K_M.gguf (16.0 GB)...
+ℹ Model not found. Downloading...
+ℹ Fetching file list...
+ℹ Downloading qwen3-coder-30b-a3b-instruct.Q4_K_M.gguf (16.0 GB)...
 [████████████████████████████████████████] 100.0% (16.0 GB / 16.0 GB)
-Saved to: /Users/username/.alpaca/models/qwen3-coder-30b-a3b-instruct.Q4_K_M.gguf
-Loading h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M...
-Model ready at http://localhost:8080
+✓ Saved to: /Users/username/.alpaca/models/qwen3-coder-30b-a3b-instruct.Q4_K_M.gguf
+ℹ Loading h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M...
+✓ Model ready at http://localhost:8080
 ```
 
 **Using file path (with default settings):**
 ```bash
 $ alpaca load f:~/models/my-model.gguf
-Loading f:~/models/my-model.gguf...
-Model ready at http://localhost:8080
+ℹ Loading f:~/models/my-model.gguf...
+✓ Model ready at http://localhost:8080
 
 $ alpaca load f:./model.gguf
-Loading f:./model.gguf...
-Model ready at http://localhost:8080
+ℹ Loading f:./model.gguf...
+✓ Model ready at http://localhost:8080
 ```
 
 File paths are loaded with default settings from `~/.alpaca/config.yaml`:
@@ -166,14 +168,14 @@ For custom settings, create a preset instead.
 ```bash
 # Missing prefix
 $ alpaca load my-preset
-Error: invalid identifier format 'my-preset'
-Expected: h:org/repo:quant, p:preset-name, or f:/path/to/file
-Examples: alpaca load p:my-preset
+✗ Error: invalid identifier format 'my-preset'
+ℹ Expected: h:org/repo:quant, p:preset-name, or f:/path/to/file
+ℹ Examples: alpaca load p:my-preset
 
 # Missing quant in HuggingFace
 $ alpaca load h:unsloth/gemma3
-Error: missing quant specifier in HuggingFace identifier
-Expected format: h:org/repo:quant (e.g., h:unsloth/gemma3:Q4_K_M)
+✗ Error: missing quant specifier in HuggingFace identifier
+ℹ Expected format: h:org/repo:quant (e.g., h:unsloth/gemma3:Q4_K_M)
 ```
 
 If another model is running, it will be stopped first automatically
@@ -202,7 +204,7 @@ Stop the currently running model.
 
 ```bash
 $ alpaca unload
-Model stopped.
+✓ Model stopped.
 ```
 
 ### Preset Management
@@ -213,14 +215,18 @@ List available presets and downloaded models.
 
 ```bash
 $ alpaca ls
-Available presets:
+📦 Presets
+──────────
   p:codellama-7b-q4
   p:mistral-7b
   p:deepseek-coder
 
-Downloaded models:
-  h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M (4.1 GB)
-  h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M (4.8 GB)
+🤖 Models
+─────────
+  h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+    4.1 GB · Downloaded 2024-01-15
+  h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M
+    4.8 GB · Downloaded 2024-01-14
 ```
 
 When no presets or models exist:
@@ -228,10 +234,11 @@ When no presets or models exist:
 $ alpaca ls
 No presets available.
 
+  Create one:  alpaca new
+
 No models downloaded.
 
-• Create preset: alpaca new
-• Download model: alpaca pull h:org/repo:quant
+  Download one:  alpaca pull h:org/repo:quant
 ```
 
 #### `alpaca show <identifier>`
@@ -241,23 +248,22 @@ Show detailed information for a preset or model.
 **Show preset details:**
 ```bash
 $ alpaca show p:codellama-7b-q4
-Name: codellama-7b-q4
-Model: f:/Users/username/.alpaca/models/codellama-7b.Q4_K_M.gguf
-Context Size: 4096
-GPU Layers: -1
-Endpoint: 127.0.0.1:8080
+📦 Preset: p:codellama-7b-q4
+  Model          f:/Users/username/.alpaca/models/codellama-7b.Q4_K_M.gguf
+  Context Size   4096
+  GPU Layers     -1
+  Endpoint       127.0.0.1:8080
 ```
 
 **Show model details:**
 ```bash
 $ alpaca show h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
-Repository: TheBloke/CodeLlama-7B-GGUF
-Quantization: Q4_K_M
-Filename: codellama-7b.Q4_K_M.gguf
-Path: /Users/username/.alpaca/models/codellama-7b.Q4_K_M.gguf
-Size: 4.1 GB
-Downloaded: 2026-01-28 10:30:00
-Status: ✓ Downloaded
+🤖 Model: h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+  Filename       codellama-7b.Q4_K_M.gguf
+  Size           4.1 GB
+  Downloaded     2026-01-28 10:30:00
+  Path           /Users/username/.alpaca/models/codellama-7b.Q4_K_M.gguf
+  Status         ✓ Ready
 ```
 
 **Error cases:**
@@ -265,21 +271,21 @@ Status: ✓ Downloaded
 If preset doesn't exist:
 ```bash
 $ alpaca show p:nonexistent
-Preset 'nonexistent' not found.
+✗ Preset 'nonexistent' not found.
 ```
 
 If model not downloaded:
 ```bash
 $ alpaca show h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 ✗ Model 'h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M' not downloaded
-• Run: alpaca pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+ℹ Run: alpaca pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 ```
 
 File paths cannot be shown:
 ```bash
 $ alpaca show f:/path/to/model.gguf
-Error: cannot show file details
-Use: alpaca show p:name or alpaca show h:org/repo:quant
+✗ Error: cannot show file details
+ℹ Use: alpaca show p:name or alpaca show h:org/repo:quant
 ```
 
 #### `alpaca new`
@@ -292,7 +298,7 @@ Preset name: my-model
 Model path (with prefix, e.g., f:/path/to/model.gguf): f:~/models/my-model.gguf
 Context size (default: 4096): 8192
 GPU layers (default: -1): 35
-Created preset 'my-model' at /Users/username/.alpaca/presets/my-model.yaml
+✓ Created preset 'my-model' at /Users/username/.alpaca/presets/my-model.yaml
 ```
 
 The command will prompt for:
@@ -310,13 +316,13 @@ Remove a preset.
 ```bash
 $ alpaca rm p:codellama-7b-q4
 Delete preset 'codellama-7b-q4'? (y/N): y
-Preset 'codellama-7b-q4' removed.
+✓ Preset 'codellama-7b-q4' removed.
 ```
 
 If preset doesn't exist:
 ```bash
 $ alpaca rm p:nonexistent
-Preset 'nonexistent' not found.
+✗ Preset 'nonexistent' not found.
 ```
 
 ### Model File Management
@@ -331,10 +337,10 @@ Download a model from HuggingFace.
 
 ```bash
 $ alpaca pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
-Fetching file list...
-Downloading codellama-7b.Q4_K_M.gguf (4.1 GB)...
+ℹ Fetching file list...
+ℹ Downloading codellama-7b.Q4_K_M.gguf (4.1 GB)...
 [████████████████████████████████████████] 100.0% (4.1 GB / 4.1 GB)
-Saved to: /Users/username/.alpaca/models/codellama-7b.Q4_K_M.gguf
+✓ Saved to: /Users/username/.alpaca/models/codellama-7b.Q4_K_M.gguf
 ```
 
 **Format**: `h:<organization>/<repository>:<quantization>`
@@ -351,17 +357,17 @@ alpaca pull h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
 Missing h: prefix:
 ```bash
 $ alpaca pull TheBloke/CodeLlama-7B-GGUF:Q4_K_M
-Error: pull only supports HuggingFace models
-Format: alpaca pull h:org/repo:quant
-Example: alpaca pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+✗ Error: pull only supports HuggingFace models
+ℹ Format: alpaca pull h:org/repo:quant
+ℹ Example: alpaca pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 ```
 
 Missing quant:
 ```bash
 $ alpaca pull h:TheBloke/CodeLlama-7B-GGUF
-Error: missing quant specifier
-Format: alpaca pull h:org/repo:quant
-Example: alpaca pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
+✗ Error: missing quant specifier
+ℹ Format: alpaca pull h:org/repo:quant
+ℹ Example: alpaca pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 ```
 
 #### `alpaca rm h:org/repo:quant`
@@ -371,13 +377,13 @@ Remove a downloaded model.
 ```bash
 $ alpaca rm h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M
 Delete model 'h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M'? (y/N): y
-Model 'h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M' removed.
+✓ Model 'h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M' removed.
 ```
 
 If model doesn't exist:
 ```bash
 $ alpaca rm h:nonexistent:Q4_K_M
-Model 'h:nonexistent:Q4_K_M' not found.
+✗ Model 'h:nonexistent:Q4_K_M' not found.
 ```
 
 This removes both the model file and its metadata entry.
