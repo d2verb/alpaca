@@ -128,6 +128,54 @@ func TestNewErrorResponse(t *testing.T) {
 	}
 }
 
+func TestNewErrorResponseWithCode(t *testing.T) {
+	tests := []struct {
+		name    string
+		code    string
+		message string
+	}{
+		{
+			name:    "preset not found",
+			code:    ErrCodePresetNotFound,
+			message: "preset 'foo' not found",
+		},
+		{
+			name:    "model not found",
+			code:    ErrCodeModelNotFound,
+			message: "model 'bar:Q4_K_M' not found",
+		},
+		{
+			name:    "server failed",
+			code:    ErrCodeServerFailed,
+			message: "llama-server failed to start",
+		},
+		{
+			name:    "empty code and message",
+			code:    "",
+			message: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp := NewErrorResponseWithCode(tt.code, tt.message)
+
+			if resp.Status != StatusError {
+				t.Errorf("Status = %q, want %q", resp.Status, StatusError)
+			}
+			if resp.Error != tt.message {
+				t.Errorf("Error = %q, want %q", resp.Error, tt.message)
+			}
+			if resp.ErrorCode != tt.code {
+				t.Errorf("ErrorCode = %q, want %q", resp.ErrorCode, tt.code)
+			}
+			if resp.Data != nil {
+				t.Errorf("Data = %v, want nil", resp.Data)
+			}
+		})
+	}
+}
+
 func TestRequest_JSONRoundTrip(t *testing.T) {
 	tests := []struct {
 		name string

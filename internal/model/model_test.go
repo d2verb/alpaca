@@ -283,3 +283,60 @@ func TestGetFilePathNotFound(t *testing.T) {
 		t.Fatal("expected error for non-existent model")
 	}
 }
+
+func TestGetDetailsSuccess(t *testing.T) {
+	// Arrange
+	tmpDir := t.TempDir()
+	mgr := NewManager(tmpDir)
+	ctx := context.Background()
+
+	metaMgr := metadata.NewManager(tmpDir)
+	entry := metadata.ModelEntry{
+		Repo:         "TheBloke/CodeLlama-7B-GGUF",
+		Quant:        "Q4_K_M",
+		Filename:     "codellama-7b.Q4_K_M.gguf",
+		Size:         4000000000,
+		DownloadedAt: time.Now().UTC(),
+	}
+	if err := metaMgr.Add(entry); err != nil {
+		t.Fatalf("add entry: %v", err)
+	}
+	if err := metaMgr.Save(ctx); err != nil {
+		t.Fatalf("save metadata: %v", err)
+	}
+
+	// Act
+	result, err := mgr.GetDetails(ctx, "TheBloke/CodeLlama-7B-GGUF", "Q4_K_M")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("GetDetails() error = %v", err)
+	}
+	if result.Repo != entry.Repo {
+		t.Errorf("Repo = %s, want %s", result.Repo, entry.Repo)
+	}
+	if result.Quant != entry.Quant {
+		t.Errorf("Quant = %s, want %s", result.Quant, entry.Quant)
+	}
+	if result.Filename != entry.Filename {
+		t.Errorf("Filename = %s, want %s", result.Filename, entry.Filename)
+	}
+	if result.Size != entry.Size {
+		t.Errorf("Size = %d, want %d", result.Size, entry.Size)
+	}
+}
+
+func TestGetDetailsNotFound(t *testing.T) {
+	// Arrange
+	tmpDir := t.TempDir()
+	mgr := NewManager(tmpDir)
+	ctx := context.Background()
+
+	// Act
+	_, err := mgr.GetDetails(ctx, "nonexistent/repo", "Q4_K_M")
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error for non-existent model")
+	}
+}
