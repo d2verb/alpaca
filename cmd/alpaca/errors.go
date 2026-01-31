@@ -47,3 +47,10 @@ func errDownloadFailed() *ExitError {
 		Message: "",
 	}
 }
+
+func errServerNotRunning() *ExitError {
+	return &ExitError{
+		Code:    exitError,
+		Message: "Server is not running.\nRun: alpaca load <preset>",
+	}
+}

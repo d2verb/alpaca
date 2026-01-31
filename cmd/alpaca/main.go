@@ -26,6 +26,7 @@ type CLI struct {
 	Remove  RemoveCmd  `cmd:"" name:"rm" help:"Remove a preset or model"`
 	Pull    PullCmd    `cmd:"" help:"Download a model"`
 	New     NewCmd     `cmd:"" help:"Create a new preset interactively"`
+	Open    OpenCmd    `cmd:"" help:"Open llama-server in browser"`
 	Version VersionCmd `cmd:"" help:"Show version"`
 
 	// Completion commands

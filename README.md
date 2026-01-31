@@ -69,6 +69,7 @@ alpaca new
 - `alpaca start [--foreground]` - Start the daemon
 - `alpaca stop` - Stop the daemon
 - `alpaca status` - Show current status
+- `alpaca open` - Open llama-server in browser
 - `alpaca logs [-f] [-s]` - View logs (`-f` follow, `-s` server logs)
 - `alpaca version` - Show version
 

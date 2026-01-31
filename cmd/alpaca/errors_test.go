@@ -72,3 +72,14 @@ func TestErrDownloadFailed(t *testing.T) {
 		t.Errorf("Message = %q, want empty", err.Message)
 	}
 }
+
+func TestErrServerNotRunning(t *testing.T) {
+	err := errServerNotRunning()
+
+	if err.Code != exitError {
+		t.Errorf("Code = %d, want %d", err.Code, exitError)
+	}
+	if err.Message == "" {
+		t.Error("Message should not be empty")
+	}
+}

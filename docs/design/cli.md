@@ -72,6 +72,29 @@ $ alpaca status
 ℹ Run: alpaca start
 ```
 
+#### `alpaca open`
+
+Open the llama-server endpoint in your default browser.
+
+```bash
+$ alpaca open
+ℹ Opening http://127.0.0.1:8080 in browser...
+```
+
+When no model is loaded:
+```bash
+$ alpaca open
+✗ Server is not running.
+ℹ Run: alpaca load <preset>
+```
+
+When daemon is not running:
+```bash
+$ alpaca open
+✗ Daemon is not running.
+ℹ Run: alpaca start
+```
+
 #### `alpaca logs`
 
 View daemon or llama-server logs.
