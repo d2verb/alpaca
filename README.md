@@ -14,6 +14,10 @@
 - **Full llama-server options**: Pass any llama-server argument via `extra_args`
 - **HuggingFace integration**: Download models directly with `alpaca pull`
 
+## Demo
+
+![Alpaca Demo](demo.gif)
+
 ## Requirements
 
 - **llama-server** installed and available in PATH

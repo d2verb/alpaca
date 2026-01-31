@@ -106,3 +106,9 @@ tasks:
     desc: Open GUI project in Xcode
     cmds:
       - open gui/Alpaca/Alpaca.xcodeproj
+
+  # Demo
+  demo:
+    desc: Regenerate demo.gif from demo.tape (requires vhs)
+    cmds:
+      - vhs demo.tape
