@@ -14,6 +14,27 @@
 - **Full llama-server options**: Pass any llama-server argument via `extra_args`
 - **HuggingFace integration**: Download models directly with `alpaca pull`
 
+## Requirements
+
+- **llama-server** installed and available in PATH
+- **macOS or Linux** (GUI is macOS only)
+
+## Installation
+
+### Homebrew (macOS/Linux)
+
+```bash
+brew install d2verb/tap/alpaca
+```
+
+### Build from source
+
+```bash
+# Requires Go 1.25+ and Task (https://taskfile.dev)
+task build
+# Binary will be at ./build/alpaca
+```
+
 ## Quick Start
 
 ```bash
@@ -30,22 +51,6 @@ alpaca status
 
 # Create a preset for repeated use
 alpaca new
-```
-
-## Installation
-
-### Homebrew (macOS/Linux)
-
-```bash
-brew install d2verb/tap/alpaca
-```
-
-### Build from source
-
-```bash
-# Requires Go 1.25+ and Task (https://taskfile.dev)
-task build
-# Binary will be at ./build/alpaca
 ```
 
 ## Commands
@@ -65,11 +70,6 @@ task build
 - `alpaca show <identifier>` - Show preset or model details
 - `alpaca rm <identifier>` - Remove a preset or model
 - `alpaca new` - Create a preset interactively
-
-## Requirements
-
-- **llama-server** installed and available in PATH
-- **macOS or Linux** (GUI is macOS only)
 
 ## Documentation
 
