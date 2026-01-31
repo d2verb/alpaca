@@ -4,11 +4,15 @@ package preset
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/d2verb/alpaca/internal/identifier"
 )
+
+// namePattern validates preset names: alphanumeric, underscore, hyphen only.
+var namePattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 const (
 	// DefaultPort is the default port for llama-server.
@@ -21,9 +25,21 @@ const (
 	DefaultGPULayers = -1
 )
 
+// ValidateName checks if a preset name is valid.
+// Valid names contain only alphanumeric characters, underscores, and hyphens.
+func ValidateName(name string) error {
+	if name == "" {
+		return fmt.Errorf("name is required")
+	}
+	if !namePattern.MatchString(name) {
+		return fmt.Errorf("name must contain only alphanumeric characters, underscores, and hyphens")
+	}
+	return nil
+}
+
 // Preset represents a model + argument combination.
 type Preset struct {
-	Name        string   `yaml:"-"` // Derived from filename
+	Name        string   `yaml:"name"` // Required, used as identifier
 	Model       string   `yaml:"model"`
 	ContextSize int      `yaml:"context_size,omitempty"`
 	GPULayers   int      `yaml:"gpu_layers,omitempty"`

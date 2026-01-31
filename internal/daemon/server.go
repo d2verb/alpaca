@@ -142,7 +142,7 @@ func classifyLoadError(err error) (code, message string) {
 	msg := err.Error()
 
 	switch {
-	case strings.Contains(msg, "load preset") && strings.Contains(msg, "no such file"):
+	case strings.Contains(msg, "preset") && strings.Contains(msg, "not found"):
 		return protocol.ErrCodePresetNotFound, msg
 	case strings.Contains(msg, "not found in metadata"):
 		return protocol.ErrCodeModelNotFound, msg

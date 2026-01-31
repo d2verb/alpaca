@@ -6,6 +6,36 @@ import (
 	"testing"
 )
 
+func TestValidateName(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"valid alphanumeric", "mypreset", false},
+		{"valid with numbers", "preset123", false},
+		{"valid with hyphen", "my-preset", false},
+		{"valid with underscore", "my_preset", false},
+		{"valid mixed", "My-Preset_123", false},
+		{"empty string", "", true},
+		{"contains space", "my preset", true},
+		{"contains dot", "my.preset", true},
+		{"contains exclamation", "preset!", true},
+		{"contains at sign", "preset@name", true},
+		{"contains slash", "org/preset", true},
+		{"contains colon", "preset:name", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateName(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateName(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestPreset_GetPort(t *testing.T) {
 	tests := []struct {
 		name string

@@ -12,7 +12,8 @@ func TestCompletePresets(t *testing.T) {
 	tmpDir := t.TempDir()
 	presets := []string{"codellama", "gemma-2b", "llama3"}
 	for _, name := range presets {
-		err := os.WriteFile(filepath.Join(tmpDir, name+".yaml"), []byte("model: test"), 0644)
+		content := "name: " + name + "\nmodel: test"
+		err := os.WriteFile(filepath.Join(tmpDir, name+".yaml"), []byte(content), 0644)
 		if err != nil {
 			t.Fatalf("failed to create preset: %v", err)
 		}

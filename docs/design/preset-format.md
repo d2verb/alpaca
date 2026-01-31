@@ -8,16 +8,19 @@ Presets define a model + argument combination that can be loaded with a single c
 
 ```
 ~/.alpaca/presets/
-├── codellama-7b-q4.yaml
-├── mistral-7b-q4.yaml
-└── deepseek-coder.yaml
+├── a1b2c3d4e5f67890.yaml
+├── 1234567890abcdef.yaml
+└── fedcba0987654321.yaml
 ```
 
-Preset name is derived from the filename (without `.yaml` extension).
+Preset files are stored with random filenames (16 hex characters). The `name` field inside the YAML file is used as the identifier for loading (e.g., `alpaca load p:codellama-7b`).
 
 ## Format
 
 ```yaml
+# Required: preset identifier (alphanumeric, underscore, hyphen only)
+name: codellama-7b
+
 # Required: model identifier with explicit prefix
 model: "f:~/.alpaca/models/codellama-7b-Q4_K_M.gguf"
 
@@ -41,6 +44,7 @@ extra_args:
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `name` | string | Preset identifier used for loading (e.g., `alpaca load p:name`). Must match `[a-zA-Z0-9_-]+`. |
 | `model` | string | Model identifier with explicit prefix: `h:org/repo:quant` (HuggingFace) or `f:/path/to/file` (file path). |
 
 ### Optional Fields (Common)
@@ -92,6 +96,7 @@ extra_args:
 
 ```yaml
 # Absolute path
+name: mistral-7b-q4
 model: "f:/Users/username/.alpaca/models/mistral-7b.Q4_K_M.gguf"
 context_size: 4096
 gpu_layers: 35
@@ -99,13 +104,15 @@ gpu_layers: 35
 
 ```yaml
 # Home directory
+name: mistral-7b-q4
 model: "f:~/.alpaca/models/mistral-7b.Q4_K_M.gguf"
 context_size: 4096
 gpu_layers: 35
 ```
 
 ```yaml
-# Relative to preset file
+# Relative to current working directory
+name: codellama
 model: "f:./models/codellama.gguf"
 context_size: 4096
 gpu_layers: 35
@@ -115,6 +122,7 @@ gpu_layers: 35
 
 ```yaml
 # HuggingFace format (auto-resolved at runtime)
+name: gemma3-4b-q4
 model: "h:unsloth/gemma3-4b-it-GGUF:Q4_K_M"
 context_size: 4096
 gpu_layers: 35
@@ -125,6 +133,7 @@ gpu_layers: 35
 ### Full-Featured Preset
 
 ```yaml
+name: codellama-34b-instruct
 model: "f:~/.alpaca/models/codellama-34b-instruct.Q4_K_M.gguf"
 context_size: 8192
 gpu_layers: 50
@@ -140,6 +149,7 @@ extra_args:
 ### Preset with Custom Host
 
 ```yaml
+name: llama3-8b-network
 model: "f:~/.alpaca/models/llama3-8b.Q4_K_M.gguf"
 host: "0.0.0.0"  # Listen on all interfaces
 port: 8080

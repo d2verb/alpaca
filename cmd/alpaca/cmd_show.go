@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/d2verb/alpaca/internal/identifier"
 	"github.com/d2verb/alpaca/internal/model"
@@ -44,7 +45,10 @@ func (c *ShowCmd) showPreset(name, presetsDir string) error {
 	loader := preset.NewLoader(presetsDir)
 	p, err := loader.Load(name)
 	if err != nil {
-		return errPresetNotFound(name)
+		if strings.Contains(err.Error(), "not found") {
+			return errPresetNotFound(name)
+		}
+		return fmt.Errorf("load preset %s: %w", name, err)
 	}
 
 	ui.PrintPresetDetails(ui.PresetDetails{

@@ -22,7 +22,7 @@ type stubPresetLoader struct {
 func (s *stubPresetLoader) Load(name string) (*preset.Preset, error) {
 	p, ok := s.presets[name]
 	if !ok {
-		return nil, fmt.Errorf("open %s.yaml: no such file or directory", name)
+		return nil, fmt.Errorf("preset %s not found", name)
 	}
 	return p, nil
 }

@@ -20,9 +20,9 @@ func TestClassifyLoadError(t *testing.T) {
 	}{
 		{
 			name:         "preset not found",
-			err:          fmt.Errorf("load preset test: no such file or directory"),
+			err:          fmt.Errorf("preset test not found"),
 			wantCode:     protocol.ErrCodePresetNotFound,
-			wantContains: "no such file",
+			wantContains: "not found",
 		},
 		{
 			name:         "model not found",

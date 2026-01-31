@@ -2,10 +2,7 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/d2verb/alpaca/internal/preset"
 	"github.com/d2verb/alpaca/internal/ui"
@@ -27,13 +24,17 @@ func (c *NewCmd) Run() error {
 	if err != nil {
 		return err
 	}
-	if name == "" {
-		return fmt.Errorf("preset name is required")
+	if err := preset.ValidateName(name); err != nil {
+		return fmt.Errorf("invalid name: %w", err)
 	}
 
 	// Check if preset already exists
-	presetPath := filepath.Join(paths.Presets, name+".yaml")
-	if _, err := os.Stat(presetPath); err == nil {
+	loader := preset.NewLoader(paths.Presets)
+	exists, err := loader.Exists(name)
+	if err != nil {
+		return err
+	}
+	if exists {
 		return fmt.Errorf("preset '%s' already exists", name)
 	}
 
@@ -52,33 +53,29 @@ func (c *NewCmd) Run() error {
 	ctxStr, _ := promptLine("Context", strconv.Itoa(preset.DefaultContextSize))
 	gpuStr, _ := promptLine("GPU Layers", strconv.Itoa(preset.DefaultGPULayers))
 
-	// Build preset content
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("model: %s\n", model))
+	// Build preset
+	p := &preset.Preset{
+		Name:  name,
+		Model: model,
+	}
 
-	// Only write host if different from default
+	// Only set non-default values
 	if hostStr != "" && hostStr != preset.DefaultHost {
-		sb.WriteString(fmt.Sprintf("host: %s\n", hostStr))
+		p.Host = hostStr
 	}
-
-	// Only write port if different from default
 	if port, err := strconv.Atoi(portStr); err == nil && port != preset.DefaultPort {
-		sb.WriteString(fmt.Sprintf("port: %d\n", port))
+		p.Port = port
 	}
-
-	// Only write context_size if different from default
 	if ctx, err := strconv.Atoi(ctxStr); err == nil && ctx != preset.DefaultContextSize {
-		sb.WriteString(fmt.Sprintf("context_size: %d\n", ctx))
+		p.ContextSize = ctx
 	}
-
-	// Only write gpu_layers if different from default
 	if gpu, err := strconv.Atoi(gpuStr); err == nil && gpu != preset.DefaultGPULayers {
-		sb.WriteString(fmt.Sprintf("gpu_layers: %d\n", gpu))
+		p.GPULayers = gpu
 	}
 
-	// Write file
-	if err := os.WriteFile(presetPath, []byte(sb.String()), 0644); err != nil {
-		return fmt.Errorf("write preset: %w", err)
+	// Create preset
+	if err := loader.Create(p); err != nil {
+		return fmt.Errorf("create preset: %w", err)
 	}
 
 	// Success message with next steps

@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
+	"strings"
 
 	"github.com/d2verb/alpaca/internal/identifier"
 	"github.com/d2verb/alpaca/internal/model"
+	"github.com/d2verb/alpaca/internal/preset"
 	"github.com/d2verb/alpaca/internal/ui"
 )
 
@@ -42,10 +42,14 @@ func (c *RemoveCmd) Run() error {
 }
 
 func (c *RemoveCmd) removePreset(name, presetsDir string) error {
-	presetPath := filepath.Join(presetsDir, name+".yaml")
+	loader := preset.NewLoader(presetsDir)
 
 	// Check if preset exists
-	if _, err := os.Stat(presetPath); os.IsNotExist(err) {
+	exists, err := loader.Exists(name)
+	if err != nil {
+		return err
+	}
+	if !exists {
 		return errPresetNotFound(name)
 	}
 
@@ -55,8 +59,11 @@ func (c *RemoveCmd) removePreset(name, presetsDir string) error {
 		return nil
 	}
 
-	// Delete file
-	if err := os.Remove(presetPath); err != nil {
+	// Remove preset
+	if err := loader.Remove(name); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return errPresetNotFound(name)
+		}
 		return fmt.Errorf("remove preset: %w", err)
 	}
 
