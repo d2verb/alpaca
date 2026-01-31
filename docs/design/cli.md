@@ -214,13 +214,13 @@ List available presets and downloaded models.
 ```bash
 $ alpaca ls
 Available presets:
-  codellama-7b-q4
-  mistral-7b
-  deepseek-coder
+  p:codellama-7b-q4
+  p:mistral-7b
+  p:deepseek-coder
 
 Downloaded models:
-  TheBloke/CodeLlama-7B-GGUF:Q4_K_M (4.1 GB)
-  TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M (4.8 GB)
+  h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M (4.1 GB)
+  h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M (4.8 GB)
 ```
 
 When no presets or models exist:

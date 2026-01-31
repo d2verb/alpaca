@@ -11,7 +11,7 @@ import (
 )
 
 type ShowCmd struct {
-	Identifier string `arg:"" help:"Show details (p:name or h:org/repo:quant)"`
+	Identifier string `arg:"" help:"Show details (p:name or h:org/repo:quant)" predictor:"show-identifier"`
 }
 
 func (c *ShowCmd) Run() error {

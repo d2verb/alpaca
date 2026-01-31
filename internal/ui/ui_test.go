@@ -131,8 +131,8 @@ func TestPrintModelList(t *testing.T) {
 	if !strings.Contains(output, "Downloaded models:") {
 		t.Error("Output should contain header")
 	}
-	if !strings.Contains(output, "org/model1") {
-		t.Error("Output should contain first model")
+	if !strings.Contains(output, "h:org/model1") {
+		t.Error("Output should contain first model with h: prefix")
 	}
 	if !strings.Contains(output, "Q4_K_M") {
 		t.Error("Output should contain first quant")
@@ -140,8 +140,8 @@ func TestPrintModelList(t *testing.T) {
 	if !strings.Contains(output, "2.5 GB") {
 		t.Error("Output should contain first size")
 	}
-	if !strings.Contains(output, "org/model2") {
-		t.Error("Output should contain second model")
+	if !strings.Contains(output, "h:org/model2") {
+		t.Error("Output should contain second model with h: prefix")
 	}
 }
 
@@ -185,11 +185,11 @@ func TestPrintPresetList(t *testing.T) {
 	if !strings.Contains(output, "Available presets:") {
 		t.Error("Output should contain header")
 	}
-	if !strings.Contains(output, "preset1") {
-		t.Error("Output should contain first preset")
+	if !strings.Contains(output, "p:preset1") {
+		t.Error("Output should contain first preset with p: prefix")
 	}
-	if !strings.Contains(output, "preset2") {
-		t.Error("Output should contain second preset")
+	if !strings.Contains(output, "p:preset2") {
+		t.Error("Output should contain second preset with p: prefix")
 	}
 }
 

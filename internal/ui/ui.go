@@ -72,8 +72,9 @@ func PrintModelList(models []ModelInfo) {
 
 	fmt.Fprintln(Output, Bold("Downloaded models:"))
 	for _, m := range models {
-		// Format: repo:quant (size)
-		fmt.Fprintf(Output, "  %s:%s %s\n",
+		// Format: h:repo:quant (size)
+		fmt.Fprintf(Output, "  %s:%s:%s %s\n",
+			Cyan("h"),
 			Cyan(m.Repo),
 			Yellow(m.Quant),
 			Dim(fmt.Sprintf("(%s)", m.SizeString)),
@@ -97,7 +98,7 @@ func PrintPresetList(presets []string) {
 
 	fmt.Fprintln(Output, Bold("Available presets:"))
 	for _, p := range presets {
-		fmt.Fprintf(Output, "  %s\n", Cyan(p))
+		fmt.Fprintf(Output, "  %s:%s\n", Cyan("p"), Cyan(p))
 	}
 }
 

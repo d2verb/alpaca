@@ -12,7 +12,7 @@ import (
 )
 
 type LoadCmd struct {
-	Identifier string `arg:"" help:"Identifier (p:preset, h:org/repo:quant, or f:/path/to/file)"`
+	Identifier string `arg:"" help:"Identifier (p:preset, h:org/repo:quant, or f:/path/to/file)" predictor:"load-identifier"`
 }
 
 func (c *LoadCmd) Run() error {

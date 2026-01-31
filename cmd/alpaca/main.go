@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/alecthomas/kong"
+	"github.com/willabides/kongplete"
 )
 
 var (
@@ -26,11 +27,14 @@ type CLI struct {
 	Pull    PullCmd    `cmd:"" help:"Download a model"`
 	New     NewCmd     `cmd:"" help:"Create a new preset interactively"`
 	Version VersionCmd `cmd:"" help:"Show version"`
+
+	// Completion commands
+	InstallCompletions kongplete.InstallCompletions `cmd:"" help:"Install shell completions"`
 }
 
 func main() {
 	cli := CLI{}
-	ctx := kong.Parse(&cli,
+	parser, err := kong.New(&cli,
 		kong.Name("alpaca"),
 		kong.Description("Lightweight llama-server wrapper"),
 		kong.UsageOnError(),
@@ -38,7 +42,23 @@ func main() {
 			Compact: true,
 		}),
 	)
-	err := ctx.Run()
+	if err != nil {
+		panic(err)
+	}
+
+	// Add completion support with different predictors per command
+	kongplete.Complete(parser,
+		kongplete.WithPredictor("show-identifier", newShowIdentifierPredictor()),
+		kongplete.WithPredictor("rm-identifier", newRmIdentifierPredictor()),
+		kongplete.WithPredictor("load-identifier", newLoadIdentifierPredictor()),
+	)
+
+	ctx, err := parser.Parse(os.Args[1:])
+	if err != nil {
+		parser.FatalIfErrorf(err)
+	}
+
+	err = ctx.Run()
 	if err != nil {
 		var exitErr *ExitError
 		if errors.As(err, &exitErr) {

@@ -12,7 +12,7 @@ import (
 )
 
 type RemoveCmd struct {
-	Identifier string `arg:"" help:"Identifier to remove (p:name or h:org/repo:quant)"`
+	Identifier string `arg:"" help:"Identifier to remove (p:name or h:org/repo:quant)" predictor:"rm-identifier"`
 }
 
 func (c *RemoveCmd) Run() error {
