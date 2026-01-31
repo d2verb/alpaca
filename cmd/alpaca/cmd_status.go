@@ -24,7 +24,7 @@ func (c *StatusCmd) Run() error {
 	preset, _ := resp.Data["preset"].(string)
 	endpoint, _ := resp.Data["endpoint"].(string)
 
-	ui.PrintStatus(state, preset, endpoint, paths.DaemonLog)
+	ui.PrintStatus(state, preset, endpoint, paths.LlamaLog)
 
 	return nil
 }

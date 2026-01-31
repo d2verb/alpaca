@@ -51,40 +51,79 @@ func TestStatusBadge(t *testing.T) {
 }
 
 func TestPrintStatus(t *testing.T) {
-	// Disable color for testing
-	color.NoColor = true
-	defer func() { color.NoColor = false }()
+	tests := []struct {
+		name           string
+		preset         string
+		expectContains string
+		expectLabel    string
+	}{
+		{
+			name:           "preset without prefix",
+			preset:         "test-preset",
+			expectContains: "p:test-preset",
+			expectLabel:    "Preset",
+		},
+		{
+			name:           "preset with p: prefix",
+			preset:         "p:codellama",
+			expectContains: "p:codellama",
+			expectLabel:    "Preset",
+		},
+		{
+			name:           "HuggingFace identifier",
+			preset:         "h:unsloth/gemma-3-4b-it-GGUF:Q4_K_M",
+			expectContains: "h:unsloth/gemma-3-4b-it-GGUF:Q4_K_M",
+			expectLabel:    "Model",
+		},
+		{
+			name:           "file path identifier",
+			preset:         "f:/path/to/model.gguf",
+			expectContains: "f:/path/to/model.gguf",
+			expectLabel:    "Model",
+		},
+	}
 
-	// Arrange
-	var buf bytes.Buffer
-	Output = &buf
-	defer func() { Output = nil }()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Disable color for testing
+			color.NoColor = true
+			defer func() { color.NoColor = false }()
 
-	// Act
-	PrintStatus("running", "test-preset", "http://localhost:8080", "/path/to/logs")
+			// Arrange
+			var buf bytes.Buffer
+			Output = &buf
+			defer func() { Output = nil }()
 
-	// Assert
-	output := buf.String()
-	if !strings.Contains(output, "🚀 Status") {
-		t.Error("Output should contain '🚀 Status' header")
-	}
-	if !strings.Contains(output, "● Running") {
-		t.Error("Output should contain running badge")
-	}
-	if !strings.Contains(output, "State") {
-		t.Error("Output should contain 'State' label")
-	}
-	if !strings.Contains(output, "Preset") {
-		t.Error("Output should contain 'Preset' label")
-	}
-	if !strings.Contains(output, "p:test-preset") {
-		t.Error("Output should contain preset name with p: prefix")
-	}
-	if !strings.Contains(output, "http://localhost:8080") {
-		t.Error("Output should contain endpoint")
-	}
-	if !strings.Contains(output, "/path/to/logs") {
-		t.Error("Output should contain log path")
+			// Act
+			PrintStatus("running", tt.preset, "http://localhost:8080", "/path/to/llama.log")
+
+			// Assert
+			output := buf.String()
+			if !strings.Contains(output, "🚀 Status") {
+				t.Error("Output should contain '🚀 Status' header")
+			}
+			if !strings.Contains(output, "● Running") {
+				t.Error("Output should contain running badge")
+			}
+			if !strings.Contains(output, "State") {
+				t.Error("Output should contain 'State' label")
+			}
+			if !strings.Contains(output, tt.expectLabel) {
+				t.Errorf("Output should contain '%s' label, got: %s", tt.expectLabel, output)
+			}
+			if !strings.Contains(output, tt.expectContains) {
+				t.Errorf("Output should contain %q, got: %s", tt.expectContains, output)
+			}
+			if !strings.Contains(output, "http://localhost:8080") {
+				t.Error("Output should contain endpoint")
+			}
+			if !strings.Contains(output, "Logs") {
+				t.Error("Output should contain 'Logs' label")
+			}
+			if !strings.Contains(output, "/path/to/llama.log") {
+				t.Error("Output should contain log path")
+			}
+		})
 	}
 }
 
@@ -99,15 +138,24 @@ func TestPrintStatus_NoPreset(t *testing.T) {
 	defer func() { Output = nil }()
 
 	// Act
-	PrintStatus("idle", "", "", "/path/to/logs")
+	PrintStatus("idle", "", "", "/path/to/llama.log")
 
 	// Assert
 	output := buf.String()
 	if strings.Contains(output, "Preset") {
 		t.Error("Output should not contain 'Preset' label when empty")
 	}
+	if strings.Contains(output, "Model") {
+		t.Error("Output should not contain 'Model' label when empty")
+	}
 	if strings.Contains(output, "Endpoint") {
 		t.Error("Output should not contain 'Endpoint' label when empty")
+	}
+	if !strings.Contains(output, "Logs") {
+		t.Error("Output should contain 'Logs' label")
+	}
+	if !strings.Contains(output, "/path/to/llama.log") {
+		t.Error("Output should contain log path")
 	}
 }
 
@@ -425,6 +473,78 @@ func TestFormatEndpoint(t *testing.T) {
 	// Assert
 	if !strings.Contains(result, "http://localhost:8080") {
 		t.Errorf("FormatEndpoint should contain the endpoint, got: %q", result)
+	}
+}
+
+func TestFormatPresetOrModel(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	tests := []struct {
+		name         string
+		input        string
+		wantLabel    string
+		wantContains []string
+	}{
+		{
+			name:         "HuggingFace identifier with quant",
+			input:        "h:org/repo:Q4_K_M",
+			wantLabel:    "Model",
+			wantContains: []string{"h:", "org/repo", "Q4_K_M"},
+		},
+		{
+			name:         "HuggingFace identifier without quant",
+			input:        "h:org/repo",
+			wantLabel:    "Model",
+			wantContains: []string{"h:", "org/repo"},
+		},
+		{
+			name:         "HuggingFace identifier with multiple colons",
+			input:        "h:org:special/repo:Q4_K_M",
+			wantLabel:    "Model",
+			wantContains: []string{"h:", "org:special/repo", "Q4_K_M"},
+		},
+		{
+			name:         "preset identifier",
+			input:        "p:my-preset",
+			wantLabel:    "Preset",
+			wantContains: []string{"p:", "my-preset"},
+		},
+		{
+			name:         "file path identifier",
+			input:        "f:/path/to/model.gguf",
+			wantLabel:    "Model",
+			wantContains: []string{"f:", "/path/to/model.gguf"},
+		},
+		{
+			name:         "no prefix - treated as preset",
+			input:        "just-a-name",
+			wantLabel:    "Preset",
+			wantContains: []string{"p:", "just-a-name"},
+		},
+		{
+			name:         "unknown prefix - treated as preset",
+			input:        "x:something",
+			wantLabel:    "Preset",
+			wantContains: []string{"p:", "x:something"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			label, formatted := formatPresetOrModel(tt.input)
+
+			if label != tt.wantLabel {
+				t.Errorf("formatPresetOrModel(%q) label = %q, want %q", tt.input, label, tt.wantLabel)
+			}
+
+			for _, expected := range tt.wantContains {
+				if !strings.Contains(formatted, expected) {
+					t.Errorf("formatPresetOrModel(%q) formatted = %q, should contain %q", tt.input, formatted, expected)
+				}
+			}
+		})
 	}
 }
 

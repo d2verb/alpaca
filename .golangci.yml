@@ -5,10 +5,10 @@ run:
 
 linters:
   disable:
-    - errcheck        # Too noisy for this codebase
+    - errcheck # Too noisy for this codebase
   enable:
-    - misspell        # Spell checking
-    - nilerr          # nil error checks
+    - misspell # Spell checking
+    - nilerr # nil error checks
 
 formatters:
   enable:

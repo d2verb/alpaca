@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/fatih/color"
 )
@@ -72,13 +73,50 @@ func PrintStatus(state, preset, endpoint, logPath string) {
 
 	PrintKeyValue("State", StatusBadge(state))
 	if preset != "" {
-		// Display with p: prefix
-		PrintKeyValue("Preset", fmt.Sprintf("%s%s", Primary("p:"), Primary(preset)))
+		label, formatted := formatPresetOrModel(preset)
+		PrintKeyValue(label, formatted)
 	}
 	if endpoint != "" {
 		PrintKeyValue("Endpoint", Link(endpoint))
 	}
 	PrintKeyValue("Logs", logPath)
+}
+
+// formatPresetOrModel formats a preset or model identifier and returns the label and formatted string.
+// It handles h:, p:, and f: prefixes, as well as identifiers without prefixes.
+func formatPresetOrModel(id string) (label, formatted string) {
+	// Check if identifier has a valid prefix
+	if len(id) < 2 || id[1] != ':' {
+		// No prefix - treat as preset name
+		return "Preset", fmt.Sprintf("%s%s", Primary("p:"), Primary(id))
+	}
+
+	prefix := id[0]
+	rest := id[2:]
+
+	switch prefix {
+	case 'h':
+		// HuggingFace model: h:org/repo:quant
+		lastColon := strings.LastIndex(rest, ":")
+		if lastColon != -1 {
+			repo := rest[:lastColon]
+			quant := rest[lastColon+1:]
+			return "Model", fmt.Sprintf("%s%s:%s", Primary("h:"), Primary(repo), Secondary(quant))
+		}
+		return "Model", fmt.Sprintf("%s%s", Primary("h:"), Primary(rest))
+
+	case 'f':
+		// File path: f:/path/to/file
+		return "Model", fmt.Sprintf("%s%s", Primary("f:"), Link(rest))
+
+	case 'p':
+		// Preset: p:name
+		return "Preset", fmt.Sprintf("%s%s", Primary("p:"), Primary(rest))
+
+	default:
+		// Unknown prefix - treat as preset name
+		return "Preset", fmt.Sprintf("%s%s", Primary("p:"), Primary(id))
+	}
 }
 
 // PrintModelList prints a list of downloaded models with formatting.

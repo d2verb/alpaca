@@ -97,3 +97,4 @@ See `architecture.md` for full protocol specification including error codes.
 - Add llama.cpp version management
 - Implement custom inference
 - Over-engineer
+- Implement features that are not needed right now (YAGNI)

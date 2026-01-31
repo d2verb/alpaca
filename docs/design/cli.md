@@ -51,18 +51,18 @@ Show current status.
 ```bash
 $ alpaca status
 🚀 Status
-  State      ● Running
-  Preset     p:qwen3-coder-30b
-  Endpoint   http://localhost:8080
-  Logs       /Users/username/.alpaca/logs/daemon.log
+  State          ● Running
+  Preset         p:qwen3-coder-30b
+  Endpoint       http://localhost:8080
+  Logs           /Users/username/.alpaca/logs/llama.log
 ```
 
 When no model is loaded:
 ```bash
 $ alpaca status
 🚀 Status
-  State      ○ Idle
-  Logs       /Users/username/.alpaca/logs/daemon.log
+  State          ○ Idle
+  Logs           /Users/username/.alpaca/logs/llama.log
 ```
 
 When daemon is not running:
