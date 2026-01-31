@@ -69,8 +69,3 @@ func (c *Client) Load(identifier string) (*protocol.Response, error) {
 func (c *Client) Unload() (*protocol.Response, error) {
 	return c.Send(protocol.NewRequest(protocol.CmdUnload, nil))
 }
-
-// ListPresets sends a list_presets request to the daemon.
-func (c *Client) ListPresets() (*protocol.Response, error) {
-	return c.Send(protocol.NewRequest(protocol.CmdListPresets, nil))
-}

@@ -170,75 +170,6 @@ func TestWaitForReady_ImmediateSuccess(t *testing.T) {
 	}
 }
 
-func TestCheckHealth_Success(t *testing.T) {
-	// Arrange
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/health" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer mockServer.Close()
-
-	// Act
-	err := CheckHealth(mockServer.URL)
-
-	// Assert
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestCheckHealth_NonOKStatus(t *testing.T) {
-	// Arrange
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusServiceUnavailable)
-	}))
-	defer mockServer.Close()
-
-	// Act
-	err := CheckHealth(mockServer.URL)
-
-	// Assert
-	if err == nil {
-		t.Fatal("expected error for non-OK status, got nil")
-	}
-	expectedMsg := "health check: status 503"
-	if err.Error() != expectedMsg {
-		t.Errorf("error message = %q, want %q", err.Error(), expectedMsg)
-	}
-}
-
-func TestCheckHealth_NetworkError(t *testing.T) {
-	// Arrange - Invalid endpoint
-	invalidEndpoint := "http://localhost:9999"
-
-	// Act
-	err := CheckHealth(invalidEndpoint)
-
-	// Assert
-	if err == nil {
-		t.Fatal("expected network error, got nil")
-	}
-	// Should contain "health check:" prefix
-	if len(err.Error()) < len("health check: ") {
-		t.Errorf("error message too short: %q", err.Error())
-	}
-}
-
-func TestCheckHealth_InvalidURL(t *testing.T) {
-	// Arrange
-	invalidEndpoint := "://invalid-url"
-
-	// Act
-	err := CheckHealth(invalidEndpoint)
-
-	// Assert
-	if err == nil {
-		t.Fatal("expected error for invalid URL, got nil")
-	}
-}
-
 func TestWaitForReady_MultipleStatusChanges(t *testing.T) {
 	// Arrange - Server alternates between error and success
 	var callCount atomic.Int32
@@ -290,32 +221,5 @@ func TestWaitForReady_SlowServer(t *testing.T) {
 	// Assert
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestCheckHealth_VerifyTimeout(t *testing.T) {
-	// Arrange - Server that never responds (exceeds HealthCheckTimeout)
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Sleep longer than HealthCheckTimeout
-		time.Sleep(6 * time.Second)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer mockServer.Close()
-
-	// Act
-	start := time.Now()
-	err := CheckHealth(mockServer.URL)
-	elapsed := time.Since(start)
-
-	// Assert
-	if err == nil {
-		t.Fatal("expected timeout error, got nil")
-	}
-	// Should timeout around HealthCheckTimeout (5s)
-	if elapsed > 6*time.Second {
-		t.Errorf("timeout took too long: %v (expected ~%v)", elapsed, HealthCheckTimeout)
-	}
-	if elapsed < 4*time.Second {
-		t.Errorf("timeout happened too quickly: %v (expected ~%v)", elapsed, HealthCheckTimeout)
 	}
 }

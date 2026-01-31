@@ -44,15 +44,6 @@ func (p *Puller) SetProgressFunc(fn ProgressFunc) {
 	p.onProgress = fn
 }
 
-// ParseModelSpec parses a model specification (repo:quant).
-func ParseModelSpec(spec string) (repo, quant string, err error) {
-	parts := strings.SplitN(spec, ":", 2)
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid model spec: expected 'repo:quant', got '%s'", spec)
-	}
-	return parts[0], parts[1], nil
-}
-
 // PullResult contains information about the downloaded file.
 type PullResult struct {
 	Path     string
