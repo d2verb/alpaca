@@ -211,8 +211,11 @@ func TestPrintModelList_Empty(t *testing.T) {
 
 	// Assert
 	output := buf.String()
-	if !strings.Contains(output, "No models downloaded") {
-		t.Error("Output should contain empty message")
+	if !strings.Contains(output, "🤖 Models") {
+		t.Error("Output should contain header even when empty")
+	}
+	if !strings.Contains(output, "(none)") {
+		t.Error("Output should contain '(none)' when empty")
 	}
 }
 
@@ -259,8 +262,11 @@ func TestPrintPresetList_Empty(t *testing.T) {
 
 	// Assert
 	output := buf.String()
-	if !strings.Contains(output, "No presets available") {
-		t.Error("Output should contain empty message")
+	if !strings.Contains(output, "📦 Presets") {
+		t.Error("Output should contain header even when empty")
+	}
+	if !strings.Contains(output, "(none)") {
+		t.Error("Output should contain '(none)' when empty")
 	}
 }
 

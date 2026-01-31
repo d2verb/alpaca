@@ -45,16 +45,8 @@ func (c *ListCmd) Run() error {
 
 	// Print both lists
 	ui.PrintPresetList(presetNames)
-	if len(presetNames) > 0 && len(models) > 0 {
-		fmt.Fprintln(ui.Output) // Single blank line between sections
-	}
+	fmt.Fprintln(ui.Output) // Single blank line between sections
 	ui.PrintModelList(models)
-
-	// Print help message if both are empty
-	if len(presetNames) == 0 && len(models) == 0 {
-		ui.PrintInfo("Create preset: alpaca new")
-		ui.PrintInfo("Download model: alpaca pull h:org/repo:quant")
-	}
 
 	return nil
 }

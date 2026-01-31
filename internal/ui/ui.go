@@ -121,12 +121,12 @@ func formatPresetOrModel(id string) (label, formatted string) {
 
 // PrintModelList prints a list of downloaded models with formatting.
 func PrintModelList(models []ModelInfo) {
+	PrintSectionHeader("🤖", "Models")
 	if len(models) == 0 {
-		PrintEmptyState("No models downloaded", "alpaca pull h:org/repo:quant")
+		fmt.Fprintf(Output, "  %s\n", Muted("(none)"))
 		return
 	}
 
-	PrintSectionHeader("🤖", "Models")
 	for _, m := range models {
 		// Display in full h:repo:quant format (matches command input)
 		fmt.Fprintf(Output, "  %s%s:%s\n",
@@ -152,12 +152,12 @@ type ModelInfo struct {
 
 // PrintPresetList prints a list of available presets with formatting.
 func PrintPresetList(presets []string) {
+	PrintSectionHeader("📦", "Presets")
 	if len(presets) == 0 {
-		PrintEmptyState("No presets available", "alpaca new")
+		fmt.Fprintf(Output, "  %s\n", Muted("(none)"))
 		return
 	}
 
-	PrintSectionHeader("📦", "Presets")
 	for _, name := range presets {
 		// Display with p: prefix (matches command input)
 		fmt.Fprintf(Output, "  %s%s\n", Primary("p:"), Primary(name))
@@ -269,14 +269,6 @@ func PrintDetailHeader(icon, title, identifier string) {
 // PrintKeyValue prints a key-value pair with aligned formatting.
 func PrintKeyValue(key, value string) {
 	fmt.Fprintf(Output, "  %-14s %s\n", key, value)
-}
-
-// PrintEmptyState prints a message when no data exists.
-func PrintEmptyState(message, suggestion string) {
-	fmt.Fprintf(Output, "%s\n\n", Muted(message))
-	if suggestion != "" {
-		fmt.Fprintf(Output, "  %s  %s\n\n", Label("Create one:"), Info(suggestion))
-	}
 }
 
 // repeatString repeats a string n times.
