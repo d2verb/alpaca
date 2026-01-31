@@ -21,8 +21,8 @@
 alpaca start
 
 # Download and load a model
-alpaca pull h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q4_K_M
-alpaca load h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q4_K_M
+alpaca pull h:unsloth/gemma-3-4b-it-GGUF:Q4_K_M
+alpaca load h:unsloth/gemma-3-4b-it-GGUF:Q4_K_M
 
 # Check status
 alpaca status
