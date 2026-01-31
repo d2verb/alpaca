@@ -31,11 +31,11 @@ Temporary design/implementation memos go in `docs/wip/`.
 
 ## After Every Change
 
-1. Run `task check`
+1. Run `task check` (Go) or `task gui:test` (Swift)
 2. Update related docs (`docs/design/`, `README.md`)
 
 ## Scope Boundaries
 
-**Do:** TDD, keep it simple, use system-installed llama-server, rely on llama-server's /health
+**Do:** TDD, keep it simple, use system-installed llama-server
 
 **Don't:** llama.cpp version management, custom inference, over-engineering, YAGNI violations
