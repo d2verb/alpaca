@@ -18,8 +18,14 @@ jobs:
         with:
           go-version: '1.25'
 
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v9
+      - name: Install Task
+        uses: arduino/setup-task@v2
+
+      - name: Install tools
+        run: task tools
+
+      - name: Run lint
+        run: task lint
 
   test:
     name: Test
@@ -32,8 +38,11 @@ jobs:
         with:
           go-version: '1.25'
 
+      - name: Install Task
+        uses: arduino/setup-task@v2
+
       - name: Run tests
-        run: go test -race ./...
+        run: task test
 
   build:
     name: Build
@@ -46,5 +55,8 @@ jobs:
         with:
           go-version: '1.25'
 
+      - name: Install Task
+        uses: arduino/setup-task@v2
+
       - name: Build CLI
-        run: go build -o alpaca ./cmd/alpaca
+        run: task build
