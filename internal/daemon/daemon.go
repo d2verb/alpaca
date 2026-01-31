@@ -226,7 +226,7 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 	if err := proc.Start(ctx, p.BuildArgs()); err != nil {
 		d.state.Store(StateIdle)
 		d.preset.Store(nil)
-		return fmt.Errorf("start llama-server: %w", err)
+		return err
 	}
 	d.process = proc
 
@@ -237,7 +237,7 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 		d.process = nil
 		d.preset.Store(nil)
 		d.state.Store(StateIdle)
-		return fmt.Errorf("wait for llama-server ready: %w", err)
+		return &llama.ProcessError{Op: llama.ProcessOpWait, Err: err}
 	}
 
 	d.state.Store(StateRunning)

@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/d2verb/alpaca/internal/identifier"
 	"github.com/d2verb/alpaca/internal/model"
@@ -61,7 +61,8 @@ func (c *RemoveCmd) removePreset(name, presetsDir string) error {
 
 	// Remove preset
 	if err := loader.Remove(name); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		var notFound *preset.NotFoundError
+		if errors.As(err, &notFound) || preset.IsStoreMissing(err) {
 			return errPresetNotFound(name)
 		}
 		return fmt.Errorf("remove preset: %w", err)

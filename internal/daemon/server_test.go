@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/d2verb/alpaca/internal/config"
+	"github.com/d2verb/alpaca/internal/llama"
 	"github.com/d2verb/alpaca/internal/metadata"
 	"github.com/d2verb/alpaca/internal/preset"
 	"github.com/d2verb/alpaca/internal/protocol"
@@ -20,27 +21,27 @@ func TestClassifyLoadError(t *testing.T) {
 	}{
 		{
 			name:         "preset not found",
-			err:          fmt.Errorf("preset test not found"),
+			err:          fmt.Errorf("load preset: %w", &preset.NotFoundError{Name: "test"}),
 			wantCode:     protocol.ErrCodePresetNotFound,
 			wantContains: "not found",
 		},
 		{
 			name:         "model not found",
-			err:          fmt.Errorf("resolve model: not found in metadata"),
+			err:          fmt.Errorf("resolve model: %w", &metadata.NotFoundError{Repo: "unknown", Quant: "Q4_K_M"}),
 			wantCode:     protocol.ErrCodeModelNotFound,
 			wantContains: "not found in metadata",
 		},
 		{
 			name:         "server start failed",
-			err:          fmt.Errorf("start llama-server: command not found"),
+			err:          &llama.ProcessError{Op: llama.ProcessOpStart, Err: fmt.Errorf("command not found")},
 			wantCode:     protocol.ErrCodeServerFailed,
 			wantContains: "start llama-server",
 		},
 		{
 			name:         "server health check failed",
-			err:          fmt.Errorf("wait for llama-server ready: timeout"),
+			err:          &llama.ProcessError{Op: llama.ProcessOpWait, Err: fmt.Errorf("timeout")},
 			wantCode:     protocol.ErrCodeServerFailed,
-			wantContains: "wait for llama-server",
+			wantContains: "wait llama-server",
 		},
 		{
 			name:         "unknown error",
@@ -255,7 +256,7 @@ func TestHandleLoad_ModelNotFound(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{
-		err: fmt.Errorf("model not found in metadata"),
+		err: &metadata.NotFoundError{Repo: "unknown", Quant: "Q4_K_M"},
 	}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
 	userCfg := config.DefaultConfig()

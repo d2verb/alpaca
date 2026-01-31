@@ -3,6 +3,7 @@ package preset
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,7 +27,7 @@ func (l *Loader) Load(name string) (*Preset, error) {
 	entries, err := os.ReadDir(l.presetsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("preset %s not found", name)
+			return nil, &storeMissingError{err: err}
 		}
 		return nil, fmt.Errorf("read presets dir: %w", err)
 	}
@@ -46,7 +47,7 @@ func (l *Loader) Load(name string) (*Preset, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("preset %s not found", name)
+	return nil, &NotFoundError{Name: name}
 }
 
 // loadFile loads a preset from a specific file path.
@@ -107,7 +108,13 @@ func (l *Loader) List() ([]string, error) {
 func (l *Loader) Exists(name string) (bool, error) {
 	_, err := l.Load(name)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		var notFound *NotFoundError
+		if errors.As(err, &notFound) {
+			return false, nil
+		}
+		// Directory doesn't exist yet - preset cannot exist
+		// This allows Create() to work correctly on first use
+		if IsStoreMissing(err) {
 			return false, nil
 		}
 		return false, err
@@ -132,7 +139,7 @@ func (l *Loader) Create(p *Preset) error {
 		return fmt.Errorf("check existing: %w", err)
 	}
 	if exists {
-		return fmt.Errorf("preset '%s' already exists", p.Name)
+		return &AlreadyExistsError{Name: p.Name}
 	}
 
 	// Generate random filename
@@ -160,7 +167,7 @@ func (l *Loader) Remove(name string) error {
 	entries, err := os.ReadDir(l.presetsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("preset %s not found", name)
+			return &storeMissingError{err: err}
 		}
 		return fmt.Errorf("read presets dir: %w", err)
 	}
@@ -184,7 +191,7 @@ func (l *Loader) Remove(name string) error {
 		}
 	}
 
-	return fmt.Errorf("preset %s not found", name)
+	return &NotFoundError{Name: name}
 }
 
 // generateFilename generates a random filename (16 hex characters).

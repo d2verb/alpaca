@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/d2verb/alpaca/internal/config"
+	"github.com/d2verb/alpaca/internal/llama"
 	"github.com/d2verb/alpaca/internal/metadata"
 	"github.com/d2verb/alpaca/internal/preset"
 )
@@ -22,7 +23,7 @@ type stubPresetLoader struct {
 func (s *stubPresetLoader) Load(name string) (*preset.Preset, error) {
 	p, ok := s.presets[name]
 	if !ok {
-		return nil, fmt.Errorf("preset %s not found", name)
+		return nil, &preset.NotFoundError{Name: name}
 	}
 	return p, nil
 }
@@ -227,7 +228,10 @@ type mockProcess struct {
 func (m *mockProcess) Start(ctx context.Context, args []string) error {
 	m.startCalled = true
 	m.receivedArgs = args
-	return m.startErr
+	if m.startErr != nil {
+		return &llama.ProcessError{Op: llama.ProcessOpStart, Err: m.startErr}
+	}
+	return nil
 }
 
 func (m *mockProcess) Stop(ctx context.Context) error {

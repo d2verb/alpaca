@@ -172,7 +172,7 @@ func (m *Manager) List() []ModelEntry {
 func (m *Manager) GetFilePath(modelsDir, repo, quant string) (string, error) {
 	entry := m.Find(repo, quant)
 	if entry == nil {
-		return "", fmt.Errorf("model %s:%s not found in metadata", repo, quant)
+		return "", &NotFoundError{Repo: repo, Quant: quant}
 	}
 
 	filePath := filepath.Join(modelsDir, entry.Filename)

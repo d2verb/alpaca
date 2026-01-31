@@ -54,7 +54,7 @@ func (p *Process) Start(ctx context.Context, args []string) error {
 	}
 
 	if err := p.cmd.Start(); err != nil {
-		return fmt.Errorf("start llama-server: %w", err)
+		return &ProcessError{Op: ProcessOpStart, Err: err}
 	}
 
 	return nil

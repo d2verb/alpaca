@@ -86,7 +86,7 @@ func (m *Manager) GetDetails(ctx context.Context, repo, quant string) (*metadata
 
 	entry := m.metadata.Find(repo, quant)
 	if entry == nil {
-		return nil, fmt.Errorf("model not found")
+		return nil, &metadata.NotFoundError{Repo: repo, Quant: quant}
 	}
 
 	return entry, nil

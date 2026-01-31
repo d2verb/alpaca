@@ -4,10 +4,13 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"os"
-	"strings"
 
+	"github.com/d2verb/alpaca/internal/llama"
+	"github.com/d2verb/alpaca/internal/metadata"
+	"github.com/d2verb/alpaca/internal/preset"
 	"github.com/d2verb/alpaca/internal/protocol"
 )
 
@@ -137,20 +140,25 @@ func (s *Server) handleLoad(ctx context.Context, req *protocol.Request) *protoco
 	})
 }
 
-// classifyLoadError determines the error code based on the error message.
+// classifyLoadError determines the error code based on the error type.
 func classifyLoadError(err error) (code, message string) {
 	msg := err.Error()
 
-	switch {
-	case strings.Contains(msg, "preset") && strings.Contains(msg, "not found"):
+	var presetNotFound *preset.NotFoundError
+	if errors.As(err, &presetNotFound) || preset.IsStoreMissing(err) {
 		return protocol.ErrCodePresetNotFound, msg
-	case strings.Contains(msg, "not found in metadata"):
-		return protocol.ErrCodeModelNotFound, msg
-	case strings.Contains(msg, "start llama-server") || strings.Contains(msg, "wait for llama-server"):
-		return protocol.ErrCodeServerFailed, msg
-	default:
-		return "", msg
 	}
+
+	var modelNotFound *metadata.NotFoundError
+	if errors.As(err, &modelNotFound) {
+		return protocol.ErrCodeModelNotFound, msg
+	}
+
+	if llama.IsProcessError(err) {
+		return protocol.ErrCodeServerFailed, msg
+	}
+
+	return "", msg
 }
 
 func (s *Server) handleUnload(ctx context.Context) *protocol.Response {

@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strings"
+	"os"
+	"syscall"
 
 	"github.com/d2verb/alpaca/internal/identifier"
 	"github.com/d2verb/alpaca/internal/model"
@@ -58,7 +60,7 @@ func (c *LoadCmd) Run() error {
 	ui.PrintInfo(fmt.Sprintf("Loading %s...", c.Identifier))
 	resp, err := cl.Load(c.Identifier)
 	if err != nil {
-		if strings.Contains(err.Error(), "connect") {
+		if os.IsNotExist(err) || errors.Is(err, syscall.ECONNREFUSED) {
 			return errDaemonNotRunning()
 		}
 		return fmt.Errorf("load model: %w", err)
