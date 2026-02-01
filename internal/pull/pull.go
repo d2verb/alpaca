@@ -15,9 +15,7 @@ import (
 	"github.com/d2verb/alpaca/internal/metadata"
 )
 
-const (
-	huggingFaceAPIURL = "https://huggingface.co/api/models"
-)
+const defaultHuggingFaceBaseURL = "https://huggingface.co"
 
 // ProgressFunc is called during download with current and total bytes.
 type ProgressFunc func(downloaded, total int64)
@@ -28,6 +26,7 @@ type Puller struct {
 	client     *http.Client
 	onProgress ProgressFunc
 	metadata   *metadata.Manager
+	baseURL    string
 }
 
 // NewPuller creates a new model puller.
@@ -36,6 +35,7 @@ func NewPuller(modelsDir string) *Puller {
 		modelsDir: modelsDir,
 		client:    &http.Client{},
 		metadata:  metadata.NewManager(modelsDir),
+		baseURL:   defaultHuggingFaceBaseURL,
 	}
 }
 
@@ -101,7 +101,7 @@ func (p *Puller) GetFileInfo(ctx context.Context, repo, quant string) (filename 
 	}
 
 	// Get file size via HEAD request
-	url := fmt.Sprintf("https://huggingface.co/%s/resolve/main/%s", repo, filename)
+	url := fmt.Sprintf("%s/%s/resolve/main/%s", p.baseURL, repo, filename)
 	req, err := http.NewRequestWithContext(ctx, "HEAD", url, nil)
 	if err != nil {
 		return "", 0, fmt.Errorf("create request: %w", err)
@@ -143,7 +143,7 @@ func (p *Puller) findMatchingFile(ctx context.Context, repo, quant string) (stri
 }
 
 func (p *Puller) listGGUFFiles(ctx context.Context, repo string) ([]string, error) {
-	url := fmt.Sprintf("%s/%s", huggingFaceAPIURL, repo)
+	url := fmt.Sprintf("%s/api/models/%s", p.baseURL, repo)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
@@ -199,7 +199,7 @@ func extractQuants(files []string) []string {
 }
 
 func (p *Puller) downloadFile(ctx context.Context, repo, filename, destPath string) (int64, error) {
-	url := fmt.Sprintf("https://huggingface.co/%s/resolve/main/%s", repo, filename)
+	url := fmt.Sprintf("%s/%s/resolve/main/%s", p.baseURL, repo, filename)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return 0, fmt.Errorf("create request: %w", err)

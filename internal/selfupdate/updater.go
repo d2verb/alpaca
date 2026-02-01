@@ -19,15 +19,17 @@ import (
 )
 
 const (
-	repoOwner  = "d2verb"
-	repoName   = "alpaca"
-	apiTimeout = 30 * time.Second
+	repoOwner            = "d2verb"
+	repoName             = "alpaca"
+	apiTimeout           = 30 * time.Second
+	defaultGitHubBaseURL = "https://api.github.com"
 )
 
 // Updater handles self-update operations.
 type Updater struct {
 	currentVersion string
 	client         *http.Client
+	baseURL        string
 }
 
 // Release represents a GitHub release.
@@ -49,6 +51,7 @@ func New(currentVersion string) *Updater {
 		client: &http.Client{
 			Timeout: apiTimeout,
 		},
+		baseURL: defaultGitHubBaseURL,
 	}
 }
 
@@ -148,7 +151,7 @@ func (u *Updater) Update(currentBinaryPath string) error {
 }
 
 func (u *Updater) getLatestRelease() (*Release, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", repoOwner, repoName)
+	url := fmt.Sprintf("%s/repos/%s/%s/releases/latest", u.baseURL, repoOwner, repoName)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
