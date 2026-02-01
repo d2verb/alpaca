@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/d2verb/alpaca/internal/identifier"
+	"github.com/d2verb/alpaca/internal/metadata"
 	"github.com/d2verb/alpaca/internal/model"
 	"github.com/d2verb/alpaca/internal/preset"
 	"github.com/d2verb/alpaca/internal/ui"
@@ -33,7 +34,7 @@ func (c *ShowCmd) Run() error {
 	case identifier.TypeHuggingFace:
 		return c.showModel(id, paths.Models)
 
-	case identifier.TypeFilePath:
+	case identifier.TypeModelFilePath, identifier.TypePresetFilePath:
 		return fmt.Errorf("cannot show file details\nUse: alpaca show p:name or alpaca show h:org/repo:quant")
 
 	default:
@@ -45,11 +46,7 @@ func (c *ShowCmd) showPreset(name, presetsDir string) error {
 	loader := preset.NewLoader(presetsDir)
 	p, err := loader.Load(name)
 	if err != nil {
-		var notFound *preset.NotFoundError
-		if errors.As(err, &notFound) || preset.IsStoreMissing(err) {
-			return errPresetNotFound(name)
-		}
-		return fmt.Errorf("load preset %s: %w", name, err)
+		return mapPresetError(err, name)
 	}
 
 	ui.PrintPresetDetails(ui.PresetDetails{
@@ -70,21 +67,15 @@ func (c *ShowCmd) showModel(id *identifier.Identifier, modelsDir string) error {
 	modelMgr := model.NewManager(modelsDir)
 	ctx := context.Background()
 
-	// Check if model exists
-	exists, err := modelMgr.Exists(ctx, id.Repo, id.Quant)
-	if err != nil {
-		return fmt.Errorf("check model: %w", err)
-	}
-
-	if !exists {
-		ui.PrintError(fmt.Sprintf("Model '%s' not downloaded", id.Raw))
-		ui.PrintInfo(fmt.Sprintf("Run: alpaca pull %s", id.Raw))
-		return errModelNotFound(id.Raw)
-	}
-
 	// Get model details
 	entry, err := modelMgr.GetDetails(ctx, id.Repo, id.Quant)
 	if err != nil {
+		var notFound *metadata.NotFoundError
+		if errors.As(err, &notFound) {
+			ui.PrintError(fmt.Sprintf("Model '%s' not downloaded", id.Raw))
+			ui.PrintInfo(fmt.Sprintf("Run: alpaca pull %s", id.Raw))
+			return errModelNotFound(id.Raw)
+		}
 		return fmt.Errorf("get model details: %w", err)
 	}
 

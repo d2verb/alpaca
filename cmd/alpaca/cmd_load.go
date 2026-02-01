@@ -1,64 +1,52 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"syscall"
 
 	"github.com/d2verb/alpaca/internal/identifier"
-	"github.com/d2verb/alpaca/internal/model"
+	"github.com/d2verb/alpaca/internal/pathutil"
 	"github.com/d2verb/alpaca/internal/protocol"
 	"github.com/d2verb/alpaca/internal/ui"
 )
 
+// LocalPresetFile is the filename for local presets.
+const LocalPresetFile = ".alpaca.yaml"
+
 type LoadCmd struct {
-	Identifier string `arg:"" help:"Identifier (p:preset, h:org/repo:quant, or f:/path/to/file)" predictor:"load-identifier"`
+	Identifier string `arg:"" optional:"" help:"Identifier (p:preset, h:org/repo:quant, f:/path/to/file, or f:*.yaml)" predictor:"load-identifier"`
 }
 
 func (c *LoadCmd) Run() error {
-	paths, err := getPaths()
-	if err != nil {
-		return err
-	}
-
 	cl, err := newClient()
 	if err != nil {
 		return err
 	}
 
-	ctx := context.Background()
+	// Resolve identifier (handles empty input → .alpaca.yaml)
+	idStr, err := c.resolveIdentifier()
+	if err != nil {
+		return err
+	}
 
-	// Parse identifier to determine handling
-	id, err := identifier.Parse(c.Identifier)
+	// Parse and normalize identifier
+	id, err := identifier.Parse(idStr)
 	if err != nil {
 		return fmt.Errorf("invalid identifier: %w", err)
 	}
 
-	// Handle HuggingFace auto-pull
-	if id.Type == identifier.TypeHuggingFace {
-		// Validate quant is provided
-		if id.Quant == "" {
-			return fmt.Errorf("missing quant specifier in HuggingFace identifier\nExpected format: h:org/repo:quant (e.g., h:unsloth/gemma3:Q4_K_M)")
-		}
-
-		modelMgr := model.NewManager(paths.Models)
-		exists, err := modelMgr.Exists(ctx, id.Repo, id.Quant)
-		if err != nil {
-			return fmt.Errorf("check model: %w", err)
-		}
-		if !exists {
-			ui.PrintInfo("Model not found. Downloading...")
-			if err := pullModel(id.Repo, id.Quant, paths.Models); err != nil {
-				return errDownloadFailed()
-			}
-		}
+	// Prepare load request (normalize paths, get display name)
+	req, err := c.prepare(id)
+	if err != nil {
+		return err
 	}
 
-	// Load model
-	ui.PrintInfo(fmt.Sprintf("Loading %s...", c.Identifier))
-	resp, err := cl.Load(c.Identifier)
+	// Send to daemon (daemon handles auto-pull)
+	ui.PrintInfo(fmt.Sprintf("Loading %s...", req.displayName))
+	resp, err := cl.Load(req.identifier, true)
 	if err != nil {
 		if os.IsNotExist(err) || errors.Is(err, syscall.ECONNREFUSED) {
 			return errDaemonNotRunning()
@@ -73,6 +61,69 @@ func (c *LoadCmd) Run() error {
 	endpoint, _ := resp.Data["endpoint"].(string)
 	ui.PrintSuccess(fmt.Sprintf("Model ready at %s", ui.FormatEndpoint(endpoint)))
 	return nil
+}
+
+// resolveIdentifier resolves the identifier from input or defaults to .alpaca.yaml.
+func (c *LoadCmd) resolveIdentifier() (string, error) {
+	if c.Identifier != "" {
+		return c.Identifier, nil
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("get working directory: %w", err)
+	}
+
+	presetPath := filepath.Join(cwd, LocalPresetFile)
+	if _, err := os.Stat(presetPath); err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("no %s found in current directory\nRun: alpaca new --local", LocalPresetFile)
+		}
+		return "", fmt.Errorf("check preset file: %w", err)
+	}
+
+	return "f:" + presetPath, nil
+}
+
+// loadRequest holds the prepared load request data.
+type loadRequest struct {
+	identifier  string
+	displayName string
+}
+
+// prepare normalizes paths and determines display name.
+func (c *LoadCmd) prepare(id *identifier.Identifier) (*loadRequest, error) {
+	req := &loadRequest{
+		identifier:  id.Raw,
+		displayName: id.Raw,
+	}
+
+	// Handle file path types (both preset and model)
+	if id.Type == identifier.TypePresetFilePath || id.Type == identifier.TypeModelFilePath {
+		absID, err := toAbsFileID(id.FilePath)
+		if err != nil {
+			return nil, err
+		}
+		req.identifier = absID
+		req.displayName = id.FilePath
+	}
+
+	return req, nil
+}
+
+// toAbsFileID converts a file path to absolute f: identifier.
+func toAbsFileID(path string) (string, error) {
+	// Resolve tilde expansion first
+	resolved, err := pathutil.ResolvePath(path, "")
+	if err != nil {
+		return "", fmt.Errorf("resolve path: %w", err)
+	}
+	// Then make absolute (for relative paths like ./preset.yaml)
+	absPath, err := filepath.Abs(resolved)
+	if err != nil {
+		return "", fmt.Errorf("make absolute path: %w", err)
+	}
+	return "f:" + absPath, nil
 }
 
 // handleLoadError converts daemon error codes into user-friendly errors.

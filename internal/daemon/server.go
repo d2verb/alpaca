@@ -129,7 +129,9 @@ func (s *Server) handleLoad(ctx context.Context, req *protocol.Request) *protoco
 		return protocol.NewErrorResponse("identifier required")
 	}
 
-	if err := s.daemon.Run(ctx, identifier); err != nil {
+	autoPull, _ := req.Args["auto_pull"].(bool)
+
+	if err := s.daemon.Run(ctx, identifier, autoPull); err != nil {
 		code, msg := classifyLoadError(err)
 		return protocol.NewErrorResponseWithCode(code, msg)
 	}
@@ -144,8 +146,7 @@ func (s *Server) handleLoad(ctx context.Context, req *protocol.Request) *protoco
 func classifyLoadError(err error) (code, message string) {
 	msg := err.Error()
 
-	var presetNotFound *preset.NotFoundError
-	if errors.As(err, &presetNotFound) || preset.IsStoreMissing(err) {
+	if preset.IsNotFound(err) {
 		return protocol.ErrCodePresetNotFound, msg
 	}
 
@@ -170,12 +171,16 @@ func (s *Server) handleUnload(ctx context.Context) *protocol.Response {
 
 func (s *Server) handleListPresets() *protocol.Response {
 	presets, err := s.daemon.ListPresets()
-	if err != nil {
+	if err != nil && len(presets) == 0 {
 		return protocol.NewErrorResponse(err.Error())
 	}
-	return protocol.NewOKResponse(map[string]any{
+	data := map[string]any{
 		"presets": presets,
-	})
+	}
+	if err != nil {
+		data["warning"] = err.Error()
+	}
+	return protocol.NewOKResponse(data)
 }
 
 func (s *Server) handleListModels(ctx context.Context) *protocol.Response {

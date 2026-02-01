@@ -1,10 +1,11 @@
 package identifier
 
 import (
+	"strings"
 	"testing"
 )
 
-func TestParse_FilePaths(t *testing.T) {
+func TestParse_ModelFilePaths(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -14,32 +15,108 @@ func TestParse_FilePaths(t *testing.T) {
 		{
 			name:     "absolute path",
 			input:    "f:/abs/path/model.gguf",
-			wantType: TypeFilePath,
+			wantType: TypeModelFilePath,
 			wantPath: "/abs/path/model.gguf",
 		},
 		{
 			name:     "home path",
 			input:    "f:~/models/test.gguf",
-			wantType: TypeFilePath,
+			wantType: TypeModelFilePath,
 			wantPath: "~/models/test.gguf",
 		},
 		{
 			name:     "current dir relative path",
 			input:    "f:./model.gguf",
-			wantType: TypeFilePath,
+			wantType: TypeModelFilePath,
 			wantPath: "./model.gguf",
 		},
 		{
 			name:     "parent dir relative path",
 			input:    "f:../models/test.gguf",
-			wantType: TypeFilePath,
+			wantType: TypeModelFilePath,
 			wantPath: "../models/test.gguf",
 		},
 		{
 			name:     "simple filename",
 			input:    "f:model.gguf",
-			wantType: TypeFilePath,
+			wantType: TypeModelFilePath,
 			wantPath: "model.gguf",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			id, err := Parse(tt.input)
+			if err != nil {
+				t.Fatalf("Parse() error = %v", err)
+			}
+			if id.Type != tt.wantType {
+				t.Errorf("Type = %v, want %v", id.Type, tt.wantType)
+			}
+			if id.FilePath != tt.wantPath {
+				t.Errorf("FilePath = %v, want %v", id.FilePath, tt.wantPath)
+			}
+			if id.Raw != tt.input {
+				t.Errorf("Raw = %v, want %v", id.Raw, tt.input)
+			}
+		})
+	}
+}
+
+func TestParse_PresetFilePaths(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantType Type
+		wantPath string
+	}{
+		{
+			name:     "yaml preset file",
+			input:    "f:/path/to/preset.yaml",
+			wantType: TypePresetFilePath,
+			wantPath: "/path/to/preset.yaml",
+		},
+		{
+			name:     "yml preset file",
+			input:    "f:/path/to/preset.yml",
+			wantType: TypePresetFilePath,
+			wantPath: "/path/to/preset.yml",
+		},
+		{
+			name:     "relative yaml preset",
+			input:    "f:./my-preset.yaml",
+			wantType: TypePresetFilePath,
+			wantPath: "./my-preset.yaml",
+		},
+		{
+			name:     "home yaml preset",
+			input:    "f:~/.alpaca.yaml",
+			wantType: TypePresetFilePath,
+			wantPath: "~/.alpaca.yaml",
+		},
+		{
+			name:     "local alpaca preset",
+			input:    "f:.alpaca.yaml",
+			wantType: TypePresetFilePath,
+			wantPath: ".alpaca.yaml",
+		},
+		{
+			name:     "uppercase YAML extension",
+			input:    "f:/path/to/preset.YAML",
+			wantType: TypePresetFilePath,
+			wantPath: "/path/to/preset.YAML",
+		},
+		{
+			name:     "mixed case Yaml extension",
+			input:    "f:/path/to/preset.Yaml",
+			wantType: TypePresetFilePath,
+			wantPath: "/path/to/preset.Yaml",
+		},
+		{
+			name:     "uppercase YML extension",
+			input:    "f:/path/to/preset.YML",
+			wantType: TypePresetFilePath,
+			wantPath: "/path/to/preset.YML",
 		},
 	}
 
@@ -230,22 +307,9 @@ func TestParse_Errors(t *testing.T) {
 			if err == nil {
 				t.Fatal("Parse() expected error, got nil")
 			}
-			if tt.wantErr != "" && !contains(err.Error(), tt.wantErr) {
+			if tt.wantErr != "" && !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("Parse() error = %v, want to contain %q", err, tt.wantErr)
 			}
 		})
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && findSubstring(s, substr))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

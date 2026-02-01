@@ -9,9 +9,18 @@ import (
 
 	"github.com/d2verb/alpaca/internal/client"
 	"github.com/d2verb/alpaca/internal/config"
+	"github.com/d2verb/alpaca/internal/preset"
 	"github.com/d2verb/alpaca/internal/pull"
 	"github.com/d2verb/alpaca/internal/ui"
 )
+
+// mapPresetError converts preset package errors to user-friendly errors.
+func mapPresetError(err error, name string) error {
+	if preset.IsNotFound(err) {
+		return errPresetNotFound(name)
+	}
+	return err
+}
 
 // stdin is the input source for prompts. Can be replaced for testing.
 var stdin = bufio.NewReader(os.Stdin)

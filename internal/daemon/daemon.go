@@ -25,6 +25,12 @@ type presetLoader interface {
 type modelManager interface {
 	List(ctx context.Context) ([]metadata.ModelEntry, error)
 	GetFilePath(ctx context.Context, repo, quant string) (string, error)
+	Exists(ctx context.Context, repo, quant string) (bool, error)
+}
+
+// modelPuller downloads models from HuggingFace.
+type modelPuller interface {
+	Pull(ctx context.Context, repo, quant string) error
 }
 
 // llamaProcess manages llama-server process lifecycle.
@@ -63,6 +69,7 @@ type Daemon struct {
 
 	presets        presetLoader
 	models         modelManager
+	puller         modelPuller
 	userConfig     *config.Config
 	config         *Config
 	llamaLogWriter io.Writer
@@ -80,10 +87,11 @@ type Config struct {
 }
 
 // New creates a new daemon instance.
-func New(cfg *Config, presets presetLoader, models modelManager, userConfig *config.Config) *Daemon {
+func New(cfg *Config, presets presetLoader, models modelManager, puller modelPuller, userConfig *config.Config) *Daemon {
 	d := &Daemon{
 		presets:        presets,
 		models:         models,
+		puller:         puller,
 		userConfig:     userConfig,
 		config:         cfg,
 		llamaLogWriter: cfg.LlamaLogWriter,
@@ -139,27 +147,78 @@ func (d *Daemon) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	return models, nil
 }
 
-// resolveHFPreset creates a preset from HuggingFace format (h:repo:quant).
-func resolveHFPreset(ctx context.Context, models modelManager, cfg *config.Config, repo, quant string) (*preset.Preset, error) {
-	// Get model file path from metadata
-	modelPath, err := models.GetFilePath(ctx, repo, quant)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create preset with defaults from userConfig (with f: prefix)
+// newDefaultPreset creates a preset with default settings from config.
+func newDefaultPreset(cfg *config.Config, name, model string) *preset.Preset {
 	return &preset.Preset{
-		Name:        fmt.Sprintf("h:%s:%s", repo, quant),
-		Model:       "f:" + modelPath,
+		Name:        name,
+		Model:       model,
 		Host:        cfg.DefaultHost,
 		Port:        cfg.DefaultPort,
 		ContextSize: cfg.DefaultCtxSize,
 		GPULayers:   cfg.DefaultGPULayers,
-	}, nil
+	}
+}
+
+// resolveHFPreset creates a preset from HuggingFace format (h:repo:quant).
+func (d *Daemon) resolveHFPreset(ctx context.Context, repo, quant string, autoPull bool) (*preset.Preset, error) {
+	if err := d.ensureModel(ctx, repo, quant, autoPull); err != nil {
+		return nil, err
+	}
+	modelPath, err := d.models.GetFilePath(ctx, repo, quant)
+	if err != nil {
+		return nil, err
+	}
+	return newDefaultPreset(d.userConfig, fmt.Sprintf("h:%s:%s", repo, quant), "f:"+modelPath), nil
+}
+
+// resolveModel resolves the model field in a preset if it's HuggingFace format.
+// Returns a new preset with the resolved model path without mutating the original.
+func (d *Daemon) resolveModel(ctx context.Context, p *preset.Preset, autoPull bool) (*preset.Preset, error) {
+	id, err := identifier.Parse(p.Model)
+	if err != nil {
+		return nil, fmt.Errorf("invalid model field in preset: %w", err)
+	}
+
+	if id.Type == identifier.TypeHuggingFace {
+		if err := d.ensureModel(ctx, id.Repo, id.Quant, autoPull); err != nil {
+			return nil, fmt.Errorf("resolve model %s:%s: %w", id.Repo, id.Quant, err)
+		}
+		// Resolve HF identifier to file path
+		modelPath, err := d.models.GetFilePath(ctx, id.Repo, id.Quant)
+		if err != nil {
+			return nil, fmt.Errorf("resolve model %s:%s: %w", id.Repo, id.Quant, err)
+		}
+		// Create new preset with resolved path (with f: prefix, don't mutate original)
+		resolved := *p
+		resolved.Model = "f:" + modelPath
+		return &resolved, nil
+	}
+
+	// Already a file path (f:...), return as-is
+	return p, nil
+}
+
+// ensureModel checks if a HuggingFace model exists and pulls it if autoPull is enabled.
+func (d *Daemon) ensureModel(ctx context.Context, repo, quant string, autoPull bool) error {
+	exists, err := d.models.Exists(ctx, repo, quant)
+	if err != nil {
+		return fmt.Errorf("check model: %w", err)
+	}
+	if exists {
+		return nil
+	}
+	if !autoPull || d.puller == nil {
+		return &metadata.NotFoundError{Repo: repo, Quant: quant}
+	}
+	if err := d.puller.Pull(ctx, repo, quant); err != nil {
+		return fmt.Errorf("pull model: %w", err)
+	}
+	return nil
 }
 
 // Run loads and runs a model (preset name, file path, or HuggingFace format).
-func (d *Daemon) Run(ctx context.Context, input string) error {
+// If autoPull is true, HuggingFace models will be downloaded automatically if not present.
+func (d *Daemon) Run(ctx context.Context, input string, autoPull bool) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -181,38 +240,34 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 
 	switch id.Type {
 	case identifier.TypePresetName:
-		// Load preset from presets directory
 		p, err = d.presets.Load(id.PresetName)
 		if err != nil {
 			return fmt.Errorf("load preset: %w", err)
 		}
 
-		// Resolve model field if it's HF format
-		p, err = preset.ResolveModel(ctx, p, d.models)
+	case identifier.TypePresetFilePath:
+		p, err = preset.LoadFile(id.FilePath)
 		if err != nil {
-			return err
+			return fmt.Errorf("load preset file: %w", err)
 		}
 
-	case identifier.TypeFilePath:
-		// Create dynamic preset from file path with default settings
-		p = &preset.Preset{
-			Name:        id.FilePath,
-			Model:       input, // Keep f: prefix for consistency
-			Host:        d.userConfig.DefaultHost,
-			Port:        d.userConfig.DefaultPort,
-			ContextSize: d.userConfig.DefaultCtxSize,
-			GPULayers:   d.userConfig.DefaultGPULayers,
-		}
+	case identifier.TypeModelFilePath:
+		p = newDefaultPreset(d.userConfig, id.FilePath, input)
 
 	case identifier.TypeHuggingFace:
-		// Create preset from HF format
-		p, err = resolveHFPreset(ctx, d.models, d.userConfig, id.Repo, id.Quant)
+		p, err = d.resolveHFPreset(ctx, id.Repo, id.Quant, autoPull)
 		if err != nil {
 			return fmt.Errorf("resolve HuggingFace model: %w", err)
 		}
 
 	default:
 		return fmt.Errorf("unknown identifier type")
+	}
+
+	// Resolve HuggingFace model reference if present
+	p, err = d.resolveModel(ctx, p, autoPull)
+	if err != nil {
+		return err
 	}
 
 	d.state.Store(StateLoading)
@@ -224,19 +279,16 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 		proc.SetLogWriter(d.llamaLogWriter)
 	}
 	if err := proc.Start(ctx, p.BuildArgs()); err != nil {
-		d.state.Store(StateIdle)
-		d.preset.Store(nil)
+		d.resetState()
 		return err
 	}
 	d.process = proc
 
 	// Wait for llama-server to become ready
 	if err := d.waitForReady(ctx, p.Endpoint()); err != nil {
-		// Cleanup on failure
 		d.process.Stop(ctx)
 		d.process = nil
-		d.preset.Store(nil)
-		d.state.Store(StateIdle)
+		d.resetState()
 		return &llama.ProcessError{Op: llama.ProcessOpWait, Err: err}
 	}
 
@@ -261,7 +313,12 @@ func (d *Daemon) stopLocked(ctx context.Context) error {
 	}
 
 	d.process = nil
+	d.resetState()
+	return nil
+}
+
+// resetState clears state and preset to idle state.
+func (d *Daemon) resetState() {
 	d.preset.Store(nil)
 	d.state.Store(StateIdle)
-	return nil
 }

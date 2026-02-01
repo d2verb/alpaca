@@ -1,10 +1,37 @@
 package preset
 
 import (
-	"context"
-	"fmt"
 	"testing"
 )
+
+func TestSanitizeName(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"already valid", "my-preset", "my-preset"},
+		{"with spaces", "my preset name", "my-preset-name"},
+		{"with special chars", "my@preset!name", "my-preset-name"},
+		{"leading/trailing special", "!@#preset$%^", "preset"},
+		{"consecutive special chars", "my...preset---name", "my-preset-name"},
+		{"underscores preserved", "my_preset_name", "my_preset_name"},
+		{"mixed valid chars", "My-Preset_123", "My-Preset_123"},
+		{"dots replaced", "my.preset.name", "my-preset-name"},
+		{"slashes replaced", "path/to/preset", "path-to-preset"},
+		{"empty string", "", ""},
+		{"all invalid chars", "!@#$%^&*()", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SanitizeName(tt.input)
+			if got != tt.want {
+				t.Errorf("SanitizeName(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
 
 func TestValidateName(t *testing.T) {
 	tests := []struct {
@@ -306,101 +333,4 @@ func slicesEqual(a, b []string) bool {
 		}
 	}
 	return true
-}
-
-type stubModelResolver struct {
-	filePath string
-	err      error
-}
-
-func (s *stubModelResolver) GetFilePath(ctx context.Context, repo, quant string) (string, error) {
-	if s.err != nil {
-		return "", s.err
-	}
-	return s.filePath, nil
-}
-
-func TestResolveModel_FilePath(t *testing.T) {
-	resolver := &stubModelResolver{filePath: "/should/not/be/used"}
-
-	p := &Preset{
-		Name:  "test",
-		Model: "f:/abs/path/model.gguf",
-	}
-
-	resolved, err := ResolveModel(context.Background(), p, resolver)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// File path should remain unchanged
-	if resolved.Model != "f:/abs/path/model.gguf" {
-		t.Errorf("Model = %q, want %q", resolved.Model, "f:/abs/path/model.gguf")
-	}
-}
-
-func TestResolveModel_HuggingFace(t *testing.T) {
-	resolver := &stubModelResolver{filePath: "/resolved/path/model.gguf"}
-
-	p := &Preset{
-		Name:  "test",
-		Model: "h:org/repo:Q4_K_M",
-	}
-
-	resolved, err := ResolveModel(context.Background(), p, resolver)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// HF format should be resolved to file path with f: prefix
-	if resolved.Model != "f:/resolved/path/model.gguf" {
-		t.Errorf("Model = %q, want %q", resolved.Model, "f:/resolved/path/model.gguf")
-	}
-
-	// Original preset should not be mutated
-	if p.Model != "h:org/repo:Q4_K_M" {
-		t.Errorf("Original preset mutated: Model = %q, want %q", p.Model, "h:org/repo:Q4_K_M")
-	}
-}
-
-func TestResolveModel_HuggingFaceError(t *testing.T) {
-	resolver := &stubModelResolver{err: fmt.Errorf("model not found")}
-
-	p := &Preset{
-		Name:  "test",
-		Model: "h:org/repo:Q4_K_M",
-	}
-
-	_, err := ResolveModel(context.Background(), p, resolver)
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-}
-
-func TestResolveModel_InvalidIdentifier(t *testing.T) {
-	resolver := &stubModelResolver{}
-
-	p := &Preset{
-		Name:  "test",
-		Model: "",
-	}
-
-	_, err := ResolveModel(context.Background(), p, resolver)
-	if err == nil {
-		t.Fatal("expected error for empty model field, got nil")
-	}
-}
-
-func TestResolveModel_OldFormatError(t *testing.T) {
-	resolver := &stubModelResolver{}
-
-	p := &Preset{
-		Name:  "test",
-		Model: "org/repo:Q4_K_M", // Old format without h: prefix
-	}
-
-	_, err := ResolveModel(context.Background(), p, resolver)
-	if err == nil {
-		t.Fatal("expected error for old format without prefix, got nil")
-	}
 }

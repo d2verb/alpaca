@@ -9,10 +9,11 @@ import (
 type Type int
 
 const (
-	TypeUnknown Type = iota
-	TypeFilePath
-	TypeHuggingFace
-	TypePresetName
+	TypeUnknown        Type = iota
+	TypeModelFilePath       // f:/path/to/model.gguf
+	TypePresetFilePath      // f:/path/to/preset.yaml
+	TypeHuggingFace         // h:org/repo:quant
+	TypePresetName          // p:preset-name
 )
 
 // Identifier represents a parsed identifier.
@@ -20,7 +21,7 @@ type Identifier struct {
 	Raw  string
 	Type Type
 
-	// For TypeFilePath
+	// For TypeModelFilePath and TypePresetFilePath
 	FilePath string
 
 	// For TypeHuggingFace
@@ -76,13 +77,25 @@ func Parse(input string) (*Identifier, error) {
 
 	case 'f':
 		// File path: f:/path/to/file
+		// Detect type based on extension
+		fileType := TypeModelFilePath
+		if isPresetFile(value) {
+			fileType = TypePresetFilePath
+		}
 		return &Identifier{
 			Raw:      input,
-			Type:     TypeFilePath,
+			Type:     fileType,
 			FilePath: value,
 		}, nil
 
 	default:
 		return nil, fmt.Errorf("unknown prefix '%c:'\nExpected: h: (HuggingFace), p: (preset), or f: (file path)", prefix)
 	}
+}
+
+// isPresetFile returns true if the path is a preset file (.yaml or .yml).
+// Case-insensitive to handle .YAML, .Yaml, etc.
+func isPresetFile(path string) bool {
+	lower := strings.ToLower(path)
+	return strings.HasSuffix(lower, ".yaml") || strings.HasSuffix(lower, ".yml")
 }
