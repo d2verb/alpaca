@@ -3,12 +3,12 @@ package preset
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/d2verb/alpaca/internal/pathutil"
 	"gopkg.in/yaml.v3"
 )
 
@@ -24,82 +24,42 @@ func NewLoader(presetsDir string) *Loader {
 
 // Load loads a preset by name (searches all YAML files for matching name field).
 func (l *Loader) Load(name string) (*Preset, error) {
-	entries, err := os.ReadDir(l.presetsDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, &storeMissingError{err: err}
-		}
-		return nil, fmt.Errorf("read presets dir: %w", err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
-			continue
-		}
-
-		preset, err := l.loadFile(filepath.Join(l.presetsDir, entry.Name()))
-		if err != nil {
-			continue // Skip invalid files
-		}
-
-		if preset.Name == name {
-			return preset, nil
-		}
-	}
-
-	return nil, &NotFoundError{Name: name}
-}
-
-// loadFile loads a preset from a specific file path.
-func (l *Loader) loadFile(path string) (*Preset, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read file: %w", err)
-	}
-
-	var preset Preset
-	if err := yaml.Unmarshal(data, &preset); err != nil {
-		return nil, fmt.Errorf("parse yaml: %w", err)
-	}
-
-	if err := ValidateName(preset.Name); err != nil {
-		return nil, fmt.Errorf("invalid preset: %w", err)
-	}
-
-	// Expand ~ in model path
-	if strings.HasPrefix(preset.Model, "~/") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("expand home dir: %w", err)
-		}
-		preset.Model = filepath.Join(home, preset.Model[2:])
-	}
-
-	return &preset, nil
+	_, p, err := l.findByName(name)
+	return p, err
 }
 
 // List returns all available preset names.
+// If some preset files fail to parse, they are skipped but a warning is included
+// in the error (the list is still returned).
 func (l *Loader) List() ([]string, error) {
 	entries, err := os.ReadDir(l.presetsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return []string{}, nil
 		}
-		return nil, fmt.Errorf("list presets: %w", err)
+		return nil, fmt.Errorf("read presets dir: %w", err)
 	}
 
-	names := []string{}
+	var names []string
+	var parseErrors []*ParseError
+
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
 			continue
 		}
 
-		preset, err := l.loadFile(filepath.Join(l.presetsDir, entry.Name()))
+		path := filepath.Join(l.presetsDir, entry.Name())
+		p, err := loadFromPath(path)
 		if err != nil {
-			continue // Skip invalid files
+			parseErrors = append(parseErrors, &ParseError{File: entry.Name(), Err: err})
+			continue
 		}
 
-		names = append(names, preset.Name)
+		names = append(names, p.Name)
+	}
+
+	if len(parseErrors) > 0 {
+		return names, fmt.Errorf("%d preset file(s) had parse errors (first: %v)", len(parseErrors), parseErrors[0])
 	}
 	return names, nil
 }
@@ -108,13 +68,7 @@ func (l *Loader) List() ([]string, error) {
 func (l *Loader) Exists(name string) (bool, error) {
 	_, err := l.Load(name)
 	if err != nil {
-		var notFound *NotFoundError
-		if errors.As(err, &notFound) {
-			return false, nil
-		}
-		// Directory doesn't exist yet - preset cannot exist
-		// This allows Create() to work correctly on first use
-		if IsStoreMissing(err) {
+		if IsNotFound(err) {
 			return false, nil
 		}
 		return false, err
@@ -164,34 +118,53 @@ func (l *Loader) Create(p *Preset) error {
 
 // Remove removes a preset by name.
 func (l *Loader) Remove(name string) error {
+	path, _, err := l.findByName(name)
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("remove preset: %w", err)
+	}
+	return nil
+}
+
+// findByName searches for a preset by name and returns its path and preset.
+// If multiple presets have the same name, the first one found (in directory order)
+// is returned. This is intentional - users should avoid duplicate names.
+// If not found, returns informative error including any parse failures.
+func (l *Loader) findByName(name string) (string, *Preset, error) {
 	entries, err := os.ReadDir(l.presetsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &storeMissingError{err: err}
+			// No directory = preset cannot exist
+			return "", nil, &NotFoundError{Name: name}
 		}
-		return fmt.Errorf("read presets dir: %w", err)
+		return "", nil, fmt.Errorf("read presets dir: %w", err)
 	}
 
+	var parseErrors []*ParseError
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
 			continue
 		}
 
 		path := filepath.Join(l.presetsDir, entry.Name())
-		preset, err := l.loadFile(path)
+		p, err := loadFromPath(path)
 		if err != nil {
+			parseErrors = append(parseErrors, &ParseError{File: entry.Name(), Err: err})
 			continue
 		}
 
-		if preset.Name == name {
-			if err := os.Remove(path); err != nil {
-				return fmt.Errorf("remove preset: %w", err)
-			}
-			return nil
+		if p.Name == name {
+			return path, p, nil
 		}
 	}
 
-	return &NotFoundError{Name: name}
+	// Not found - include parse error hints if any
+	if len(parseErrors) > 0 {
+		return "", nil, fmt.Errorf("preset '%s' not found; %d file(s) had parse errors (first: %v)", name, len(parseErrors), parseErrors[0])
+	}
+	return "", nil, &NotFoundError{Name: name}
 }
 
 // generateFilename generates a random filename (16 hex characters).
@@ -201,4 +174,92 @@ func generateFilename() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(bytes), nil
+}
+
+// LoadFile loads a preset from an explicit file path.
+// Relative paths in the model field (f:./ or f:../) are resolved
+// relative to the preset file's directory.
+func LoadFile(filePath string) (*Preset, error) {
+	// Resolve tilde and relative paths
+	resolvedPath, err := pathutil.ResolvePath(filePath, "")
+	if err != nil {
+		return nil, fmt.Errorf("resolve preset path: %w", err)
+	}
+
+	// Get absolute path for the preset file
+	absPath, err := filepath.Abs(resolvedPath)
+	if err != nil {
+		return nil, fmt.Errorf("resolve preset path: %w", err)
+	}
+
+	return loadFromPath(absPath)
+}
+
+// loadFromPath loads a preset from an absolute file path.
+func loadFromPath(absPath string) (*Preset, error) {
+	data, err := os.ReadFile(absPath)
+	if err != nil {
+		return nil, fmt.Errorf("read file: %w", err)
+	}
+
+	var preset Preset
+	if err := yaml.Unmarshal(data, &preset); err != nil {
+		return nil, fmt.Errorf("parse yaml: %w", err)
+	}
+
+	if err := ValidateName(preset.Name); err != nil {
+		return nil, fmt.Errorf("invalid preset: %w", err)
+	}
+
+	// Resolve model path relative to preset file directory
+	baseDir := filepath.Dir(absPath)
+	resolvedModel, err := resolveModelPath(preset.Model, baseDir)
+	if err != nil {
+		return nil, fmt.Errorf("resolve model path: %w", err)
+	}
+	preset.Model = resolvedModel
+
+	return &preset, nil
+}
+
+// WriteFile writes a preset to the specified file path.
+func WriteFile(path string, p *Preset) error {
+	data, err := yaml.Marshal(p)
+	if err != nil {
+		return fmt.Errorf("marshal preset: %w", err)
+	}
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("write file: %w", err)
+	}
+	return nil
+}
+
+// resolveModelPath resolves the model path in a preset.
+// - h: prefixed paths are returned as-is (HuggingFace identifiers)
+// - f: prefixed paths have relative paths resolved from baseDir
+func resolveModelPath(model, baseDir string) (string, error) {
+	if model == "" {
+		return "", fmt.Errorf("model field is required")
+	}
+
+	// HuggingFace identifiers are returned as-is
+	if strings.HasPrefix(model, "h:") {
+		return model, nil
+	}
+
+	// File paths must have f: prefix
+	if !strings.HasPrefix(model, "f:") {
+		return "", fmt.Errorf("model must have h: or f: prefix, got %q", model)
+	}
+
+	// Extract path after f: prefix
+	path := model[2:]
+
+	// Resolve path (handles tilde expansion and relative paths)
+	resolved, err := pathutil.ResolvePath(path, baseDir)
+	if err != nil {
+		return "", err
+	}
+
+	return "f:" + resolved, nil
 }

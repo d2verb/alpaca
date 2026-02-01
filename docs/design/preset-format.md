@@ -2,9 +2,14 @@
 
 ## Overview
 
-Presets define a model + argument combination that can be loaded with a single command. They are stored as YAML files in `~/.alpaca/presets/`.
+Presets define a model + argument combination that can be loaded with a single command. Alpaca supports two types of presets:
 
-## File Location
+1. **Global presets**: Stored in `~/.alpaca/presets/`, available from anywhere
+2. **Local presets**: Stored as `.alpaca.yaml` in a project directory
+
+## File Locations
+
+### Global Presets
 
 ```
 ~/.alpaca/presets/
@@ -13,7 +18,18 @@ Presets define a model + argument combination that can be loaded with a single c
 └── fedcba0987654321.yaml
 ```
 
-Preset files are stored with random filenames (16 hex characters). The `name` field inside the YAML file is used as the identifier for loading (e.g., `alpaca load p:codellama-7b`).
+Global preset files are stored with random filenames (16 hex characters). The `name` field inside the YAML file is used as the identifier for loading (e.g., `alpaca load p:codellama-7b`).
+
+### Local Presets
+
+```
+my-project/
+├── .alpaca.yaml     # Local preset
+├── src/
+└── ...
+```
+
+Local presets are project-specific configuration files. When you run `alpaca load` without arguments in a directory containing `.alpaca.yaml`, that preset is loaded automatically.
 
 ## Format
 
@@ -172,7 +188,14 @@ model: "f:./model.gguf"                # Relative to current working directory
 model: "f:../shared/model.gguf"        # Parent of current working directory
 ```
 
-**Important:** Relative paths are resolved from the current working directory when `alpaca load` is executed, NOT from the preset file's directory. It's recommended to use absolute paths or home directory paths (`~/`) for clarity.
+**Path resolution:** For both local and global presets, relative paths (`./` and `../`) are resolved from the preset file's directory. This allows you to reference models relative to your preset location:
+
+```yaml
+# In /path/to/project/.alpaca.yaml
+model: "f:./models/local-model.gguf"  # Resolves to /path/to/project/models/local-model.gguf
+```
+
+**Recommendation for global presets:** Since global presets are stored in `~/.alpaca/presets/`, using relative paths would resolve from that directory (e.g., `f:./model.gguf` → `~/.alpaca/presets/model.gguf`). It's recommended to use absolute paths or home directory paths (`~/`) for global presets.
 
 The `f:` prefix is stripped when passing the path to llama-server.
 
@@ -194,6 +217,67 @@ model: "h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M"
 - Missing prefix → Parse error with clear message
 - HuggingFace model not downloaded → Error with suggestion to run `alpaca pull`
 - File path doesn't exist → Error when starting llama-server
+
+## Local Presets
+
+Local presets allow per-project model configuration using `.alpaca.yaml` files.
+
+### Creating a Local Preset
+
+```bash
+$ cd my-project
+$ alpaca new --local
+📦 Create Local Preset
+Name [my-project]:
+Model: f:./models/my-model.gguf
+Host [127.0.0.1]:
+Port [8080]:
+Context [2048]: 4096
+GPU Layers [-1]:
+✓ Created '.alpaca.yaml'
+💡 alpaca load
+```
+
+The default name is derived from the directory name (sanitized to valid characters).
+
+### Loading a Local Preset
+
+```bash
+$ cd my-project
+$ alpaca load
+ℹ Loading my-project...
+✓ Model ready at http://localhost:8080
+```
+
+When `alpaca load` is run without arguments, it looks for `.alpaca.yaml` in the current directory.
+
+### Loading from a Specific Path
+
+```bash
+$ alpaca load f:./custom-preset.yaml
+$ alpaca load f:../shared/preset.yaml
+```
+
+Any `.yaml` or `.yml` file can be loaded with the `f:` prefix.
+
+### Relative Paths in Local Presets
+
+Relative paths in the `model` field are resolved from the preset file's directory:
+
+```yaml
+# In /path/to/project/.alpaca.yaml
+name: my-project
+model: "f:./models/model.gguf"      # → /path/to/project/models/model.gguf
+model: "f:../shared/model.gguf"     # → /path/to/shared/model.gguf
+```
+
+This makes local presets portable - they work correctly regardless of which directory you run `alpaca load` from (as long as you're in the project directory).
+
+### Use Cases
+
+- **Project-specific models**: Different projects using different model configurations
+- **Team sharing**: Commit `.alpaca.yaml` to version control for consistent team setup
+- **Local development**: Reference models stored relative to the project
 
 ## Design Decisions
 

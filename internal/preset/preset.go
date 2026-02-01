@@ -2,17 +2,17 @@
 package preset
 
 import (
-	"context"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/d2verb/alpaca/internal/identifier"
 )
 
 // namePattern validates preset names: alphanumeric, underscore, hyphen only.
 var namePattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+// invalidCharsPattern matches characters that are not alphanumeric, underscore, or hyphen.
+var invalidCharsPattern = regexp.MustCompile(`[^a-zA-Z0-9_-]+`)
 
 const (
 	// DefaultPort is the default port for llama-server.
@@ -35,6 +35,24 @@ func ValidateName(name string) error {
 		return fmt.Errorf("name must contain only alphanumeric characters, underscores, and hyphens")
 	}
 	return nil
+}
+
+// SanitizeName converts an arbitrary string to a valid preset name.
+// Invalid characters are replaced with hyphens, consecutive hyphens are
+// collapsed to a single hyphen, and leading/trailing hyphens are trimmed.
+func SanitizeName(name string) string {
+	// Replace invalid characters with hyphens
+	result := invalidCharsPattern.ReplaceAllString(name, "-")
+
+	// Collapse consecutive hyphens to a single hyphen
+	for strings.Contains(result, "--") {
+		result = strings.ReplaceAll(result, "--", "-")
+	}
+
+	// Trim leading and trailing hyphens
+	result = strings.Trim(result, "-")
+
+	return result
 }
 
 // Preset represents a model + argument combination.
@@ -112,33 +130,4 @@ func (p *Preset) BuildArgs() []string {
 		args = append(args, strings.Fields(arg)...)
 	}
 	return args
-}
-
-// ModelResolver resolves HuggingFace model identifiers to file paths.
-type ModelResolver interface {
-	GetFilePath(ctx context.Context, repo, quant string) (string, error)
-}
-
-// ResolveModel resolves the model field in a preset if it's HuggingFace format.
-// Returns a new preset with the resolved model path without mutating the original.
-func ResolveModel(ctx context.Context, p *Preset, resolver ModelResolver) (*Preset, error) {
-	id, err := identifier.Parse(p.Model)
-	if err != nil {
-		return nil, fmt.Errorf("invalid model field in preset: %w", err)
-	}
-
-	if id.Type == identifier.TypeHuggingFace {
-		// Resolve HF identifier to file path
-		modelPath, err := resolver.GetFilePath(ctx, id.Repo, id.Quant)
-		if err != nil {
-			return nil, fmt.Errorf("resolve model %s:%s: %w", id.Repo, id.Quant, err)
-		}
-		// Create new preset with resolved path (with f: prefix, don't mutate original)
-		resolved := *p
-		resolved.Model = "f:" + modelPath
-		return &resolved, nil
-	}
-
-	// Already a file path (f:...), return as-is
-	return p, nil
 }

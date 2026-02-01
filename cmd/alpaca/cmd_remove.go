@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/d2verb/alpaca/internal/identifier"
@@ -33,7 +32,7 @@ func (c *RemoveCmd) Run() error {
 	case identifier.TypeHuggingFace:
 		return c.removeModel(id, paths.Models)
 
-	case identifier.TypeFilePath:
+	case identifier.TypeModelFilePath, identifier.TypePresetFilePath:
 		return fmt.Errorf("file paths (f:) cannot be removed\nUse: alpaca rm p:preset-name or alpaca rm h:org/repo:quant")
 
 	default:
@@ -61,11 +60,7 @@ func (c *RemoveCmd) removePreset(name, presetsDir string) error {
 
 	// Remove preset
 	if err := loader.Remove(name); err != nil {
-		var notFound *preset.NotFoundError
-		if errors.As(err, &notFound) || preset.IsStoreMissing(err) {
-			return errPresetNotFound(name)
-		}
-		return fmt.Errorf("remove preset: %w", err)
+		return mapPresetError(err, name)
 	}
 
 	ui.PrintSuccess(fmt.Sprintf("Preset '%s' removed", name))

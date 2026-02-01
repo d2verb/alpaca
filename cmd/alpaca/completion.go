@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/d2verb/alpaca/internal/config"
 	"github.com/d2verb/alpaca/internal/model"
 	"github.com/d2verb/alpaca/internal/preset"
 	"github.com/posener/complete"
@@ -56,54 +57,41 @@ func (p *identifierPredictor) Predict(args complete.Args) []string {
 
 	// Determine completion based on prefix
 	switch {
-	case value == "":
-		// No input yet - suggest actual items from all valid prefixes
-		var results []string
-		for _, prefix := range p.validPrefixes {
-			switch prefix {
-			case "p:":
-				results = append(results, completePresets(ctx, paths.Presets, "p:")...)
-			case "h:":
-				results = append(results, completeModels(ctx, paths.Models, "h:")...)
-			case "f:":
-				// f: prefix doesn't have completion
-			}
-		}
-		return results
-
 	case strings.HasPrefix(value, "p:"):
-		// Preset completion: p:name
 		return completePresets(ctx, paths.Presets, value)
 
 	case strings.HasPrefix(value, "h:"):
-		// HuggingFace model completion: h:org/repo:quant
 		return completeModels(ctx, paths.Models, value)
 
 	case strings.HasPrefix(value, "f:"):
 		// File path completion - no completion support
-		// Users can manually type the full path
 		return nil
 
 	default:
-		// Invalid input - suggest actual items from valid prefixes
-		var results []string
-		for _, prefix := range p.validPrefixes {
-			switch prefix {
-			case "p:":
-				results = append(results, completePresets(ctx, paths.Presets, prefix)...)
-			case "h:":
-				results = append(results, completeModels(ctx, paths.Models, prefix)...)
-			}
-		}
-		return results
+		// No input or invalid prefix - suggest all valid completions
+		return p.completeAll(ctx, paths)
 	}
+}
+
+// completeAll returns completions for all valid prefixes.
+func (p *identifierPredictor) completeAll(ctx context.Context, paths *config.Paths) []string {
+	var results []string
+	for _, prefix := range p.validPrefixes {
+		switch prefix {
+		case "p:":
+			results = append(results, completePresets(ctx, paths.Presets, prefix)...)
+		case "h:":
+			results = append(results, completeModels(ctx, paths.Models, prefix)...)
+		}
+	}
+	return results
 }
 
 // completePresets returns preset name completions.
 func completePresets(ctx context.Context, presetsDir, partial string) []string {
 	loader := preset.NewLoader(presetsDir)
 	names, err := loader.List()
-	if err != nil {
+	if err != nil && len(names) == 0 {
 		return nil
 	}
 

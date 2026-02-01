@@ -19,9 +19,9 @@ func (c *ListCmd) Run() error {
 
 	// Load presets
 	loader := preset.NewLoader(paths.Presets)
-	presetNames, err := loader.List()
-	if err != nil {
-		return fmt.Errorf("list presets: %w", err)
+	presetNames, presetErr := loader.List()
+	if presetErr != nil && len(presetNames) == 0 {
+		return fmt.Errorf("list presets: %w", presetErr)
 	}
 
 	// Load models
@@ -45,6 +45,9 @@ func (c *ListCmd) Run() error {
 
 	// Print both lists
 	ui.PrintPresetList(presetNames)
+	if presetErr != nil {
+		ui.PrintWarning(presetErr.Error())
+	}
 	fmt.Fprintln(ui.Output) // Single blank line between sections
 	ui.PrintModelList(models)
 

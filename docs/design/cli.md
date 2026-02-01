@@ -139,15 +139,32 @@ $ alpaca logs -f -s
 
 ### Model Management
 
-#### `alpaca load <identifier>`
+#### `alpaca load [identifier]`
 
-Load a model using an explicit identifier with prefix.
+Load a model using an explicit identifier with prefix, or load a local preset.
 
 **Identifier Format:**
 All identifiers must use an explicit prefix:
 - `h:org/repo:quant` - HuggingFace model (auto-download if not present)
-- `p:preset-name` - Preset
+- `p:preset-name` - Global preset
 - `f:/path/to/file` - File path (uses default settings)
+- `f:*.yaml` or `f:*.yml` - Local preset file
+
+**No argument (local preset):**
+When run without arguments, loads `.alpaca.yaml` from the current directory:
+```bash
+$ cd my-project
+$ alpaca load
+ℹ Loading my-project...
+✓ Model ready at http://localhost:8080
+```
+
+If no `.alpaca.yaml` exists:
+```bash
+$ alpaca load
+✗ Error: no .alpaca.yaml found in current directory
+ℹ Run: alpaca new --local
+```
 
 **Using preset:**
 ```bash
@@ -176,6 +193,17 @@ $ alpaca load f:~/models/my-model.gguf
 
 $ alpaca load f:./model.gguf
 ℹ Loading f:./model.gguf...
+✓ Model ready at http://localhost:8080
+```
+
+**Using local preset file:**
+```bash
+$ alpaca load f:./custom-preset.yaml
+ℹ Loading my-custom-preset...
+✓ Model ready at http://localhost:8080
+
+$ alpaca load f:../shared/preset.yaml
+ℹ Loading shared-preset...
 ✓ Model ready at http://localhost:8080
 ```
 
@@ -308,6 +336,7 @@ $ alpaca show f:/path/to/model.gguf
 
 Create a new preset interactively.
 
+**Global preset (default):**
 ```bash
 $ alpaca new
 📦 Create Preset
@@ -317,9 +346,32 @@ Host [127.0.0.1]:
 Port [8080]:
 Context [2048]: 8192
 GPU Layers [-1]: 35
-✅ Created 'my-model'
+✓ Created 'my-model'
 💡 alpaca load p:my-model
 ```
+
+**Flags:**
+- `--local`: Create `.alpaca.yaml` in the current directory instead of a global preset
+
+**Local preset:**
+```bash
+$ cd my-project
+$ alpaca new --local
+📦 Create Local Preset
+Name [my-project]:
+Model: f:./models/model.gguf
+Host [127.0.0.1]:
+Port [8080]:
+Context [2048]: 4096
+GPU Layers [-1]:
+✓ Created '.alpaca.yaml'
+💡 alpaca load
+```
+
+When using `--local`:
+- The default name is derived from the current directory name
+- The preset is saved to `.alpaca.yaml` in the current directory
+- Relative paths in the model field are supported and resolved from the preset file's directory
 
 The command will prompt for:
 - **Name**: Name for the preset file (without .yaml extension) - **required**

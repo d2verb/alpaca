@@ -3,6 +3,7 @@ package preset
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -11,7 +12,7 @@ func TestLoader_Load(t *testing.T) {
 
 	// Create a valid preset file with random filename
 	validPreset := `name: valid-preset
-model: /path/to/model.gguf
+model: "f:/path/to/model.gguf"
 context_size: 4096
 gpu_layers: 32
 threads: 8
@@ -26,7 +27,7 @@ extra_args:
 	}
 
 	// Create a preset without name field (should be skipped)
-	noNamePreset := `model: /path/to/noname.gguf
+	noNamePreset := `model: "f:/path/to/noname.gguf"
 `
 	if err := os.WriteFile(filepath.Join(tmpDir, "def456.yaml"), []byte(noNamePreset), 0644); err != nil {
 		t.Fatal(err)
@@ -34,7 +35,7 @@ extra_args:
 
 	// Create a preset with home directory expansion
 	homePreset := `name: home-preset
-model: ~/.alpaca/models/test.gguf
+model: "f:~/.alpaca/models/test.gguf"
 `
 	if err := os.WriteFile(filepath.Join(tmpDir, "ghi789.yaml"), []byte(homePreset), 0644); err != nil {
 		t.Fatal(err)
@@ -56,8 +57,8 @@ model: ~/.alpaca/models/test.gguf
 		if p.Name != "valid-preset" {
 			t.Errorf("Name = %q, want %q", p.Name, "valid-preset")
 		}
-		if p.Model != "/path/to/model.gguf" {
-			t.Errorf("Model = %q, want %q", p.Model, "/path/to/model.gguf")
+		if p.Model != "f:/path/to/model.gguf" {
+			t.Errorf("Model = %q, want %q", p.Model, "f:/path/to/model.gguf")
 		}
 		if p.ContextSize != 4096 {
 			t.Errorf("ContextSize = %d, want %d", p.ContextSize, 4096)
@@ -86,7 +87,7 @@ model: ~/.alpaca/models/test.gguf
 		}
 
 		home, _ := os.UserHomeDir()
-		expected := filepath.Join(home, ".alpaca/models/test.gguf")
+		expected := "f:" + filepath.Join(home, ".alpaca/models/test.gguf")
 		if p.Model != expected {
 			t.Errorf("Model = %q, want %q", p.Model, expected)
 		}
@@ -120,9 +121,9 @@ func TestLoader_List(t *testing.T) {
 			filename string
 			content  string
 		}{
-			{"abc123.yaml", "name: alpha\nmodel: test.gguf"},
-			{"def456.yaml", "name: beta\nmodel: test.gguf"},
-			{"ghi789.yaml", "name: gamma\nmodel: test.gguf"},
+			{"abc123.yaml", "name: alpha\nmodel: \"f:/path/to/test.gguf\""},
+			{"def456.yaml", "name: beta\nmodel: \"f:/path/to/test.gguf\""},
+			{"ghi789.yaml", "name: gamma\nmodel: \"f:/path/to/test.gguf\""},
 		}
 		for _, p := range presets {
 			if err := os.WriteFile(filepath.Join(tmpDir, p.filename), []byte(p.content), 0644); err != nil {
@@ -140,15 +141,19 @@ func TestLoader_List(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Create an invalid preset (should be skipped)
+		// Create an invalid preset (should be skipped but reported as warning)
 		if err := os.WriteFile(filepath.Join(tmpDir, "invalid.yaml"), []byte("{{invalid"), 0644); err != nil {
 			t.Fatal(err)
 		}
 
 		loader := NewLoader(tmpDir)
 		names, err := loader.List()
-		if err != nil {
-			t.Fatalf("List() error = %v", err)
+		// Should return valid names with a warning about parse errors
+		if err == nil {
+			t.Fatal("List() expected warning error for invalid files, got nil")
+		}
+		if !strings.Contains(err.Error(), "parse errors") {
+			t.Errorf("List() error should mention parse errors, got: %v", err)
 		}
 
 		if len(names) != 3 {
@@ -196,7 +201,7 @@ func TestLoader_Exists(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	preset := `name: test-preset
-model: /path/to/model.gguf
+model: "f:/path/to/model.gguf"
 `
 	if err := os.WriteFile(filepath.Join(tmpDir, "abc123.yaml"), []byte(preset), 0644); err != nil {
 		t.Fatal(err)
@@ -232,7 +237,7 @@ func TestLoader_Create(t *testing.T) {
 
 		p := &Preset{
 			Name:  "my-preset",
-			Model: "/path/to/model.gguf",
+			Model: "f:/path/to/model.gguf",
 		}
 
 		err := loader.Create(p)
@@ -256,7 +261,7 @@ func TestLoader_Create(t *testing.T) {
 
 		p := &Preset{
 			Name:  "my-preset",
-			Model: "/path/to/model.gguf",
+			Model: "f:/path/to/model.gguf",
 		}
 
 		if err := loader.Create(p); err != nil {
@@ -276,7 +281,7 @@ func TestLoader_Create(t *testing.T) {
 
 		p := &Preset{
 			Name:  "invalid name!", // spaces and special chars
-			Model: "/path/to/model.gguf",
+			Model: "f:/path/to/model.gguf",
 		}
 
 		err := loader.Create(p)
@@ -286,12 +291,202 @@ func TestLoader_Create(t *testing.T) {
 	})
 }
 
+func TestLoadFile(t *testing.T) {
+	t.Run("loads preset from file path", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: local-preset
+model: f:/abs/path/model.gguf
+context_size: 4096
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		if p.Name != "local-preset" {
+			t.Errorf("Name = %q, want %q", p.Name, "local-preset")
+		}
+		if p.Model != "f:/abs/path/model.gguf" {
+			t.Errorf("Model = %q, want %q", p.Model, "f:/abs/path/model.gguf")
+		}
+		if p.ContextSize != 4096 {
+			t.Errorf("ContextSize = %d, want %d", p.ContextSize, 4096)
+		}
+	})
+
+	t.Run("resolves dot-relative model path from preset directory", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: relative-model
+model: f:./models/local.gguf
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		expected := "f:" + filepath.Join(tmpDir, "models/local.gguf")
+		if p.Model != expected {
+			t.Errorf("Model = %q, want %q", p.Model, expected)
+		}
+	})
+
+	t.Run("resolves bare relative model path from preset directory", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: bare-relative-model
+model: f:models/local.gguf
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		expected := "f:" + filepath.Join(tmpDir, "models/local.gguf")
+		if p.Model != expected {
+			t.Errorf("Model = %q, want %q", p.Model, expected)
+		}
+	})
+
+	t.Run("resolves parent-relative model path", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		subDir := filepath.Join(tmpDir, "project")
+		if err := os.MkdirAll(subDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+
+		preset := `name: parent-model
+model: f:../shared/model.gguf
+`
+		presetPath := filepath.Join(subDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		expected := "f:" + filepath.Join(tmpDir, "shared/model.gguf")
+		if p.Model != expected {
+			t.Errorf("Model = %q, want %q", p.Model, expected)
+		}
+	})
+
+	t.Run("expands tilde in model path", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: tilde-model
+model: f:~/models/model.gguf
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		home, _ := os.UserHomeDir()
+		expected := "f:" + filepath.Join(home, "models/model.gguf")
+		if p.Model != expected {
+			t.Errorf("Model = %q, want %q", p.Model, expected)
+		}
+	})
+
+	t.Run("preserves HuggingFace model identifier", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: hf-model
+model: h:org/repo:Q4_K_M
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		if p.Model != "h:org/repo:Q4_K_M" {
+			t.Errorf("Model = %q, want %q", p.Model, "h:org/repo:Q4_K_M")
+		}
+	})
+
+	t.Run("returns error for non-existent file", func(t *testing.T) {
+		_, err := LoadFile("/nonexistent/path/.alpaca.yaml")
+		if err == nil {
+			t.Error("LoadFile() expected error for non-existent file")
+		}
+	})
+
+	t.Run("returns error for invalid YAML", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte("{{invalid yaml"), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		_, err := LoadFile(presetPath)
+		if err == nil {
+			t.Error("LoadFile() expected error for invalid YAML")
+		}
+	})
+
+	t.Run("returns error for missing name", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte("model: f:/path/model.gguf"), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		_, err := LoadFile(presetPath)
+		if err == nil {
+			t.Error("LoadFile() expected error for missing name")
+		}
+	})
+
+	t.Run("returns error for model without prefix", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte("name: test\nmodel: /path/model.gguf"), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		_, err := LoadFile(presetPath)
+		if err == nil {
+			t.Error("LoadFile() expected error for model without prefix")
+		}
+	})
+}
+
 func TestLoader_Remove(t *testing.T) {
 	t.Run("removes preset by name", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		preset := `name: test-preset
-model: /path/to/model.gguf
+model: "f:/path/to/model.gguf"
 `
 		if err := os.WriteFile(filepath.Join(tmpDir, "abc123.yaml"), []byte(preset), 0644); err != nil {
 			t.Fatal(err)

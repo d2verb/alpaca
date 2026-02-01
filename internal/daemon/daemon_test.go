@@ -38,6 +38,7 @@ func (s *stubPresetLoader) List() ([]string, error) {
 type stubModelManager struct {
 	entries  []metadata.ModelEntry
 	filePath string
+	exists   bool
 	err      error
 }
 
@@ -52,16 +53,36 @@ func (s *stubModelManager) GetFilePath(ctx context.Context, repo, quant string) 
 	return s.filePath, nil
 }
 
+func (s *stubModelManager) Exists(ctx context.Context, repo, quant string) (bool, error) {
+	if s.err != nil {
+		return false, s.err
+	}
+	return s.exists, nil
+}
+
+type stubPuller struct {
+	pullCalled bool
+	pullErr    error
+}
+
+func (s *stubPuller) Pull(ctx context.Context, repo, quant string) error {
+	s.pullCalled = true
+	return s.pullErr
+}
+
 func TestResolveHFPresetSuccess(t *testing.T) {
-	models := &stubModelManager{filePath: "/path/to/model.gguf"}
-	cfg := &config.Config{
+	models := &stubModelManager{filePath: "/path/to/model.gguf", exists: true}
+	userCfg := &config.Config{
 		DefaultHost:      "127.0.0.1",
 		DefaultPort:      8080,
 		DefaultCtxSize:   4096,
 		DefaultGPULayers: -1,
 	}
+	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
 
-	p, err := resolveHFPreset(context.Background(), models, cfg, "TheBloke/CodeLlama-7B-GGUF", "Q4_K_M")
+	d := New(cfg, &stubPresetLoader{}, models, nil, userCfg)
+
+	p, err := d.resolveHFPreset(context.Background(), "TheBloke/CodeLlama-7B-GGUF", "Q4_K_M", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -87,10 +108,13 @@ func TestResolveHFPresetSuccess(t *testing.T) {
 }
 
 func TestResolveHFPresetModelNotFound(t *testing.T) {
-	models := &stubModelManager{err: fmt.Errorf("model not found")}
-	cfg := config.DefaultConfig()
+	models := &stubModelManager{exists: false}
+	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	userCfg := config.DefaultConfig()
 
-	_, err := resolveHFPreset(context.Background(), models, cfg, "unknown/repo", "Q4_K_M")
+	d := New(cfg, &stubPresetLoader{}, models, nil, userCfg)
+
+	_, err := d.resolveHFPreset(context.Background(), "unknown/repo", "Q4_K_M", false)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -101,7 +125,7 @@ func TestNewDaemonStartsIdle(t *testing.T) {
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
 
-	d := New(cfg, presets, models, config.DefaultConfig())
+	d := New(cfg, presets, models, nil, config.DefaultConfig())
 
 	if d.State() != StateIdle {
 		t.Errorf("State() = %q, want %q", d.State(), StateIdle)
@@ -116,7 +140,7 @@ func TestListPresetsViaInterface(t *testing.T) {
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
 
-	d := New(cfg, presets, models, config.DefaultConfig())
+	d := New(cfg, presets, models, nil, config.DefaultConfig())
 
 	names, err := d.ListPresets()
 	if err != nil {
@@ -142,7 +166,7 @@ func TestListModelsViaInterface(t *testing.T) {
 	presets := &stubPresetLoader{}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
 
-	d := New(cfg, presets, models, config.DefaultConfig())
+	d := New(cfg, presets, models, nil, config.DefaultConfig())
 
 	infos, err := d.ListModels(context.Background())
 	if err != nil {
@@ -164,7 +188,7 @@ func TestStateIsLockFree(t *testing.T) {
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
 
-	d := New(cfg, presets, models, config.DefaultConfig())
+	d := New(cfg, presets, models, nil, config.DefaultConfig())
 
 	// Manually acquire the mutex to simulate Run() holding it
 	d.mu.Lock()
@@ -196,7 +220,7 @@ func TestConcurrentStateAccess(t *testing.T) {
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
 
-	d := New(cfg, presets, models, config.DefaultConfig())
+	d := New(cfg, presets, models, nil, config.DefaultConfig())
 
 	const numReaders = 100
 	var wg sync.WaitGroup
@@ -273,7 +297,7 @@ func TestDaemonRun_PresetNameSuccess(t *testing.T) {
 	}
 	userCfg := config.DefaultConfig()
 
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models, nil, userCfg)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -283,7 +307,7 @@ func TestDaemonRun_PresetNameSuccess(t *testing.T) {
 	d.waitForReady = mockHealthChecker(nil) // Success
 
 	// Act
-	err := d.Run(context.Background(), "p:test-preset")
+	err := d.Run(context.Background(), "p:test-preset", false)
 
 	// Assert
 	if err != nil {
@@ -318,7 +342,7 @@ func TestDaemonRun_FilePathSuccess(t *testing.T) {
 		DefaultGPULayers: 35,
 	}
 
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models, nil, userCfg)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -328,7 +352,7 @@ func TestDaemonRun_FilePathSuccess(t *testing.T) {
 	d.waitForReady = mockHealthChecker(nil)
 
 	// Act
-	err := d.Run(context.Background(), "f:/path/to/custom.gguf")
+	err := d.Run(context.Background(), "f:/path/to/custom.gguf", false)
 
 	// Assert
 	if err != nil {
@@ -358,6 +382,7 @@ func TestDaemonRun_HuggingFaceSuccess(t *testing.T) {
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{
 		filePath: "/models/codellama-7b.Q4_K_M.gguf",
+		exists:   true,
 	}
 	cfg := &Config{
 		LlamaServerPath: "/usr/local/bin/llama-server",
@@ -365,7 +390,7 @@ func TestDaemonRun_HuggingFaceSuccess(t *testing.T) {
 	}
 	userCfg := config.DefaultConfig()
 
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models, nil, userCfg)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -375,7 +400,7 @@ func TestDaemonRun_HuggingFaceSuccess(t *testing.T) {
 	d.waitForReady = mockHealthChecker(nil)
 
 	// Act
-	err := d.Run(context.Background(), "h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M")
+	err := d.Run(context.Background(), "h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M", false)
 
 	// Assert
 	if err != nil {
@@ -406,7 +431,7 @@ func TestDaemonRun_PresetNotFound(t *testing.T) {
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
 	userCfg := config.DefaultConfig()
 
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models, nil, userCfg)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -416,7 +441,7 @@ func TestDaemonRun_PresetNotFound(t *testing.T) {
 	d.waitForReady = mockHealthChecker(nil)
 
 	// Act
-	err := d.Run(context.Background(), "p:nonexistent")
+	err := d.Run(context.Background(), "p:nonexistent", false)
 
 	// Assert
 	if err == nil {
@@ -437,12 +462,12 @@ func TestDaemonRun_ModelNotFound(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{
-		err: fmt.Errorf("model not found"),
+		exists: false,
 	}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
 	userCfg := config.DefaultConfig()
 
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models, nil, userCfg)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -452,7 +477,7 @@ func TestDaemonRun_ModelNotFound(t *testing.T) {
 	d.waitForReady = mockHealthChecker(nil)
 
 	// Act
-	err := d.Run(context.Background(), "h:unknown/repo:Q4_K_M")
+	err := d.Run(context.Background(), "h:unknown/repo:Q4_K_M", false)
 
 	// Assert
 	if err == nil {
@@ -487,7 +512,7 @@ func TestDaemonRun_ProcessStartFailure(t *testing.T) {
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
 	userCfg := config.DefaultConfig()
 
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models, nil, userCfg)
 
 	// Mock dependencies
 	mockProc := &mockProcess{
@@ -499,7 +524,7 @@ func TestDaemonRun_ProcessStartFailure(t *testing.T) {
 	d.waitForReady = mockHealthChecker(nil)
 
 	// Act
-	err := d.Run(context.Background(), "p:test-preset")
+	err := d.Run(context.Background(), "p:test-preset", false)
 
 	// Assert
 	if err == nil {
@@ -534,7 +559,7 @@ func TestDaemonRun_HealthCheckTimeout(t *testing.T) {
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
 	userCfg := config.DefaultConfig()
 
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models, nil, userCfg)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -544,7 +569,7 @@ func TestDaemonRun_HealthCheckTimeout(t *testing.T) {
 	d.waitForReady = mockHealthChecker(fmt.Errorf("health check timeout"))
 
 	// Act
-	err := d.Run(context.Background(), "p:test-preset")
+	err := d.Run(context.Background(), "p:test-preset", false)
 
 	// Assert
 	if err == nil {
@@ -589,7 +614,7 @@ func TestDaemonRun_StopsExistingModel(t *testing.T) {
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
 	userCfg := config.DefaultConfig()
 
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models, nil, userCfg)
 
 	// Mock dependencies
 	firstMockProc := &mockProcess{}
@@ -606,13 +631,13 @@ func TestDaemonRun_StopsExistingModel(t *testing.T) {
 
 	// Act
 	// Load first model
-	err := d.Run(context.Background(), "p:first-preset")
+	err := d.Run(context.Background(), "p:first-preset", false)
 	if err != nil {
 		t.Fatalf("first Run() failed: %v", err)
 	}
 
 	// Load second model (should stop first)
-	err = d.Run(context.Background(), "p:second-preset")
+	err = d.Run(context.Background(), "p:second-preset", false)
 
 	// Assert
 	if err != nil {
@@ -636,7 +661,7 @@ func TestDaemonRun_InvalidIdentifier(t *testing.T) {
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
 	userCfg := config.DefaultConfig()
 
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models, nil, userCfg)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -646,7 +671,7 @@ func TestDaemonRun_InvalidIdentifier(t *testing.T) {
 	d.waitForReady = mockHealthChecker(nil)
 
 	// Act
-	err := d.Run(context.Background(), "invalid:format:too:many:colons")
+	err := d.Run(context.Background(), "invalid:format:too:many:colons", false)
 
 	// Assert
 	if err == nil {
@@ -678,7 +703,7 @@ func TestDaemonKill_WhenRunning(t *testing.T) {
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
 	userCfg := config.DefaultConfig()
 
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models, nil, userCfg)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -688,7 +713,7 @@ func TestDaemonKill_WhenRunning(t *testing.T) {
 	d.waitForReady = mockHealthChecker(nil)
 
 	// Start a model first
-	err := d.Run(context.Background(), "p:test-preset")
+	err := d.Run(context.Background(), "p:test-preset", false)
 	if err != nil {
 		t.Fatalf("Run() failed: %v", err)
 	}
@@ -718,7 +743,7 @@ func TestDaemonKill_WhenIdle(t *testing.T) {
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
 	userCfg := config.DefaultConfig()
 
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models, nil, userCfg)
 
 	// Act
 	err := d.Kill(context.Background())
@@ -750,7 +775,7 @@ func TestDaemonKill_StopError(t *testing.T) {
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
 	userCfg := config.DefaultConfig()
 
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models, nil, userCfg)
 
 	// Mock dependencies
 	mockProc := &mockProcess{
@@ -762,7 +787,7 @@ func TestDaemonKill_StopError(t *testing.T) {
 	d.waitForReady = mockHealthChecker(nil)
 
 	// Start a model first
-	err := d.Run(context.Background(), "p:test-preset")
+	err := d.Run(context.Background(), "p:test-preset", false)
 	if err != nil {
 		t.Fatalf("Run() failed: %v", err)
 	}
@@ -795,11 +820,12 @@ func TestDaemonRun_PresetWithHFModel(t *testing.T) {
 	}
 	models := &stubModelManager{
 		filePath: "/models/codellama.gguf",
+		exists:   true,
 	}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
 	userCfg := config.DefaultConfig()
 
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models, nil, userCfg)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -809,7 +835,7 @@ func TestDaemonRun_PresetWithHFModel(t *testing.T) {
 	d.waitForReady = mockHealthChecker(nil)
 
 	// Act
-	err := d.Run(context.Background(), "p:codellama-preset")
+	err := d.Run(context.Background(), "p:codellama-preset", false)
 
 	// Assert
 	if err != nil {
@@ -845,12 +871,12 @@ func TestDaemonRun_PresetWithHFModelNotFound(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{
-		err: fmt.Errorf("model not found"),
+		exists: false,
 	}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
 	userCfg := config.DefaultConfig()
 
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models, nil, userCfg)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -860,7 +886,7 @@ func TestDaemonRun_PresetWithHFModelNotFound(t *testing.T) {
 	d.waitForReady = mockHealthChecker(nil)
 
 	// Act
-	err := d.Run(context.Background(), "p:missing-preset")
+	err := d.Run(context.Background(), "p:missing-preset", false)
 
 	// Assert
 	if err == nil {
@@ -899,7 +925,7 @@ func TestDaemonRun_FailsToStopExistingModel(t *testing.T) {
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
 	userCfg := config.DefaultConfig()
 
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models, nil, userCfg)
 
 	// Mock dependencies
 	firstMockProc := &mockProcess{
@@ -917,13 +943,13 @@ func TestDaemonRun_FailsToStopExistingModel(t *testing.T) {
 
 	// Act
 	// Load first model
-	err := d.Run(context.Background(), "p:first-preset")
+	err := d.Run(context.Background(), "p:first-preset", false)
 	if err != nil {
 		t.Fatalf("first Run() failed: %v", err)
 	}
 
 	// Try to load second model (should fail to stop first)
-	err = d.Run(context.Background(), "p:second-preset")
+	err = d.Run(context.Background(), "p:second-preset", false)
 
 	// Assert
 	if err == nil {
@@ -955,7 +981,7 @@ func TestDaemonRun_ContextCancelledDuringHealthCheck(t *testing.T) {
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
 	userCfg := config.DefaultConfig()
 
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models, nil, userCfg)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -967,7 +993,7 @@ func TestDaemonRun_ContextCancelledDuringHealthCheck(t *testing.T) {
 	// Act
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
-	err := d.Run(ctx, "p:test-preset")
+	err := d.Run(ctx, "p:test-preset", false)
 
 	// Assert
 	if err == nil {
@@ -981,5 +1007,141 @@ func TestDaemonRun_ContextCancelledDuringHealthCheck(t *testing.T) {
 	}
 	if mockProc.stopCalled {
 		t.Log("Process.Stop() was called for cleanup (acceptable)")
+	}
+}
+
+func TestResolveModel_FilePath(t *testing.T) {
+	models := &stubModelManager{filePath: "/should/not/be/used"}
+	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	d := New(cfg, &stubPresetLoader{}, models, nil, config.DefaultConfig())
+
+	p := &preset.Preset{
+		Name:  "test",
+		Model: "f:/abs/path/model.gguf",
+	}
+
+	resolved, err := d.resolveModel(context.Background(), p, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// File path should remain unchanged
+	if resolved.Model != "f:/abs/path/model.gguf" {
+		t.Errorf("Model = %q, want %q", resolved.Model, "f:/abs/path/model.gguf")
+	}
+}
+
+func TestResolveModel_HuggingFace(t *testing.T) {
+	models := &stubModelManager{filePath: "/resolved/path/model.gguf", exists: true}
+	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	d := New(cfg, &stubPresetLoader{}, models, nil, config.DefaultConfig())
+
+	p := &preset.Preset{
+		Name:  "test",
+		Model: "h:org/repo:Q4_K_M",
+	}
+
+	resolved, err := d.resolveModel(context.Background(), p, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// HF format should be resolved to file path with f: prefix
+	if resolved.Model != "f:/resolved/path/model.gguf" {
+		t.Errorf("Model = %q, want %q", resolved.Model, "f:/resolved/path/model.gguf")
+	}
+
+	// Original preset should not be mutated
+	if p.Model != "h:org/repo:Q4_K_M" {
+		t.Errorf("Original preset mutated: Model = %q, want %q", p.Model, "h:org/repo:Q4_K_M")
+	}
+}
+
+func TestResolveModel_HuggingFaceNotExists(t *testing.T) {
+	models := &stubModelManager{exists: false}
+	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	d := New(cfg, &stubPresetLoader{}, models, nil, config.DefaultConfig())
+
+	p := &preset.Preset{
+		Name:  "test",
+		Model: "h:org/repo:Q4_K_M",
+	}
+
+	_, err := d.resolveModel(context.Background(), p, false)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestResolveModel_InvalidIdentifier(t *testing.T) {
+	models := &stubModelManager{}
+	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	d := New(cfg, &stubPresetLoader{}, models, nil, config.DefaultConfig())
+
+	p := &preset.Preset{
+		Name:  "test",
+		Model: "",
+	}
+
+	_, err := d.resolveModel(context.Background(), p, false)
+	if err == nil {
+		t.Fatal("expected error for empty model field, got nil")
+	}
+}
+
+func TestResolveModel_OldFormatError(t *testing.T) {
+	models := &stubModelManager{}
+	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	d := New(cfg, &stubPresetLoader{}, models, nil, config.DefaultConfig())
+
+	p := &preset.Preset{
+		Name:  "test",
+		Model: "org/repo:Q4_K_M", // Old format without h: prefix
+	}
+
+	_, err := d.resolveModel(context.Background(), p, false)
+	if err == nil {
+		t.Fatal("expected error for old format without prefix, got nil")
+	}
+}
+
+func TestEnsureModel_AutoPullWhenNotExists(t *testing.T) {
+	models := &stubModelManager{exists: false, filePath: "/models/test.gguf"}
+	puller := &stubPuller{}
+	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	d := New(cfg, &stubPresetLoader{}, models, puller, config.DefaultConfig())
+
+	err := d.ensureModel(context.Background(), "org/repo", "Q4_K_M", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !puller.pullCalled {
+		t.Error("puller.Pull() should be called when autoPull=true and model not exists")
+	}
+}
+
+func TestEnsureModel_NoPullWhenExists(t *testing.T) {
+	models := &stubModelManager{exists: true, filePath: "/models/test.gguf"}
+	puller := &stubPuller{}
+	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	d := New(cfg, &stubPresetLoader{}, models, puller, config.DefaultConfig())
+
+	err := d.ensureModel(context.Background(), "org/repo", "Q4_K_M", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if puller.pullCalled {
+		t.Error("puller.Pull() should not be called when model exists")
+	}
+}
+
+func TestEnsureModel_ErrorWhenNotExistsAndNoPull(t *testing.T) {
+	models := &stubModelManager{exists: false}
+	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	d := New(cfg, &stubPresetLoader{}, models, nil, config.DefaultConfig())
+
+	err := d.ensureModel(context.Background(), "org/repo", "Q4_K_M", false)
+	if err == nil {
+		t.Fatal("expected error when model not exists and autoPull=false")
 	}
 }
