@@ -47,3 +47,26 @@ homebrew_casks:
     homepage: https://github.com/d2verb/alpaca
     description: Lightweight llama-server wrapper for macOS
     license: MIT
+    hooks:
+      post:
+        install: |
+          require "digest"
+          require "json"
+          require "fileutils"
+
+          receipt_dir = "#{ENV["HOME"]}/.alpaca"
+          FileUtils.mkdir_p(receipt_dir)
+
+          binary_path = "#{staged_path}/alpaca"
+          fingerprint = Digest::SHA256.file(binary_path).hexdigest
+          timestamp = Time.now.utc.iso8601
+
+          receipt = {
+            schema_version: 1,
+            install_source: "brew",
+            installed_at: timestamp,
+            binary_path: binary_path,
+            binary_fingerprint: "sha256:#{fingerprint}"
+          }
+
+          File.write("#{receipt_dir}/install.json", JSON.pretty_generate(receipt))

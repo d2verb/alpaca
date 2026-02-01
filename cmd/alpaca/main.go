@@ -27,6 +27,7 @@ type CLI struct {
 	Pull    PullCmd    `cmd:"" help:"Download a model"`
 	New     NewCmd     `cmd:"" help:"Create a new preset interactively"`
 	Open    OpenCmd    `cmd:"" help:"Open llama-server in browser"`
+	Upgrade UpgradeCmd `cmd:"" help:"Upgrade alpaca to the latest version"`
 	Version VersionCmd `cmd:"" help:"Show version"`
 
 	// Completion commands
