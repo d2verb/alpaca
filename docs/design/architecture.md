@@ -177,7 +177,7 @@ Models can be loaded in two ways:
 ```bash
 $ alpaca load p:my-preset
 ```
-Loads model using settings from `~/.alpaca/presets/my-preset.yaml`.
+Loads model using settings from the global preset named `my-preset`.
 
 **2. Via HuggingFace Format:**
 ```bash

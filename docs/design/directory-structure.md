@@ -9,9 +9,9 @@ All Alpaca data is stored under `~/.alpaca/`:
 ├── config.yaml          # Global configuration
 ├── alpaca.sock          # Unix socket for daemon communication
 ├── alpaca.pid           # Daemon PID file
-├── presets/             # Preset definitions
-│   ├── codellama-7b.yaml
-│   ├── mistral-7b.yaml
+├── presets/             # Preset definitions (random filenames)
+│   ├── a1b2c3d4e5f67890.yaml
+│   ├── 1234567890abcdef.yaml
 │   └── ...
 ├── models/              # Downloaded models
 │   ├── .metadata.json   # Model download metadata
@@ -102,13 +102,16 @@ Presets can reference models anywhere on the filesystem:
 
 ```yaml
 # Using default location
-model: ~/.alpaca/models/codellama-7b-Q4_K_M.gguf
+model: "f:~/.alpaca/models/codellama-7b-Q4_K_M.gguf"
 
 # Using custom location
-model: /Volumes/ExternalDrive/models/llama3-70b.gguf
+model: "f:/Volumes/ExternalDrive/models/llama3-70b.gguf"
 
-# Using relative path (relative to home)
-model: ~/Downloads/some-model.gguf
+# Using home directory path
+model: "f:~/Downloads/some-model.gguf"
+
+# Using HuggingFace format (resolved at runtime)
+model: "h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M"
 ```
 
 ## Initialization
