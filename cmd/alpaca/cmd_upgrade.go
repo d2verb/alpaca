@@ -21,6 +21,22 @@ func (c *UpgradeCmd) Run() error {
 		return fmt.Errorf("get executable path: %w", err)
 	}
 
+	// Detect install source by path first
+	source := receipt.DetectInstallSource(currentBinary)
+
+	// For package managers, use path-based detection directly
+	switch source {
+	case receipt.SourceBrew:
+		return c.handleBrewInstall()
+	case receipt.SourceApt:
+		return c.handleAptInstall()
+	case receipt.SourceGo:
+		return c.handleGoInstall()
+	case receipt.SourceUnknown:
+		return c.handleUnknownInstall()
+	}
+
+	// For script installs, check receipt for fingerprint verification
 	r, err := receipt.Load()
 	if err != nil {
 		if errors.Is(err, receipt.ErrNotFound) {
@@ -47,19 +63,7 @@ func (c *UpgradeCmd) Run() error {
 		ui.PrintInfo("Fingerprint matches, proceeding...")
 	}
 
-	// Handle based on install source
-	switch r.InstallSource {
-	case receipt.SourceScript:
-		return c.handleScriptInstall(currentBinary, r)
-	case receipt.SourceBrew:
-		return c.handleBrewInstall()
-	case receipt.SourceApt:
-		return c.handleAptInstall()
-	case receipt.SourceGo:
-		return c.handleGoInstall()
-	default:
-		return c.handleUnknownInstall()
-	}
+	return c.handleScriptInstall(currentBinary, r)
 }
 
 func (c *UpgradeCmd) handleScriptInstall(currentBinary string, r *receipt.Receipt) error {
