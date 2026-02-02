@@ -28,7 +28,7 @@
 ### Homebrew (macOS)
 
 ```bash
-brew install d2verb/tap/alpaca
+brew install --cask d2verb/tap/alpaca
 ```
 
 ### Shell script (Linux/macOS)
@@ -71,7 +71,6 @@ alpaca new
 - `alpaca status` - Show current status
 - `alpaca open` - Open llama-server in browser
 - `alpaca logs [-f] [-s]` - View logs (`-f` follow, `-s` server logs)
-- `alpaca version` - Show version
 
 ### Models
 - `alpaca load <identifier>` - Load a model (`p:preset`, `h:org/repo:quant`, `f:path`)
@@ -81,6 +80,11 @@ alpaca new
 - `alpaca show <identifier>` - Show preset or model details
 - `alpaca rm <identifier>` - Remove a preset or model
 - `alpaca new` - Create a preset interactively
+
+### Utility
+- `alpaca upgrade [-c]` - Upgrade to the latest version (`-c` check only)
+- `alpaca version` - Show version
+- `alpaca install-completions` - Install shell completions
 
 ## Documentation
 
