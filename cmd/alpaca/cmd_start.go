@@ -80,7 +80,7 @@ func (c *StartCmd) startBackground(paths *config.Paths) error {
 	}
 
 	// Wait for daemon to become ready (max 5 seconds)
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		time.Sleep(100 * time.Millisecond)
 		if daemon.IsSocketAvailable(paths.Socket) {
 			// User-facing output (not logged)
