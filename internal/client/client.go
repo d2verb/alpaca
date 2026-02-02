@@ -59,10 +59,9 @@ func (c *Client) Status() (*protocol.Response, error) {
 }
 
 // Load sends a load request to the daemon.
-func (c *Client) Load(identifier string, autoPull bool) (*protocol.Response, error) {
+func (c *Client) Load(identifier string) (*protocol.Response, error) {
 	return c.Send(protocol.NewRequest(protocol.CmdLoad, map[string]any{
 		"identifier": identifier,
-		"auto_pull":  autoPull,
 	}))
 }
 

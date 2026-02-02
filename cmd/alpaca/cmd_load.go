@@ -1,14 +1,18 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"syscall"
 
+	"github.com/d2verb/alpaca/internal/config"
 	"github.com/d2verb/alpaca/internal/identifier"
+	"github.com/d2verb/alpaca/internal/model"
 	"github.com/d2verb/alpaca/internal/pathutil"
+	"github.com/d2verb/alpaca/internal/preset"
 	"github.com/d2verb/alpaca/internal/protocol"
 	"github.com/d2verb/alpaca/internal/ui"
 )
@@ -22,6 +26,11 @@ type LoadCmd struct {
 
 func (c *LoadCmd) Run() error {
 	cl, err := newClient()
+	if err != nil {
+		return err
+	}
+
+	paths, err := getPaths()
 	if err != nil {
 		return err
 	}
@@ -44,9 +53,15 @@ func (c *LoadCmd) Run() error {
 		return err
 	}
 
-	// Send to daemon (daemon handles auto-pull)
+	// Ensure HuggingFace model is downloaded (with progress bar)
+	// This handles direct HF identifiers and presets that reference HF models
+	if err := c.ensureHFModel(paths, id); err != nil {
+		return err
+	}
+
+	// Send to daemon
 	ui.PrintInfo(fmt.Sprintf("Loading %s...", req.displayName))
-	resp, err := cl.Load(req.identifier, true)
+	resp, err := cl.Load(req.identifier)
 	if err != nil {
 		if os.IsNotExist(err) || errors.Is(err, syscall.ECONNREFUSED) {
 			return errDaemonNotRunning()
@@ -61,6 +76,77 @@ func (c *LoadCmd) Run() error {
 	endpoint, _ := resp.Data["endpoint"].(string)
 	ui.PrintSuccess(fmt.Sprintf("Model ready at %s", ui.FormatEndpoint(endpoint)))
 	return nil
+}
+
+// ensureHFModel ensures HuggingFace models are downloaded before loading.
+// Handles direct HF identifiers and presets that reference HF models.
+func (c *LoadCmd) ensureHFModel(paths *config.Paths, id *identifier.Identifier) error {
+	var repo, quant string
+
+	switch id.Type {
+	case identifier.TypeHuggingFace:
+		// Direct HF identifier: h:org/repo:quant
+		repo, quant = id.Repo, id.Quant
+
+	case identifier.TypePresetName:
+		// Preset name: p:name - load from presets directory
+		loader := preset.NewLoader(paths.Presets)
+		p, err := loader.Load(id.PresetName)
+		if err == nil {
+			repo, quant = extractHFModel(p.Model)
+		}
+		// If preset loading fails, daemon will provide consistent error message
+
+	case identifier.TypePresetFilePath:
+		// Preset file: f:*.yaml - load from file path
+		p, err := preset.LoadFile(id.FilePath)
+		if err == nil {
+			repo, quant = extractHFModel(p.Model)
+		}
+		// If preset loading fails, daemon will provide consistent error message
+
+	default:
+		// Model file path or other types don't need pulling
+		return nil
+	}
+
+	// No HF model to pull
+	if repo == "" {
+		return nil
+	}
+
+	// Check if already downloaded
+	modelMgr := model.NewManager(paths.Models)
+	ctx := context.Background()
+
+	exists, err := modelMgr.Exists(ctx, repo, quant)
+	if err != nil {
+		return fmt.Errorf("check model: %w", err)
+	}
+
+	if exists {
+		return nil
+	}
+
+	// Pull with progress bar
+	if err := pullModel(repo, quant, paths.Models); err != nil {
+		return fmt.Errorf("download model: %w", err)
+	}
+
+	return nil
+}
+
+// extractHFModel extracts repo and quant from an HF model reference (h:org/repo:quant).
+// Returns empty strings if not an HF model.
+func extractHFModel(modelField string) (repo, quant string) {
+	id, err := identifier.Parse(modelField)
+	if err != nil {
+		return "", ""
+	}
+	if id.Type != identifier.TypeHuggingFace {
+		return "", ""
+	}
+	return id.Repo, id.Quant
 }
 
 // resolveIdentifier resolves the identifier from input or defaults to .alpaca.yaml.
