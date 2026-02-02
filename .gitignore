@@ -42,3 +42,5 @@ vendor/
 
 docs/wip/**/*
 !docs/wip/.gitkeep
+
+.serena/
