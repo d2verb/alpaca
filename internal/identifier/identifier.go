@@ -54,12 +54,7 @@ func Parse(input string) (*Identifier, error) {
 	case 'h':
 		// HuggingFace: h:org/repo:quant
 		// Parse but don't validate (validation happens at download time)
-		parts := strings.SplitN(value, ":", 2)
-		repo := parts[0]
-		quant := ""
-		if len(parts) == 2 {
-			quant = parts[1]
-		}
+		repo, quant, _ := strings.Cut(value, ":")
 		return &Identifier{
 			Raw:   input,
 			Type:  TypeHuggingFace,

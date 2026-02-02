@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 )
@@ -113,12 +114,9 @@ func (m *Manager) Add(entry ModelEntry) error {
 	defer m.mu.Unlock()
 
 	// Remove existing entry if present
-	for i, e := range m.data.Models {
-		if e.Repo == entry.Repo && e.Quant == entry.Quant {
-			m.data.Models = append(m.data.Models[:i], m.data.Models[i+1:]...)
-			break
-		}
-	}
+	m.data.Models = slices.DeleteFunc(m.data.Models, func(e ModelEntry) bool {
+		return e.Repo == entry.Repo && e.Quant == entry.Quant
+	})
 
 	// Add new entry
 	m.data.Models = append(m.data.Models, entry)
@@ -131,12 +129,9 @@ func (m *Manager) Remove(repo, quant string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	for i, e := range m.data.Models {
-		if e.Repo == repo && e.Quant == quant {
-			m.data.Models = append(m.data.Models[:i], m.data.Models[i+1:]...)
-			return nil
-		}
-	}
+	m.data.Models = slices.DeleteFunc(m.data.Models, func(e ModelEntry) bool {
+		return e.Repo == repo && e.Quant == quant
+	})
 
 	return nil
 }
@@ -162,9 +157,7 @@ func (m *Manager) List() []ModelEntry {
 	defer m.mu.Unlock()
 
 	// Return a copy to prevent external mutation
-	entries := make([]ModelEntry, len(m.data.Models))
-	copy(entries, m.data.Models)
-	return entries
+	return slices.Clone(m.data.Models)
 }
 
 // GetFilePath resolves repo:quant to the actual file path.
