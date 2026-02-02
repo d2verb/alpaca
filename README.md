@@ -28,7 +28,7 @@
 ### Homebrew (macOS)
 
 ```bash
-brew install --cask d2verb/tap/alpaca
+brew install d2verb/tap/alpaca
 ```
 
 ### Shell script (Linux/macOS)
