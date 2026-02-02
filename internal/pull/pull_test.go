@@ -1,6 +1,7 @@
 package pull
 
 import (
+	"path/filepath"
 	"testing"
 )
 
@@ -108,5 +109,37 @@ func TestNewPuller(t *testing.T) {
 	}
 	if puller.metadata == nil {
 		t.Error("metadata should not be nil")
+	}
+}
+
+// TestFilepathIsLocalBehavior documents the expected behavior of filepath.IsLocal
+// which is used to validate filenames before passing to os.Root.Create.
+func TestFilepathIsLocalBehavior(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		wantOK   bool
+	}{
+		// Valid filenames
+		{name: "simple filename", filename: "model.gguf", wantOK: true},
+		{name: "filename with dashes and dots", filename: "codellama-7b.Q4_K_M.gguf", wantOK: true},
+		{name: "hidden file", filename: ".hidden.gguf", wantOK: true},
+		{name: "double dots in name", filename: "model..v2.gguf", wantOK: true},
+		{name: "filename starting with double dots", filename: "..model.gguf", wantOK: true},
+
+		// Invalid filenames (path traversal attempts)
+		{name: "path traversal", filename: "../../../.bashrc", wantOK: false},
+		{name: "path traversal mid-path", filename: "foo/../../../.bashrc", wantOK: false},
+		{name: "absolute path", filename: "/etc/passwd", wantOK: false},
+		{name: "double dot only", filename: "..", wantOK: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := filepath.IsLocal(tt.filename)
+			if got != tt.wantOK {
+				t.Errorf("filepath.IsLocal(%q) = %v, want %v", tt.filename, got, tt.wantOK)
+			}
+		})
 	}
 }

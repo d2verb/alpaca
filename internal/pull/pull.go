@@ -64,12 +64,18 @@ func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, err
 		return nil, err
 	}
 
-	// Download file
-	destPath := filepath.Join(p.modelsDir, filename)
-	size, err := p.downloadFile(ctx, repo, filename, destPath)
+	// Validate filename (for clear error messages)
+	if !filepath.IsLocal(filename) {
+		return nil, fmt.Errorf("invalid filename from API: %s", filename)
+	}
+
+	// Download file with OS-level path confinement
+	size, err := p.downloadFile(ctx, repo, filename)
 	if err != nil {
 		return nil, err
 	}
+
+	destPath := filepath.Join(p.modelsDir, filename)
 
 	// Save metadata entry
 	entry := metadata.ModelEntry{
@@ -198,7 +204,7 @@ func extractQuants(files []string) []string {
 	return found
 }
 
-func (p *Puller) downloadFile(ctx context.Context, repo, filename, destPath string) (int64, error) {
+func (p *Puller) downloadFile(ctx context.Context, repo, filename string) (int64, error) {
 	url := fmt.Sprintf("%s/%s/resolve/main/%s", p.baseURL, repo, filename)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -215,8 +221,16 @@ func (p *Puller) downloadFile(ctx context.Context, repo, filename, destPath stri
 		return 0, fmt.Errorf("download failed: status %d", resp.StatusCode)
 	}
 
-	// Create destination file
-	out, err := os.Create(destPath)
+	// Open models directory with OS-level path confinement.
+	// This prevents path traversal attacks even with malicious filenames.
+	root, err := os.OpenRoot(p.modelsDir)
+	if err != nil {
+		return 0, fmt.Errorf("open models dir: %w", err)
+	}
+	defer root.Close()
+
+	// Create destination file (confined to modelsDir)
+	out, err := root.Create(filename)
 	if err != nil {
 		return 0, fmt.Errorf("create file: %w", err)
 	}
@@ -230,7 +244,7 @@ func (p *Puller) downloadFile(ctx context.Context, repo, filename, destPath stri
 	for {
 		select {
 		case <-ctx.Done():
-			os.Remove(destPath)
+			root.Remove(filename)
 			return 0, ctx.Err()
 		default:
 		}
@@ -245,7 +259,7 @@ func (p *Puller) downloadFile(ctx context.Context, repo, filename, destPath stri
 				}
 			}
 			if ew != nil {
-				os.Remove(destPath)
+				root.Remove(filename)
 				return 0, fmt.Errorf("write file: %w", ew)
 			}
 		}
@@ -253,7 +267,7 @@ func (p *Puller) downloadFile(ctx context.Context, repo, filename, destPath stri
 			if er == io.EOF {
 				break
 			}
-			os.Remove(destPath)
+			root.Remove(filename)
 			return 0, fmt.Errorf("read response: %w", er)
 		}
 	}
