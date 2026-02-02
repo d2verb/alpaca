@@ -484,8 +484,85 @@ Show version information.
 
 ```bash
 $ alpaca version
-alpaca version 0.1.0
+alpaca version 0.1.0 (a1b2c3d)
 ```
+
+The output includes the version number and commit hash for debugging purposes.
+
+### `alpaca upgrade`
+
+Upgrade alpaca to the latest version.
+
+```bash
+$ alpaca upgrade
+ℹ Checking for updates...
+
+  Current: 0.1.0
+  Latest:  0.2.0
+
+ℹ Downloading...
+✓ Upgraded to 0.2.0
+```
+
+When already up to date:
+```bash
+$ alpaca upgrade
+ℹ Checking for updates...
+
+  Current: 0.2.0
+  Latest:  0.2.0
+
+✓ Already up to date
+```
+
+**Flags:**
+- `--check`, `-c`: Check for updates without installing
+- `--force`, `-f`: Force upgrade even if installation source is unknown or mismatched
+
+**Check only mode:**
+```bash
+$ alpaca upgrade --check
+ℹ Checking for updates...
+
+  Current: 0.1.0
+  Latest:  0.2.0
+
+ℹ Update available. Run: alpaca upgrade
+```
+
+**Installation source detection:**
+
+The upgrade command detects how alpaca was installed and provides appropriate guidance:
+
+- **Homebrew**: Prompts to use `brew upgrade alpaca`
+- **apt**: Prompts to use `sudo apt update && sudo apt upgrade alpaca`
+- **go install**: Prompts to use `go install github.com/d2verb/alpaca/cmd/alpaca@latest`
+- **Install script**: Performs self-update automatically
+- **Unknown**: Suggests using `--force` or original installation method
+
+```bash
+# Homebrew installation
+$ alpaca upgrade
+ℹ Installed via Homebrew.
+To upgrade, run:
+
+    brew upgrade alpaca
+```
+
+### `alpaca install-completions`
+
+Install shell completions for bash, zsh, or fish.
+
+```bash
+$ alpaca install-completions
+```
+
+This command installs shell completions using the `kongplete` library. After installation, restart your shell or source the appropriate configuration file.
+
+**Supported shells:**
+- bash
+- zsh
+- fish
 
 ## Exit Codes
 
