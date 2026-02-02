@@ -11,7 +11,8 @@ import (
 // expandTilde expands ~ to home directory.
 // Returns the path unchanged if it doesn't start with ~/.
 func expandTilde(path string) (string, error) {
-	if !strings.HasPrefix(path, "~/") {
+	rest, found := strings.CutPrefix(path, "~/")
+	if !found {
 		return path, nil
 	}
 
@@ -20,7 +21,7 @@ func expandTilde(path string) (string, error) {
 		return "", fmt.Errorf("expand home dir: %w", err)
 	}
 
-	return filepath.Join(home, path[2:]), nil
+	return filepath.Join(home, rest), nil
 }
 
 // ResolvePath resolves a path with tilde expansion and relative path resolution.

@@ -52,7 +52,7 @@ func (c *StopCmd) Run() error {
 	}
 
 	// Wait for process to exit (max 10 seconds)
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		time.Sleep(100 * time.Millisecond)
 		running, err := daemon.IsProcessRunning(status.PID)
 		if err != nil {
