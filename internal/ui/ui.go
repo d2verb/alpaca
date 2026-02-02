@@ -224,15 +224,7 @@ func PrintPresetDetails(p PresetDetails) {
 	}
 	PrintKeyValue("Endpoint", Link(fmt.Sprintf("%s:%d", p.Host, p.Port)))
 	if len(p.ExtraArgs) > 0 {
-		// Join args into a single string
-		argsStr := ""
-		for i, arg := range p.ExtraArgs {
-			if i > 0 {
-				argsStr += " "
-			}
-			argsStr += arg
-		}
-		PrintKeyValue("Extra Args", argsStr)
+		PrintKeyValue("Extra Args", strings.Join(p.ExtraArgs, " "))
 	}
 }
 
@@ -258,7 +250,7 @@ func PrintSectionHeader(icon, title string) {
 	fmt.Fprintf(Output, "%s %s\n", icon, Heading(title))
 	// Divider length: icon (2 chars including icon + 2 chars including space,) + title length
 	dividerLen := len(title) + 4
-	fmt.Fprintln(Output, Muted(repeatString("─", dividerLen)))
+	fmt.Fprintln(Output, Muted(strings.Repeat("─", dividerLen)))
 }
 
 // PrintDetailHeader prints a header for detail views (no divider).
@@ -269,13 +261,4 @@ func PrintDetailHeader(icon, title, identifier string) {
 // PrintKeyValue prints a key-value pair with aligned formatting.
 func PrintKeyValue(key, value string) {
 	fmt.Fprintf(Output, "  %-14s %s\n", key, value)
-}
-
-// repeatString repeats a string n times.
-func repeatString(s string, n int) string {
-	result := ""
-	for i := 0; i < n; i++ {
-		result += s
-	}
-	return result
 }
