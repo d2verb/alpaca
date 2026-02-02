@@ -129,9 +129,7 @@ func (s *Server) handleLoad(ctx context.Context, req *protocol.Request) *protoco
 		return protocol.NewErrorResponse("identifier required")
 	}
 
-	autoPull, _ := req.Args["auto_pull"].(bool)
-
-	if err := s.daemon.Run(ctx, identifier, autoPull); err != nil {
+	if err := s.daemon.Run(ctx, identifier); err != nil {
 		code, msg := classifyLoadError(err)
 		return protocol.NewErrorResponseWithCode(code, msg)
 	}

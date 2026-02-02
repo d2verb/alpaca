@@ -25,12 +25,6 @@ type presetLoader interface {
 type modelManager interface {
 	List(ctx context.Context) ([]metadata.ModelEntry, error)
 	GetFilePath(ctx context.Context, repo, quant string) (string, error)
-	Exists(ctx context.Context, repo, quant string) (bool, error)
-}
-
-// modelPuller downloads models from HuggingFace.
-type modelPuller interface {
-	Pull(ctx context.Context, repo, quant string) error
 }
 
 // llamaProcess manages llama-server process lifecycle.
@@ -69,7 +63,6 @@ type Daemon struct {
 
 	presets        presetLoader
 	models         modelManager
-	puller         modelPuller
 	userConfig     *config.Config
 	config         *Config
 	llamaLogWriter io.Writer
@@ -87,11 +80,10 @@ type Config struct {
 }
 
 // New creates a new daemon instance.
-func New(cfg *Config, presets presetLoader, models modelManager, puller modelPuller, userConfig *config.Config) *Daemon {
+func New(cfg *Config, presets presetLoader, models modelManager, userConfig *config.Config) *Daemon {
 	d := &Daemon{
 		presets:        presets,
 		models:         models,
-		puller:         puller,
 		userConfig:     userConfig,
 		config:         cfg,
 		llamaLogWriter: cfg.LlamaLogWriter,
@@ -160,10 +152,8 @@ func newDefaultPreset(cfg *config.Config, name, model string) *preset.Preset {
 }
 
 // resolveHFPreset creates a preset from HuggingFace format (h:repo:quant).
-func (d *Daemon) resolveHFPreset(ctx context.Context, repo, quant string, autoPull bool) (*preset.Preset, error) {
-	if err := d.ensureModel(ctx, repo, quant, autoPull); err != nil {
-		return nil, err
-	}
+// Returns error if model is not downloaded.
+func (d *Daemon) resolveHFPreset(ctx context.Context, repo, quant string) (*preset.Preset, error) {
 	modelPath, err := d.models.GetFilePath(ctx, repo, quant)
 	if err != nil {
 		return nil, err
@@ -173,17 +163,15 @@ func (d *Daemon) resolveHFPreset(ctx context.Context, repo, quant string, autoPu
 
 // resolveModel resolves the model field in a preset if it's HuggingFace format.
 // Returns a new preset with the resolved model path without mutating the original.
-func (d *Daemon) resolveModel(ctx context.Context, p *preset.Preset, autoPull bool) (*preset.Preset, error) {
+// Returns error if HuggingFace model is not downloaded.
+func (d *Daemon) resolveModel(ctx context.Context, p *preset.Preset) (*preset.Preset, error) {
 	id, err := identifier.Parse(p.Model)
 	if err != nil {
 		return nil, fmt.Errorf("invalid model field in preset: %w", err)
 	}
 
 	if id.Type == identifier.TypeHuggingFace {
-		if err := d.ensureModel(ctx, id.Repo, id.Quant, autoPull); err != nil {
-			return nil, fmt.Errorf("resolve model %s:%s: %w", id.Repo, id.Quant, err)
-		}
-		// Resolve HF identifier to file path
+		// Resolve HF identifier to file path (returns error if not downloaded)
 		modelPath, err := d.models.GetFilePath(ctx, id.Repo, id.Quant)
 		if err != nil {
 			return nil, fmt.Errorf("resolve model %s:%s: %w", id.Repo, id.Quant, err)
@@ -198,27 +186,9 @@ func (d *Daemon) resolveModel(ctx context.Context, p *preset.Preset, autoPull bo
 	return p, nil
 }
 
-// ensureModel checks if a HuggingFace model exists and pulls it if autoPull is enabled.
-func (d *Daemon) ensureModel(ctx context.Context, repo, quant string, autoPull bool) error {
-	exists, err := d.models.Exists(ctx, repo, quant)
-	if err != nil {
-		return fmt.Errorf("check model: %w", err)
-	}
-	if exists {
-		return nil
-	}
-	if !autoPull || d.puller == nil {
-		return &metadata.NotFoundError{Repo: repo, Quant: quant}
-	}
-	if err := d.puller.Pull(ctx, repo, quant); err != nil {
-		return fmt.Errorf("pull model: %w", err)
-	}
-	return nil
-}
-
 // Run loads and runs a model (preset name, file path, or HuggingFace format).
-// If autoPull is true, HuggingFace models will be downloaded automatically if not present.
-func (d *Daemon) Run(ctx context.Context, input string, autoPull bool) error {
+// Returns error if HuggingFace model is not downloaded (use CLI to pull first).
+func (d *Daemon) Run(ctx context.Context, input string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -255,7 +225,7 @@ func (d *Daemon) Run(ctx context.Context, input string, autoPull bool) error {
 		p = newDefaultPreset(d.userConfig, id.FilePath, input)
 
 	case identifier.TypeHuggingFace:
-		p, err = d.resolveHFPreset(ctx, id.Repo, id.Quant, autoPull)
+		p, err = d.resolveHFPreset(ctx, id.Repo, id.Quant)
 		if err != nil {
 			return fmt.Errorf("resolve HuggingFace model: %w", err)
 		}
@@ -265,7 +235,7 @@ func (d *Daemon) Run(ctx context.Context, input string, autoPull bool) error {
 	}
 
 	// Resolve HuggingFace model reference if present
-	p, err = d.resolveModel(ctx, p, autoPull)
+	p, err = d.resolveModel(ctx, p)
 	if err != nil {
 		return err
 	}

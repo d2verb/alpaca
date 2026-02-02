@@ -15,19 +15,8 @@ import (
 	"github.com/d2verb/alpaca/internal/logging"
 	"github.com/d2verb/alpaca/internal/model"
 	"github.com/d2verb/alpaca/internal/preset"
-	"github.com/d2verb/alpaca/internal/pull"
 	"github.com/d2verb/alpaca/internal/ui"
 )
-
-// pullerAdapter adapts pull.Puller to daemon's modelPuller interface.
-type pullerAdapter struct {
-	puller *pull.Puller
-}
-
-func (a *pullerAdapter) Pull(ctx context.Context, repo, quant string) error {
-	_, err := a.puller.Pull(ctx, repo, quant)
-	return err
-}
 
 type StartCmd struct {
 	Foreground bool `short:"f" help:"Run in foreground (don't daemonize)"`
@@ -131,12 +120,11 @@ func (c *StartCmd) runDaemon(paths *config.Paths) error {
 	// Start daemon
 	presetLoader := preset.NewLoader(paths.Presets)
 	modelManager := model.NewManager(paths.Models)
-	puller := &pullerAdapter{puller: pull.NewPuller(paths.Models)}
 	d := daemon.New(&daemon.Config{
 		LlamaServerPath: userConfig.LlamaServerPath,
 		SocketPath:      paths.Socket,
 		LlamaLogWriter:  llamaLogWriter,
-	}, presetLoader, modelManager, puller, userConfig)
+	}, presetLoader, modelManager, userConfig)
 
 	server := daemon.NewServer(d, paths.Socket)
 
