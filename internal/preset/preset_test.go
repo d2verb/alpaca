@@ -1,6 +1,7 @@
 package preset
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -316,21 +317,9 @@ func TestPreset_BuildArgs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.preset.BuildArgs()
-			if !slicesEqual(got, tt.want) {
+			if !slices.Equal(got, tt.want) {
 				t.Errorf("BuildArgs() = %v, want %v", got, tt.want)
 			}
 		})
 	}
-}
-
-func slicesEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
