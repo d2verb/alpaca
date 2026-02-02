@@ -210,8 +210,10 @@ model: "h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M"
 
 **Resolution process:**
 1. Model must be downloaded first with `alpaca pull h:org/repo:quant`
-2. At runtime, `h:org/repo:quant` is resolved to `f:/path/to/downloaded/file.gguf`
+2. At load time, the daemon resolves `h:org/repo:quant` to `f:/path/to/downloaded/file.gguf`
 3. The `f:` prefix is stripped when starting llama-server
+
+**Note:** The HuggingFace to file path resolution happens in the daemon layer (not the preset package). The preset package stores the model identifier as-is; the daemon looks up the downloaded file path when loading the model.
 
 **Error handling:**
 - Missing prefix → Parse error with clear message
