@@ -134,10 +134,6 @@ func (c *NewCmd) collectInputs(name string) (*preset.Preset, error) {
 	if err != nil {
 		return nil, err
 	}
-	gpuStr, err := promptLine("GPU Layers", strconv.Itoa(preset.DefaultGPULayers))
-	if err != nil {
-		return nil, err
-	}
 
 	p := &preset.Preset{
 		Name:  name,
@@ -153,9 +149,6 @@ func (c *NewCmd) collectInputs(name string) (*preset.Preset, error) {
 	}
 	if ctx, err := strconv.Atoi(ctxStr); err == nil && ctx != preset.DefaultContextSize {
 		p.ContextSize = ctx
-	}
-	if gpu, err := strconv.Atoi(gpuStr); err == nil && gpu != preset.DefaultGPULayers {
-		p.GPULayers = gpu
 	}
 
 	return p, nil

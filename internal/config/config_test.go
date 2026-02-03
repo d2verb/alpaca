@@ -22,9 +22,6 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.DefaultCtxSize != 4096 {
 		t.Errorf("DefaultCtxSize = %d, want 4096", cfg.DefaultCtxSize)
 	}
-	if cfg.DefaultGPULayers != -1 {
-		t.Errorf("DefaultGPULayers = %d, want -1", cfg.DefaultGPULayers)
-	}
 }
 
 func TestGetPaths(t *testing.T) {
@@ -171,7 +168,6 @@ func TestLoadConfigPartial(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	configContent := `default_ctx_size: 8192
-default_gpu_layers: 33
 `
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -187,9 +183,6 @@ default_gpu_layers: 33
 	// Overridden values
 	if cfg.DefaultCtxSize != 8192 {
 		t.Errorf("DefaultCtxSize = %d, want 8192", cfg.DefaultCtxSize)
-	}
-	if cfg.DefaultGPULayers != 33 {
-		t.Errorf("DefaultGPULayers = %d, want 33", cfg.DefaultGPULayers)
 	}
 	// Default values for unspecified fields
 	if cfg.LlamaServerPath != "llama-server" {
@@ -208,7 +201,6 @@ func TestLoadConfigComplete(t *testing.T) {
 default_port: 9090
 default_host: 0.0.0.0
 default_ctx_size: 16384
-default_gpu_layers: 99
 `
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -232,9 +224,6 @@ default_gpu_layers: 99
 	}
 	if cfg.DefaultCtxSize != 16384 {
 		t.Errorf("DefaultCtxSize = %d, want 16384", cfg.DefaultCtxSize)
-	}
-	if cfg.DefaultGPULayers != 99 {
-		t.Errorf("DefaultGPULayers = %d, want 99", cfg.DefaultGPULayers)
 	}
 }
 

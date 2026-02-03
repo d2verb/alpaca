@@ -189,7 +189,6 @@ type PresetDetails struct {
 	Name        string
 	Model       string
 	ContextSize int
-	GPULayers   int
 	Threads     int
 	Host        string
 	Port        int
@@ -215,9 +214,6 @@ func PrintPresetDetails(p PresetDetails) {
 	PrintKeyValue("Model", Link(p.Model))
 	if p.ContextSize > 0 {
 		PrintKeyValue("Context Size", fmt.Sprintf("%d", p.ContextSize))
-	}
-	if p.GPULayers != 0 {
-		PrintKeyValue("GPU Layers", fmt.Sprintf("%d", p.GPULayers))
 	}
 	if p.Threads > 0 {
 		PrintKeyValue("Threads", fmt.Sprintf("%d", p.Threads))

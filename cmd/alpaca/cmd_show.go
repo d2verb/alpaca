@@ -53,7 +53,6 @@ func (c *ShowCmd) showPreset(name, presetsDir string) error {
 		Name:        p.Name,
 		Model:       p.Model,
 		ContextSize: p.ContextSize,
-		GPULayers:   p.GPULayers,
 		Threads:     p.Threads,
 		Host:        p.GetHost(),
 		Port:        p.GetPort(),
