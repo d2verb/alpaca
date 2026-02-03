@@ -160,7 +160,7 @@ func TestPreset_BuildArgs(t *testing.T) {
 			preset: Preset{Model: "/path/to/model.gguf"},
 			want: []string{
 				"-m", "/path/to/model.gguf",
-				"--ctx-size", "2048",
+				"--ctx-size", "4096",
 				"--port", "8080",
 				"--host", "127.0.0.1",
 			},
@@ -186,7 +186,7 @@ func TestPreset_BuildArgs(t *testing.T) {
 			},
 			want: []string{
 				"-m", "/path/to/model.gguf",
-				"--ctx-size", "2048",
+				"--ctx-size", "4096",
 				"--threads", "8",
 				"--port", "8080",
 				"--host", "127.0.0.1",
@@ -201,7 +201,7 @@ func TestPreset_BuildArgs(t *testing.T) {
 			},
 			want: []string{
 				"-m", "/path/to/model.gguf",
-				"--ctx-size", "2048",
+				"--ctx-size", "4096",
 				"--port", "9090",
 				"--host", "0.0.0.0",
 			},
@@ -214,7 +214,7 @@ func TestPreset_BuildArgs(t *testing.T) {
 			},
 			want: []string{
 				"-m", "/path/to/model.gguf",
-				"--ctx-size", "2048",
+				"--ctx-size", "4096",
 				"--port", "8080",
 				"--host", "127.0.0.1",
 				"--verbose", "--log-disable",
@@ -228,7 +228,7 @@ func TestPreset_BuildArgs(t *testing.T) {
 			},
 			want: []string{
 				"-m", "/path/to/model.gguf",
-				"--ctx-size", "2048",
+				"--ctx-size", "4096",
 				"--port", "8080",
 				"--host", "127.0.0.1",
 				"-b", "2048", "-ub", "2048", "--jinja",
@@ -242,7 +242,7 @@ func TestPreset_BuildArgs(t *testing.T) {
 			},
 			want: []string{
 				"-m", "/path/to/model.gguf",
-				"--ctx-size", "2048",
+				"--ctx-size", "4096",
 				"--port", "8080",
 				"--host", "127.0.0.1",
 				"-b", "2048", "--temp", "0.7", "--jinja",

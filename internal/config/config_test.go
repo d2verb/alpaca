@@ -7,23 +7,6 @@ import (
 	"testing"
 )
 
-func TestDefaultConfig(t *testing.T) {
-	cfg := DefaultConfig()
-
-	if cfg.LlamaServerPath != "llama-server" {
-		t.Errorf("LlamaServerPath = %q, want %q", cfg.LlamaServerPath, "llama-server")
-	}
-	if cfg.DefaultPort != DefaultPort {
-		t.Errorf("DefaultPort = %d, want %d", cfg.DefaultPort, DefaultPort)
-	}
-	if cfg.DefaultHost != DefaultHost {
-		t.Errorf("DefaultHost = %q, want %q", cfg.DefaultHost, DefaultHost)
-	}
-	if cfg.DefaultCtxSize != 4096 {
-		t.Errorf("DefaultCtxSize = %d, want 4096", cfg.DefaultCtxSize)
-	}
-}
-
 func TestGetPaths(t *testing.T) {
 	paths, err := GetPaths()
 	if err != nil {
@@ -40,7 +23,6 @@ func TestGetPaths(t *testing.T) {
 		want string
 	}{
 		{"Home", paths.Home, alpacaHome},
-		{"Config", paths.Config, filepath.Join(alpacaHome, "config.yaml")},
 		{"Socket", paths.Socket, filepath.Join(alpacaHome, "alpaca.sock")},
 		{"PID", paths.PID, filepath.Join(alpacaHome, "alpaca.pid")},
 		{"Presets", paths.Presets, filepath.Join(alpacaHome, "presets")},
@@ -68,9 +50,6 @@ func TestGetPaths_ContainsAlpacaDir(t *testing.T) {
 	// All paths should be under .alpaca
 	if !strings.Contains(paths.Home, ".alpaca") {
 		t.Errorf("Home should contain .alpaca: %q", paths.Home)
-	}
-	if !strings.HasPrefix(paths.Config, paths.Home) {
-		t.Errorf("Config should be under Home: %q", paths.Config)
 	}
 	if !strings.HasPrefix(paths.Socket, paths.Home) {
 		t.Errorf("Socket should be under Home: %q", paths.Socket)
@@ -129,117 +108,5 @@ func TestPaths_EnsureDirectories(t *testing.T) {
 	// Calling again should not error (idempotent)
 	if err := paths.EnsureDirectories(); err != nil {
 		t.Errorf("EnsureDirectories() second call error = %v", err)
-	}
-}
-
-func TestConstants(t *testing.T) {
-	// Verify constants have expected values
-	if DefaultPort != 8080 {
-		t.Errorf("DefaultPort = %d, want 8080", DefaultPort)
-	}
-	if DefaultHost != "127.0.0.1" {
-		t.Errorf("DefaultHost = %q, want 127.0.0.1", DefaultHost)
-	}
-}
-
-func TestLoadConfigNonExistent(t *testing.T) {
-	// Arrange
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "nonexistent.yaml")
-
-	// Act
-	cfg, err := LoadConfig(configPath)
-
-	// Assert
-	if err != nil {
-		t.Fatalf("expected no error for non-existent file, got %v", err)
-	}
-	// Should return defaults
-	if cfg.LlamaServerPath != "llama-server" {
-		t.Errorf("LlamaServerPath = %q, want llama-server", cfg.LlamaServerPath)
-	}
-	if cfg.DefaultCtxSize != 4096 {
-		t.Errorf("DefaultCtxSize = %d, want 4096", cfg.DefaultCtxSize)
-	}
-}
-
-func TestLoadConfigPartial(t *testing.T) {
-	// Arrange
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yaml")
-	configContent := `default_ctx_size: 8192
-`
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
-
-	// Act
-	cfg, err := LoadConfig(configPath)
-
-	// Assert
-	if err != nil {
-		t.Fatalf("LoadConfig() error = %v", err)
-	}
-	// Overridden values
-	if cfg.DefaultCtxSize != 8192 {
-		t.Errorf("DefaultCtxSize = %d, want 8192", cfg.DefaultCtxSize)
-	}
-	// Default values for unspecified fields
-	if cfg.LlamaServerPath != "llama-server" {
-		t.Errorf("LlamaServerPath = %q, want llama-server", cfg.LlamaServerPath)
-	}
-	if cfg.DefaultPort != 8080 {
-		t.Errorf("DefaultPort = %d, want 8080", cfg.DefaultPort)
-	}
-}
-
-func TestLoadConfigComplete(t *testing.T) {
-	// Arrange
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yaml")
-	configContent := `llama_server_path: /usr/local/bin/llama-server
-default_port: 9090
-default_host: 0.0.0.0
-default_ctx_size: 16384
-`
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
-
-	// Act
-	cfg, err := LoadConfig(configPath)
-
-	// Assert
-	if err != nil {
-		t.Fatalf("LoadConfig() error = %v", err)
-	}
-	if cfg.LlamaServerPath != "/usr/local/bin/llama-server" {
-		t.Errorf("LlamaServerPath = %q, want /usr/local/bin/llama-server", cfg.LlamaServerPath)
-	}
-	if cfg.DefaultPort != 9090 {
-		t.Errorf("DefaultPort = %d, want 9090", cfg.DefaultPort)
-	}
-	if cfg.DefaultHost != "0.0.0.0" {
-		t.Errorf("DefaultHost = %q, want 0.0.0.0", cfg.DefaultHost)
-	}
-	if cfg.DefaultCtxSize != 16384 {
-		t.Errorf("DefaultCtxSize = %d, want 16384", cfg.DefaultCtxSize)
-	}
-}
-
-func TestLoadConfigInvalidYAML(t *testing.T) {
-	// Arrange
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yaml")
-	if err := os.WriteFile(configPath, []byte("not: valid: yaml:"), 0644); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
-
-	// Act
-	_, err := LoadConfig(configPath)
-
-	// Assert
-	if err == nil {
-		t.Fatal("expected error for invalid YAML")
 	}
 }
