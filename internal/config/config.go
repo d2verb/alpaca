@@ -1,62 +1,14 @@
-// Package config handles Alpaca configuration.
+// Package config handles Alpaca path configuration.
 package config
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/d2verb/alpaca/internal/preset"
-	"gopkg.in/yaml.v3"
 )
 
-// Config represents the global Alpaca configuration.
-type Config struct {
-	LlamaServerPath string `yaml:"llama_server_path"`
-	DefaultPort     int    `yaml:"default_port"`
-	DefaultHost     string `yaml:"default_host"`
-	DefaultCtxSize  int    `yaml:"default_ctx_size"`
-}
-
-// DefaultConfig returns a config with default values.
-func DefaultConfig() *Config {
-	return &Config{
-		LlamaServerPath: "llama-server",
-		DefaultPort:     preset.DefaultPort,
-		DefaultHost:     preset.DefaultHost,
-		DefaultCtxSize:  preset.DefaultContextSize,
-	}
-}
-
-// LoadConfig loads configuration from the specified path.
-// If the file doesn't exist, returns DefaultConfig().
-// If the file exists but is partially filled, missing fields use default values.
-func LoadConfig(configPath string) (*Config, error) {
-	// Start with defaults
-	cfg := DefaultConfig()
-
-	// Try to read file
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// File doesn't exist - use defaults
-			return cfg, nil
-		}
-		return nil, fmt.Errorf("read config file: %w", err)
-	}
-
-	// Parse YAML, overlaying onto defaults
-	if err := yaml.Unmarshal(data, cfg); err != nil {
-		return nil, fmt.Errorf("parse config: %w", err)
-	}
-
-	return cfg, nil
-}
-
-// Paths returns common paths used by Alpaca.
+// Paths holds common paths used by Alpaca.
 type Paths struct {
 	Home      string
-	Config    string
 	Socket    string
 	PID       string
 	Presets   string
@@ -77,7 +29,6 @@ func GetPaths() (*Paths, error) {
 	logsDir := filepath.Join(alpacaHome, "logs")
 	return &Paths{
 		Home:      alpacaHome,
-		Config:    filepath.Join(alpacaHome, "config.yaml"),
 		Socket:    filepath.Join(alpacaHome, "alpaca.sock"),
 		PID:       filepath.Join(alpacaHome, "alpaca.pid"),
 		Presets:   filepath.Join(alpacaHome, "presets"),

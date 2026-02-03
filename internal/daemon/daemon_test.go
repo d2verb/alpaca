@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/d2verb/alpaca/internal/config"
 	"github.com/d2verb/alpaca/internal/llama"
 	"github.com/d2verb/alpaca/internal/metadata"
 	"github.com/d2verb/alpaca/internal/preset"
@@ -65,14 +64,9 @@ func (s *stubModelManager) Exists(ctx context.Context, repo, quant string) (bool
 
 func TestResolveHFPresetSuccess(t *testing.T) {
 	models := &stubModelManager{filePath: "/path/to/model.gguf", exists: true}
-	userCfg := &config.Config{
-		DefaultHost:    "127.0.0.1",
-		DefaultPort:    8080,
-		DefaultCtxSize: 4096,
-	}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
 
-	d := New(cfg, &stubPresetLoader{}, models, userCfg)
+	d := New(cfg, &stubPresetLoader{}, models)
 
 	p, err := d.resolveHFPreset(context.Background(), "TheBloke/CodeLlama-7B-GGUF", "Q4_K_M")
 	if err != nil {
@@ -85,23 +79,23 @@ func TestResolveHFPresetSuccess(t *testing.T) {
 	if p.Model != "f:/path/to/model.gguf" {
 		t.Errorf("Model = %q, want %q", p.Model, "f:/path/to/model.gguf")
 	}
-	if p.Host != "127.0.0.1" {
-		t.Errorf("Host = %q, want %q", p.Host, "127.0.0.1")
+	// Host, Port, ContextSize use preset defaults via GetXxx() methods
+	if p.GetHost() != preset.DefaultHost {
+		t.Errorf("GetHost() = %q, want %q", p.GetHost(), preset.DefaultHost)
 	}
-	if p.Port != 8080 {
-		t.Errorf("Port = %d, want %d", p.Port, 8080)
+	if p.GetPort() != preset.DefaultPort {
+		t.Errorf("GetPort() = %d, want %d", p.GetPort(), preset.DefaultPort)
 	}
-	if p.ContextSize != 4096 {
-		t.Errorf("ContextSize = %d, want %d", p.ContextSize, 4096)
+	if p.GetContextSize() != preset.DefaultContextSize {
+		t.Errorf("GetContextSize() = %d, want %d", p.GetContextSize(), preset.DefaultContextSize)
 	}
 }
 
 func TestResolveHFPresetModelNotFound(t *testing.T) {
 	models := &stubModelManager{exists: false}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
-	userCfg := config.DefaultConfig()
 
-	d := New(cfg, &stubPresetLoader{}, models, userCfg)
+	d := New(cfg, &stubPresetLoader{}, models)
 
 	_, err := d.resolveHFPreset(context.Background(), "unknown/repo", "Q4_K_M")
 	if err == nil {
@@ -114,7 +108,7 @@ func TestNewDaemonStartsIdle(t *testing.T) {
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
 
-	d := New(cfg, presets, models, config.DefaultConfig())
+	d := New(cfg, presets, models)
 
 	if d.State() != StateIdle {
 		t.Errorf("State() = %q, want %q", d.State(), StateIdle)
@@ -129,7 +123,7 @@ func TestListPresetsViaInterface(t *testing.T) {
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
 
-	d := New(cfg, presets, models, config.DefaultConfig())
+	d := New(cfg, presets, models)
 
 	names, err := d.ListPresets()
 	if err != nil {
@@ -155,7 +149,7 @@ func TestListModelsViaInterface(t *testing.T) {
 	presets := &stubPresetLoader{}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
 
-	d := New(cfg, presets, models, config.DefaultConfig())
+	d := New(cfg, presets, models)
 
 	infos, err := d.ListModels(context.Background())
 	if err != nil {
@@ -177,7 +171,7 @@ func TestStateIsLockFree(t *testing.T) {
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
 
-	d := New(cfg, presets, models, config.DefaultConfig())
+	d := New(cfg, presets, models)
 
 	// Manually acquire the mutex to simulate Run() holding it
 	d.mu.Lock()
@@ -209,7 +203,7 @@ func TestConcurrentStateAccess(t *testing.T) {
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
 
-	d := New(cfg, presets, models, config.DefaultConfig())
+	d := New(cfg, presets, models)
 
 	const numReaders = 100
 	var wg sync.WaitGroup
@@ -283,9 +277,7 @@ func TestDaemonRun_PresetNameSuccess(t *testing.T) {
 		LlamaServerPath: "/usr/local/bin/llama-server",
 		SocketPath:      "/tmp/test.sock",
 	}
-	userCfg := config.DefaultConfig()
-
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -323,13 +315,8 @@ func TestDaemonRun_FilePathSuccess(t *testing.T) {
 		LlamaServerPath: "/usr/local/bin/llama-server",
 		SocketPath:      "/tmp/test.sock",
 	}
-	userCfg := &config.Config{
-		DefaultHost:    "0.0.0.0",
-		DefaultPort:    9090,
-		DefaultCtxSize: 8192,
-	}
 
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -349,18 +336,19 @@ func TestDaemonRun_FilePathSuccess(t *testing.T) {
 		t.Errorf("State() = %q, want %q", d.State(), StateRunning)
 	}
 
-	preset := d.CurrentPreset()
-	if preset == nil {
+	p := d.CurrentPreset()
+	if p == nil {
 		t.Fatal("CurrentPreset() should not be nil")
 	}
-	if preset.Model != "f:/path/to/custom.gguf" {
-		t.Errorf("Preset.Model = %q, want %q", preset.Model, "f:/path/to/custom.gguf")
+	if p.Model != "f:/path/to/custom.gguf" {
+		t.Errorf("Preset.Model = %q, want %q", p.Model, "f:/path/to/custom.gguf")
 	}
-	if preset.Host != "0.0.0.0" {
-		t.Errorf("Preset.Host = %q, want %q", preset.Host, "0.0.0.0")
+	// Host, Port use preset defaults via GetXxx() methods
+	if p.GetHost() != preset.DefaultHost {
+		t.Errorf("GetHost() = %q, want %q", p.GetHost(), preset.DefaultHost)
 	}
-	if preset.Port != 9090 {
-		t.Errorf("Preset.Port = %d, want %d", preset.Port, 9090)
+	if p.GetPort() != preset.DefaultPort {
+		t.Errorf("GetPort() = %d, want %d", p.GetPort(), preset.DefaultPort)
 	}
 }
 
@@ -375,9 +363,7 @@ func TestDaemonRun_HuggingFaceSuccess(t *testing.T) {
 		LlamaServerPath: "/usr/local/bin/llama-server",
 		SocketPath:      "/tmp/test.sock",
 	}
-	userCfg := config.DefaultConfig()
-
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -416,9 +402,7 @@ func TestDaemonRun_PresetNotFound(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -452,9 +436,7 @@ func TestDaemonRun_ModelNotFound(t *testing.T) {
 		exists: false,
 	}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -497,9 +479,7 @@ func TestDaemonRun_ProcessStartFailure(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{
@@ -544,9 +524,7 @@ func TestDaemonRun_HealthCheckTimeout(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -599,9 +577,7 @@ func TestDaemonRun_StopsExistingModel(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models)
 
 	// Mock dependencies
 	firstMockProc := &mockProcess{}
@@ -646,9 +622,7 @@ func TestDaemonRun_InvalidIdentifier(t *testing.T) {
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -688,9 +662,7 @@ func TestDaemonKill_WhenRunning(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -728,9 +700,7 @@ func TestDaemonKill_WhenIdle(t *testing.T) {
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models)
 
 	// Act
 	err := d.Kill(context.Background())
@@ -760,9 +730,7 @@ func TestDaemonKill_StopError(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{
@@ -810,9 +778,7 @@ func TestDaemonRun_PresetWithHFModel(t *testing.T) {
 		exists:   true,
 	}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -861,9 +827,7 @@ func TestDaemonRun_PresetWithHFModelNotFound(t *testing.T) {
 		exists: false,
 	}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -910,9 +874,7 @@ func TestDaemonRun_FailsToStopExistingModel(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models)
 
 	// Mock dependencies
 	firstMockProc := &mockProcess{
@@ -966,9 +928,7 @@ func TestDaemonRun_ContextCancelledDuringHealthCheck(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	d := New(cfg, presets, models, userCfg)
+	d := New(cfg, presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -1000,7 +960,7 @@ func TestDaemonRun_ContextCancelledDuringHealthCheck(t *testing.T) {
 func TestResolveModel_FilePath(t *testing.T) {
 	models := &stubModelManager{filePath: "/should/not/be/used"}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
-	d := New(cfg, &stubPresetLoader{}, models, config.DefaultConfig())
+	d := New(cfg, &stubPresetLoader{}, models)
 
 	p := &preset.Preset{
 		Name:  "test",
@@ -1021,7 +981,7 @@ func TestResolveModel_FilePath(t *testing.T) {
 func TestResolveModel_HuggingFace(t *testing.T) {
 	models := &stubModelManager{filePath: "/resolved/path/model.gguf", exists: true}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
-	d := New(cfg, &stubPresetLoader{}, models, config.DefaultConfig())
+	d := New(cfg, &stubPresetLoader{}, models)
 
 	p := &preset.Preset{
 		Name:  "test",
@@ -1047,7 +1007,7 @@ func TestResolveModel_HuggingFace(t *testing.T) {
 func TestResolveModel_HuggingFaceNotExists(t *testing.T) {
 	models := &stubModelManager{exists: false}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
-	d := New(cfg, &stubPresetLoader{}, models, config.DefaultConfig())
+	d := New(cfg, &stubPresetLoader{}, models)
 
 	p := &preset.Preset{
 		Name:  "test",
@@ -1063,7 +1023,7 @@ func TestResolveModel_HuggingFaceNotExists(t *testing.T) {
 func TestResolveModel_InvalidIdentifier(t *testing.T) {
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
-	d := New(cfg, &stubPresetLoader{}, models, config.DefaultConfig())
+	d := New(cfg, &stubPresetLoader{}, models)
 
 	p := &preset.Preset{
 		Name:  "test",
@@ -1079,7 +1039,7 @@ func TestResolveModel_InvalidIdentifier(t *testing.T) {
 func TestResolveModel_OldFormatError(t *testing.T) {
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
-	d := New(cfg, &stubPresetLoader{}, models, config.DefaultConfig())
+	d := New(cfg, &stubPresetLoader{}, models)
 
 	p := &preset.Preset{
 		Name:  "test",

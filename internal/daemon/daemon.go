@@ -8,7 +8,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/d2verb/alpaca/internal/config"
 	"github.com/d2verb/alpaca/internal/identifier"
 	"github.com/d2verb/alpaca/internal/llama"
 	"github.com/d2verb/alpaca/internal/metadata"
@@ -63,7 +62,6 @@ type Daemon struct {
 
 	presets        presetLoader
 	models         modelManager
-	userConfig     *config.Config
 	config         *Config
 	llamaLogWriter io.Writer
 
@@ -80,11 +78,10 @@ type Config struct {
 }
 
 // New creates a new daemon instance.
-func New(cfg *Config, presets presetLoader, models modelManager, userConfig *config.Config) *Daemon {
+func New(cfg *Config, presets presetLoader, models modelManager) *Daemon {
 	d := &Daemon{
 		presets:        presets,
 		models:         models,
-		userConfig:     userConfig,
 		config:         cfg,
 		llamaLogWriter: cfg.LlamaLogWriter,
 		// Default implementations (can be overridden in tests)
@@ -139,14 +136,12 @@ func (d *Daemon) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	return models, nil
 }
 
-// newDefaultPreset creates a preset with default settings from config.
-func newDefaultPreset(cfg *config.Config, name, model string) *preset.Preset {
+// newDefaultPreset creates a preset with default settings.
+func newDefaultPreset(name, model string) *preset.Preset {
 	return &preset.Preset{
-		Name:        name,
-		Model:       model,
-		Host:        cfg.DefaultHost,
-		Port:        cfg.DefaultPort,
-		ContextSize: cfg.DefaultCtxSize,
+		Name:  name,
+		Model: model,
+		// Host, Port, ContextSize use preset package defaults via GetXxx() methods
 	}
 }
 
@@ -157,7 +152,7 @@ func (d *Daemon) resolveHFPreset(ctx context.Context, repo, quant string) (*pres
 	if err != nil {
 		return nil, err
 	}
-	return newDefaultPreset(d.userConfig, fmt.Sprintf("h:%s:%s", repo, quant), "f:"+modelPath), nil
+	return newDefaultPreset(fmt.Sprintf("h:%s:%s", repo, quant), "f:"+modelPath), nil
 }
 
 // resolveModel resolves the model field in a preset if it's HuggingFace format.
@@ -221,7 +216,7 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 		}
 
 	case identifier.TypeModelFilePath:
-		p = newDefaultPreset(d.userConfig, id.FilePath, input)
+		p = newDefaultPreset(id.FilePath, input)
 
 	case identifier.TypeHuggingFace:
 		p, err = d.resolveHFPreset(ctx, id.Repo, id.Quant)

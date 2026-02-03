@@ -111,20 +111,14 @@ func (c *StartCmd) runDaemon(paths *config.Paths) error {
 	}
 	defer daemon.RemovePIDFile(paths.PID)
 
-	// Load user config
-	userConfig, err := config.LoadConfig(paths.Config)
-	if err != nil {
-		userConfig = config.DefaultConfig()
-	}
-
 	// Start daemon
 	presetLoader := preset.NewLoader(paths.Presets)
 	modelManager := model.NewManager(paths.Models)
 	d := daemon.New(&daemon.Config{
-		LlamaServerPath: userConfig.LlamaServerPath,
+		LlamaServerPath: "llama-server",
 		SocketPath:      paths.Socket,
 		LlamaLogWriter:  llamaLogWriter,
-	}, presetLoader, modelManager, userConfig)
+	}, presetLoader, modelManager)
 
 	server := daemon.NewServer(d, paths.Socket)
 

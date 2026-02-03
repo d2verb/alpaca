@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/d2verb/alpaca/internal/config"
 	"github.com/d2verb/alpaca/internal/llama"
 	"github.com/d2verb/alpaca/internal/metadata"
 	"github.com/d2verb/alpaca/internal/preset"
@@ -72,9 +71,7 @@ func TestHandleStatus_Idle(t *testing.T) {
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	// Act
@@ -111,9 +108,7 @@ func TestHandleStatus_Running(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	// Mock dependencies to allow Run to succeed
@@ -163,9 +158,7 @@ func TestHandleLoad_Success(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	// Mock dependencies
@@ -199,9 +192,7 @@ func TestHandleLoad_MissingIdentifier(t *testing.T) {
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	req := &protocol.Request{
@@ -228,9 +219,7 @@ func TestHandleLoad_PresetNotFound(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	req := &protocol.Request{
@@ -259,9 +248,7 @@ func TestHandleLoad_ModelNotFound(t *testing.T) {
 		err: &metadata.NotFoundError{Repo: "unknown", Quant: "Q4_K_M"},
 	}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	req := &protocol.Request{
@@ -299,9 +286,7 @@ func TestHandleLoad_ServerStartFailed(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	// Mock process that fails to start
@@ -348,9 +333,7 @@ func TestHandleUnload_Success(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	// Mock dependencies and start a model first
@@ -382,9 +365,7 @@ func TestHandleUnload_WhenIdle(t *testing.T) {
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	// Act
@@ -412,9 +393,7 @@ func TestHandleUnload_Error(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	// Mock process that fails to stop
@@ -450,9 +429,7 @@ func TestHandleListPresets_Success(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	// Act
@@ -483,9 +460,7 @@ func TestHandleListPresets_Error(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	// Act
@@ -510,9 +485,7 @@ func TestHandleListModels_Success(t *testing.T) {
 		},
 	}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	// Act
@@ -549,9 +522,7 @@ func TestHandleListModels_Error(t *testing.T) {
 		err: fmt.Errorf("failed to read metadata"),
 	}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	// Act
@@ -571,9 +542,7 @@ func TestHandleRequest_Status(t *testing.T) {
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	req := &protocol.Request{Command: protocol.CmdStatus}
@@ -603,9 +572,7 @@ func TestHandleRequest_Load(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	// Mock dependencies
@@ -636,9 +603,7 @@ func TestHandleRequest_Unload(t *testing.T) {
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	req := &protocol.Request{Command: protocol.CmdUnload}
@@ -659,9 +624,7 @@ func TestHandleRequest_ListPresets(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	req := &protocol.Request{Command: protocol.CmdListPresets}
@@ -680,9 +643,7 @@ func TestHandleRequest_ListModels(t *testing.T) {
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	req := &protocol.Request{Command: protocol.CmdListModels}
@@ -701,9 +662,7 @@ func TestHandleRequest_UnknownCommand(t *testing.T) {
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
 	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
-	userCfg := config.DefaultConfig()
-
-	daemon := New(cfg, presets, models, userCfg)
+	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
 	req := &protocol.Request{Command: "unknown_command"}
