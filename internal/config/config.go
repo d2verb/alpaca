@@ -6,14 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/d2verb/alpaca/internal/preset"
 	"gopkg.in/yaml.v3"
-)
-
-const (
-	// DefaultPort is the default port for llama-server.
-	DefaultPort = 8080
-	// DefaultHost is the default host for llama-server.
-	DefaultHost = "127.0.0.1"
 )
 
 // Config represents the global Alpaca configuration.
@@ -28,9 +22,9 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		LlamaServerPath: "llama-server",
-		DefaultPort:     DefaultPort,
-		DefaultHost:     DefaultHost,
-		DefaultCtxSize:  4096,
+		DefaultPort:     preset.DefaultPort,
+		DefaultHost:     preset.DefaultHost,
+		DefaultCtxSize:  preset.DefaultContextSize,
 	}
 }
 

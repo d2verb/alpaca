@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/d2verb/alpaca/internal/preset"
 )
 
 func TestDefaultConfig(t *testing.T) {
@@ -13,14 +15,14 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.LlamaServerPath != "llama-server" {
 		t.Errorf("LlamaServerPath = %q, want %q", cfg.LlamaServerPath, "llama-server")
 	}
-	if cfg.DefaultPort != DefaultPort {
-		t.Errorf("DefaultPort = %d, want %d", cfg.DefaultPort, DefaultPort)
+	if cfg.DefaultPort != preset.DefaultPort {
+		t.Errorf("DefaultPort = %d, want %d", cfg.DefaultPort, preset.DefaultPort)
 	}
-	if cfg.DefaultHost != DefaultHost {
-		t.Errorf("DefaultHost = %q, want %q", cfg.DefaultHost, DefaultHost)
+	if cfg.DefaultHost != preset.DefaultHost {
+		t.Errorf("DefaultHost = %q, want %q", cfg.DefaultHost, preset.DefaultHost)
 	}
-	if cfg.DefaultCtxSize != 4096 {
-		t.Errorf("DefaultCtxSize = %d, want 4096", cfg.DefaultCtxSize)
+	if cfg.DefaultCtxSize != preset.DefaultContextSize {
+		t.Errorf("DefaultCtxSize = %d, want %d", cfg.DefaultCtxSize, preset.DefaultContextSize)
 	}
 }
 
@@ -132,13 +134,18 @@ func TestPaths_EnsureDirectories(t *testing.T) {
 	}
 }
 
-func TestConstants(t *testing.T) {
-	// Verify constants have expected values
-	if DefaultPort != 8080 {
-		t.Errorf("DefaultPort = %d, want 8080", DefaultPort)
+func TestDefaultConfigUsesPresetDefaults(t *testing.T) {
+	// Verify config defaults are sourced from preset package (SSOT)
+	cfg := DefaultConfig()
+
+	if cfg.DefaultPort != preset.DefaultPort {
+		t.Errorf("DefaultPort = %d, want preset.DefaultPort (%d)", cfg.DefaultPort, preset.DefaultPort)
 	}
-	if DefaultHost != "127.0.0.1" {
-		t.Errorf("DefaultHost = %q, want 127.0.0.1", DefaultHost)
+	if cfg.DefaultHost != preset.DefaultHost {
+		t.Errorf("DefaultHost = %q, want preset.DefaultHost (%q)", cfg.DefaultHost, preset.DefaultHost)
+	}
+	if cfg.DefaultCtxSize != preset.DefaultContextSize {
+		t.Errorf("DefaultCtxSize = %d, want preset.DefaultContextSize (%d)", cfg.DefaultCtxSize, preset.DefaultContextSize)
 	}
 }
 
@@ -158,8 +165,8 @@ func TestLoadConfigNonExistent(t *testing.T) {
 	if cfg.LlamaServerPath != "llama-server" {
 		t.Errorf("LlamaServerPath = %q, want llama-server", cfg.LlamaServerPath)
 	}
-	if cfg.DefaultCtxSize != 4096 {
-		t.Errorf("DefaultCtxSize = %d, want 4096", cfg.DefaultCtxSize)
+	if cfg.DefaultCtxSize != preset.DefaultContextSize {
+		t.Errorf("DefaultCtxSize = %d, want %d", cfg.DefaultCtxSize, preset.DefaultContextSize)
 	}
 }
 
