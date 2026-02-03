@@ -189,7 +189,7 @@ Loads model using metadata from `~/.alpaca/models/.metadata.json`. If not downlo
 ```bash
 $ alpaca load f:~/models/my-model.gguf
 ```
-Loads model file directly with default settings from `~/.alpaca/config.yaml`.
+Loads model file directly with default settings (host: 127.0.0.1, port: 8080, context_size: 4096).
 
 ### Model Switching Flow
 

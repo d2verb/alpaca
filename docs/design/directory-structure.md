@@ -6,7 +6,6 @@ All Alpaca data is stored under `~/.alpaca/`:
 
 ```
 ~/.alpaca/
-├── config.yaml          # Global configuration
 ├── alpaca.sock          # Unix socket for daemon communication
 ├── alpaca.pid           # Daemon PID file
 ├── presets/             # Preset definitions (random filenames)
@@ -24,21 +23,6 @@ All Alpaca data is stored under `~/.alpaca/`:
 ```
 
 ## Files
-
-### config.yaml
-
-Global configuration for Alpaca.
-
-```yaml
-# Path to llama-server binary
-llama_server_path: /usr/local/bin/llama-server
-
-# Default port (can be overridden in presets)
-default_port: 8080
-
-# Default host (can be overridden in presets)
-default_host: "127.0.0.1"
-```
 
 ### alpaca.sock
 
