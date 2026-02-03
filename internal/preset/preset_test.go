@@ -126,28 +126,6 @@ func TestPreset_GetContextSize(t *testing.T) {
 	}
 }
 
-func TestPreset_GetGPULayers(t *testing.T) {
-	tests := []struct {
-		name      string
-		gpuLayers int
-		want      int
-	}{
-		{"returns custom gpu layers", 32, 32},
-		{"returns default when not set", 0, DefaultGPULayers},
-		// Note: Cannot distinguish between "not set in YAML" and "explicitly set to 0".
-		// To use CPU-only mode (0 GPU layers), use extra_args: ["--n-gpu-layers", "0"]
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			p := &Preset{GPULayers: tt.gpuLayers}
-			if got := p.GetGPULayers(); got != tt.want {
-				t.Errorf("GetGPULayers() = %d, want %d", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestPreset_Endpoint(t *testing.T) {
 	tests := []struct {
 		name string
@@ -183,7 +161,6 @@ func TestPreset_BuildArgs(t *testing.T) {
 			want: []string{
 				"-m", "/path/to/model.gguf",
 				"--ctx-size", "2048",
-				"--n-gpu-layers", "-1",
 				"--port", "8080",
 				"--host", "127.0.0.1",
 			},
@@ -197,21 +174,6 @@ func TestPreset_BuildArgs(t *testing.T) {
 			want: []string{
 				"-m", "/path/to/model.gguf",
 				"--ctx-size", "4096",
-				"--n-gpu-layers", "-1",
-				"--port", "8080",
-				"--host", "127.0.0.1",
-			},
-		},
-		{
-			name: "with gpu layers",
-			preset: Preset{
-				Model:     "/path/to/model.gguf",
-				GPULayers: 32,
-			},
-			want: []string{
-				"-m", "/path/to/model.gguf",
-				"--ctx-size", "2048",
-				"--n-gpu-layers", "32",
 				"--port", "8080",
 				"--host", "127.0.0.1",
 			},
@@ -225,7 +187,6 @@ func TestPreset_BuildArgs(t *testing.T) {
 			want: []string{
 				"-m", "/path/to/model.gguf",
 				"--ctx-size", "2048",
-				"--n-gpu-layers", "-1",
 				"--threads", "8",
 				"--port", "8080",
 				"--host", "127.0.0.1",
@@ -241,7 +202,6 @@ func TestPreset_BuildArgs(t *testing.T) {
 			want: []string{
 				"-m", "/path/to/model.gguf",
 				"--ctx-size", "2048",
-				"--n-gpu-layers", "-1",
 				"--port", "9090",
 				"--host", "0.0.0.0",
 			},
@@ -255,7 +215,6 @@ func TestPreset_BuildArgs(t *testing.T) {
 			want: []string{
 				"-m", "/path/to/model.gguf",
 				"--ctx-size", "2048",
-				"--n-gpu-layers", "-1",
 				"--port", "8080",
 				"--host", "127.0.0.1",
 				"--verbose", "--log-disable",
@@ -270,7 +229,6 @@ func TestPreset_BuildArgs(t *testing.T) {
 			want: []string{
 				"-m", "/path/to/model.gguf",
 				"--ctx-size", "2048",
-				"--n-gpu-layers", "-1",
 				"--port", "8080",
 				"--host", "127.0.0.1",
 				"-b", "2048", "-ub", "2048", "--jinja",
@@ -285,7 +243,6 @@ func TestPreset_BuildArgs(t *testing.T) {
 			want: []string{
 				"-m", "/path/to/model.gguf",
 				"--ctx-size", "2048",
-				"--n-gpu-layers", "-1",
 				"--port", "8080",
 				"--host", "127.0.0.1",
 				"-b", "2048", "--temp", "0.7", "--jinja",
@@ -296,7 +253,6 @@ func TestPreset_BuildArgs(t *testing.T) {
 			preset: Preset{
 				Model:       "/path/to/model.gguf",
 				ContextSize: 2048,
-				GPULayers:   16,
 				Threads:     4,
 				Port:        3000,
 				Host:        "localhost",
@@ -305,7 +261,6 @@ func TestPreset_BuildArgs(t *testing.T) {
 			want: []string{
 				"-m", "/path/to/model.gguf",
 				"--ctx-size", "2048",
-				"--n-gpu-layers", "16",
 				"--threads", "4",
 				"--port", "3000",
 				"--host", "localhost",

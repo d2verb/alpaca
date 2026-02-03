@@ -42,7 +42,6 @@ model: "f:~/.alpaca/models/codellama-7b-Q4_K_M.gguf"
 
 # Common options (mapped to llama-server arguments)
 context_size: 4096      # --ctx-size
-gpu_layers: 35          # --n-gpu-layers
 threads: 8              # --threads
 port: 8080              # --port
 
@@ -68,14 +67,11 @@ extra_args:
 | Field | Type | Default | llama-server flag |
 |-------|------|---------|-------------------|
 | `context_size` | int | 2048 | `--ctx-size` |
-| `gpu_layers` | int | -1 (all layers) | `--n-gpu-layers` |
 | `threads` | int | 0 (omit flag, llama-server decides) | `--threads` |
 | `port` | int | 8080 | `--port` |
 | `host` | string | "127.0.0.1" | `--host` |
 
-**Note on defaults:** Alpaca applies explicit defaults for `context_size`, `gpu_layers`, `host`, and `port`. When these fields are omitted from the YAML, the defaults are still passed to llama-server. Only `threads` omits the flag when not specified, allowing llama-server to decide.
-
-**Special case for `gpu_layers`:** Setting `gpu_layers: 0` in YAML will use 0 GPU layers (CPU-only mode). However, due to YAML's zero-value behavior, omitting the field also results in 0, which gets replaced with the default (-1). To explicitly use CPU-only mode, add `--n-gpu-layers 0` to `extra_args`.
+**Note on defaults:** Alpaca applies explicit defaults for `context_size`, `host`, and `port`. When these fields are omitted from the YAML, the defaults are still passed to llama-server. `threads` omits the flag when not specified, allowing llama-server to decide.
 
 ### Extra Arguments
 
@@ -115,7 +111,6 @@ extra_args:
 name: mistral-7b-q4
 model: "f:/Users/username/.alpaca/models/mistral-7b.Q4_K_M.gguf"
 context_size: 4096
-gpu_layers: 35
 ```
 
 ```yaml
@@ -123,7 +118,6 @@ gpu_layers: 35
 name: mistral-7b-q4
 model: "f:~/.alpaca/models/mistral-7b.Q4_K_M.gguf"
 context_size: 4096
-gpu_layers: 35
 ```
 
 ```yaml
@@ -131,7 +125,6 @@ gpu_layers: 35
 name: codellama
 model: "f:./models/codellama.gguf"
 context_size: 4096
-gpu_layers: 35
 ```
 
 ### Preset with HuggingFace Model Reference
@@ -141,7 +134,6 @@ gpu_layers: 35
 name: gemma3-4b-q4
 model: "h:unsloth/gemma3-4b-it-GGUF:Q4_K_M"
 context_size: 4096
-gpu_layers: 35
 ```
 
 **Note:** HuggingFace models must be downloaded first with `alpaca pull h:org/repo:quant`. The model field will be automatically resolved to `f:/path/to/downloaded/file.gguf` at runtime.
@@ -152,7 +144,6 @@ gpu_layers: 35
 name: codellama-34b-instruct
 model: "f:~/.alpaca/models/codellama-34b-instruct.Q4_K_M.gguf"
 context_size: 8192
-gpu_layers: 50
 threads: 12
 port: 8081
 extra_args:
@@ -170,7 +161,6 @@ model: "f:~/.alpaca/models/llama3-8b.Q4_K_M.gguf"
 host: "0.0.0.0"  # Listen on all interfaces
 port: 8080
 context_size: 4096
-gpu_layers: 35
 ```
 
 ## Model Field Resolution
@@ -235,7 +225,6 @@ Model: f:./models/my-model.gguf
 Host [127.0.0.1]:
 Port [8080]:
 Context [2048]: 4096
-GPU Layers [-1]:
 ✓ Created '.alpaca.yaml'
 💡 alpaca load
 ```

@@ -211,9 +211,6 @@ File paths are loaded with default settings:
 - `host`: 127.0.0.1
 - `port`: 8080
 - `context_size`: 2048
-- `gpu_layers`: -1 (all layers)
-
-These defaults are defined in the preset package. For custom settings, create a preset instead.
 
 **Error handling:**
 ```bash
@@ -237,10 +234,9 @@ When loading a model without a preset, the following defaults are used:
 host: 127.0.0.1
 port: 8080
 context_size: 2048
-gpu_layers: -1  # Use all GPU layers
 ```
 
-These defaults are defined in the preset package constants and cannot be changed without modifying the code.
+These defaults are defined in the preset package constants.
 
 #### `alpaca unload`
 
@@ -295,7 +291,6 @@ $ alpaca show p:codellama-7b-q4
 📦 Preset: p:codellama-7b-q4
   Model          f:/Users/username/.alpaca/models/codellama-7b.Q4_K_M.gguf
   Context Size   4096
-  GPU Layers     -1
   Endpoint       127.0.0.1:8080
 ```
 
@@ -345,7 +340,6 @@ Model: h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 Host [127.0.0.1]:
 Port [8080]:
 Context [2048]: 8192
-GPU Layers [-1]: 35
 ✓ Created 'my-model'
 💡 alpaca load p:my-model
 ```
@@ -363,7 +357,6 @@ Model: f:./models/model.gguf
 Host [127.0.0.1]:
 Port [8080]:
 Context [2048]: 4096
-GPU Layers [-1]:
 ✓ Created '.alpaca.yaml'
 💡 alpaca load
 ```
@@ -379,7 +372,6 @@ The command will prompt for:
 - **Host**: Server host address (default: 127.0.0.1)
 - **Port**: Server port (default: 8080)
 - **Context**: Context window size (default: 2048)
-- **GPU Layers**: Number of layers to offload to GPU (default: -1 for all)
 
 Press Enter to accept default values (shown in brackets). Only non-default values are written to the YAML file.
 

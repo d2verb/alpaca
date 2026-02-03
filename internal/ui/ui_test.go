@@ -376,7 +376,6 @@ func TestPrintPresetDetails(t *testing.T) {
 		Name:        "my-preset",
 		Model:       "h:org/model:Q4_K_M",
 		ContextSize: 4096,
-		GPULayers:   32,
 		Threads:     8,
 		Host:        "127.0.0.1",
 		Port:        8080,
@@ -402,12 +401,6 @@ func TestPrintPresetDetails(t *testing.T) {
 	}
 	if !strings.Contains(output, "4096") {
 		t.Error("Output should contain context size value")
-	}
-	if !strings.Contains(output, "GPU Layers") {
-		t.Error("Output should contain 'GPU Layers' label")
-	}
-	if !strings.Contains(output, "32") {
-		t.Error("Output should contain gpu layers value")
 	}
 	if !strings.Contains(output, "Threads") {
 		t.Error("Output should contain 'Threads' label")
@@ -456,9 +449,6 @@ func TestPrintPresetDetails_Minimal(t *testing.T) {
 	}
 	if strings.Contains(output, "Context Size") {
 		t.Error("Output should not contain 'Context Size' label when zero")
-	}
-	if strings.Contains(output, "GPU Layers") {
-		t.Error("Output should not contain 'GPU Layers' label when zero")
 	}
 	if strings.Contains(output, "Threads") {
 		t.Error("Output should not contain 'Threads' label when zero")

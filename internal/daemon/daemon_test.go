@@ -66,10 +66,9 @@ func (s *stubModelManager) Exists(ctx context.Context, repo, quant string) (bool
 func TestResolveHFPresetSuccess(t *testing.T) {
 	models := &stubModelManager{filePath: "/path/to/model.gguf", exists: true}
 	userCfg := &config.Config{
-		DefaultHost:      "127.0.0.1",
-		DefaultPort:      8080,
-		DefaultCtxSize:   4096,
-		DefaultGPULayers: -1,
+		DefaultHost:    "127.0.0.1",
+		DefaultPort:    8080,
+		DefaultCtxSize: 4096,
 	}
 	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
 
@@ -94,9 +93,6 @@ func TestResolveHFPresetSuccess(t *testing.T) {
 	}
 	if p.ContextSize != 4096 {
 		t.Errorf("ContextSize = %d, want %d", p.ContextSize, 4096)
-	}
-	if p.GPULayers != -1 {
-		t.Errorf("GPULayers = %d, want %d", p.GPULayers, -1)
 	}
 }
 
@@ -275,7 +271,6 @@ func TestDaemonRun_PresetNameSuccess(t *testing.T) {
 		Host:        "127.0.0.1",
 		Port:        8080,
 		ContextSize: 4096,
-		GPULayers:   -1,
 	}
 
 	presets := &stubPresetLoader{
@@ -329,10 +324,9 @@ func TestDaemonRun_FilePathSuccess(t *testing.T) {
 		SocketPath:      "/tmp/test.sock",
 	}
 	userCfg := &config.Config{
-		DefaultHost:      "0.0.0.0",
-		DefaultPort:      9090,
-		DefaultCtxSize:   8192,
-		DefaultGPULayers: 35,
+		DefaultHost:    "0.0.0.0",
+		DefaultPort:    9090,
+		DefaultCtxSize: 8192,
 	}
 
 	d := New(cfg, presets, models, userCfg)

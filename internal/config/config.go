@@ -18,21 +18,19 @@ const (
 
 // Config represents the global Alpaca configuration.
 type Config struct {
-	LlamaServerPath  string `yaml:"llama_server_path"`
-	DefaultPort      int    `yaml:"default_port"`
-	DefaultHost      string `yaml:"default_host"`
-	DefaultCtxSize   int    `yaml:"default_ctx_size"`
-	DefaultGPULayers int    `yaml:"default_gpu_layers"`
+	LlamaServerPath string `yaml:"llama_server_path"`
+	DefaultPort     int    `yaml:"default_port"`
+	DefaultHost     string `yaml:"default_host"`
+	DefaultCtxSize  int    `yaml:"default_ctx_size"`
 }
 
 // DefaultConfig returns a config with default values.
 func DefaultConfig() *Config {
 	return &Config{
-		LlamaServerPath:  "llama-server",
-		DefaultPort:      DefaultPort,
-		DefaultHost:      DefaultHost,
-		DefaultCtxSize:   4096,
-		DefaultGPULayers: -1,
+		LlamaServerPath: "llama-server",
+		DefaultPort:     DefaultPort,
+		DefaultHost:     DefaultHost,
+		DefaultCtxSize:  4096,
 	}
 }
 

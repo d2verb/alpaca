@@ -14,7 +14,6 @@ func TestLoader_Load(t *testing.T) {
 	validPreset := `name: valid-preset
 model: "f:/path/to/model.gguf"
 context_size: 4096
-gpu_layers: 32
 threads: 8
 port: 9090
 host: "0.0.0.0"
@@ -62,9 +61,6 @@ model: "f:~/.alpaca/models/test.gguf"
 		}
 		if p.ContextSize != 4096 {
 			t.Errorf("ContextSize = %d, want %d", p.ContextSize, 4096)
-		}
-		if p.GPULayers != 32 {
-			t.Errorf("GPULayers = %d, want %d", p.GPULayers, 32)
 		}
 		if p.Threads != 8 {
 			t.Errorf("Threads = %d, want %d", p.Threads, 8)

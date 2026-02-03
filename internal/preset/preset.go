@@ -21,8 +21,6 @@ const (
 	DefaultHost = "127.0.0.1"
 	// DefaultContextSize is the default context size for llama-server.
 	DefaultContextSize = 2048
-	// DefaultGPULayers is the default number of GPU layers (-1 = all layers).
-	DefaultGPULayers = -1
 )
 
 // ValidateName checks if a preset name is valid.
@@ -60,7 +58,6 @@ type Preset struct {
 	Name        string   `yaml:"name"` // Required, used as identifier
 	Model       string   `yaml:"model"`
 	ContextSize int      `yaml:"context_size,omitempty"`
-	GPULayers   int      `yaml:"gpu_layers,omitempty"`
 	Threads     int      `yaml:"threads,omitempty"`
 	Port        int      `yaml:"port,omitempty"`
 	Host        string   `yaml:"host,omitempty"`
@@ -91,14 +88,6 @@ func (p *Preset) GetContextSize() int {
 	return DefaultContextSize
 }
 
-// GetGPULayers returns the GPU layers, using default if not set.
-func (p *Preset) GetGPULayers() int {
-	if p.GPULayers != 0 {
-		return p.GPULayers
-	}
-	return DefaultGPULayers
-}
-
 // Endpoint returns the HTTP endpoint for this preset.
 func (p *Preset) Endpoint() string {
 	return fmt.Sprintf("http://%s:%d", p.GetHost(), p.GetPort())
@@ -113,9 +102,8 @@ func (p *Preset) BuildArgs() []string {
 		"-m", modelPath,
 	}
 
-	// Always include context size and GPU layers with defaults
+	// Always include context size with default
 	args = append(args, "--ctx-size", strconv.Itoa(p.GetContextSize()))
-	args = append(args, "--n-gpu-layers", strconv.Itoa(p.GetGPULayers()))
 
 	if p.Threads > 0 {
 		args = append(args, "--threads", strconv.Itoa(p.Threads))

@@ -147,7 +147,6 @@ func newDefaultPreset(cfg *config.Config, name, model string) *preset.Preset {
 		Host:        cfg.DefaultHost,
 		Port:        cfg.DefaultPort,
 		ContextSize: cfg.DefaultCtxSize,
-		GPULayers:   cfg.DefaultGPULayers,
 	}
 }
 
