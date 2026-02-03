@@ -115,9 +115,8 @@ func (c *StartCmd) runDaemon(paths *config.Paths) error {
 	presetLoader := preset.NewLoader(paths.Presets)
 	modelManager := model.NewManager(paths.Models)
 	d := daemon.New(&daemon.Config{
-		LlamaServerPath: "llama-server",
-		SocketPath:      paths.Socket,
-		LlamaLogWriter:  llamaLogWriter,
+		SocketPath:     paths.Socket,
+		LlamaLogWriter: llamaLogWriter,
 	}, presetLoader, modelManager)
 
 	server := daemon.NewServer(d, paths.Socket)

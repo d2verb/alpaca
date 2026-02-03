@@ -64,7 +64,7 @@ func (s *stubModelManager) Exists(ctx context.Context, repo, quant string) (bool
 
 func TestResolveHFPresetSuccess(t *testing.T) {
 	models := &stubModelManager{filePath: "/path/to/model.gguf", exists: true}
-	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	cfg := &Config{SocketPath: "/tmp/test.sock"}
 
 	d := New(cfg, &stubPresetLoader{}, models)
 
@@ -93,7 +93,7 @@ func TestResolveHFPresetSuccess(t *testing.T) {
 
 func TestResolveHFPresetModelNotFound(t *testing.T) {
 	models := &stubModelManager{exists: false}
-	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	cfg := &Config{SocketPath: "/tmp/test.sock"}
 
 	d := New(cfg, &stubPresetLoader{}, models)
 
@@ -106,7 +106,7 @@ func TestResolveHFPresetModelNotFound(t *testing.T) {
 func TestNewDaemonStartsIdle(t *testing.T) {
 	presets := &stubPresetLoader{names: []string{"test"}}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	cfg := &Config{SocketPath: "/tmp/test.sock"}
 
 	d := New(cfg, presets, models)
 
@@ -121,7 +121,7 @@ func TestNewDaemonStartsIdle(t *testing.T) {
 func TestListPresetsViaInterface(t *testing.T) {
 	presets := &stubPresetLoader{names: []string{"codellama", "mistral"}}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	cfg := &Config{SocketPath: "/tmp/test.sock"}
 
 	d := New(cfg, presets, models)
 
@@ -147,7 +147,7 @@ func TestListModelsViaInterface(t *testing.T) {
 	}
 	models := &stubModelManager{entries: entries}
 	presets := &stubPresetLoader{}
-	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	cfg := &Config{SocketPath: "/tmp/test.sock"}
 
 	d := New(cfg, presets, models)
 
@@ -169,7 +169,7 @@ func TestStateIsLockFree(t *testing.T) {
 	// concurrently without blocking, even when Run() holds the mutex.
 	presets := &stubPresetLoader{names: []string{"test"}}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	cfg := &Config{SocketPath: "/tmp/test.sock"}
 
 	d := New(cfg, presets, models)
 
@@ -201,7 +201,7 @@ func TestConcurrentStateAccess(t *testing.T) {
 	// The race detector (-race flag) will catch any data races.
 	presets := &stubPresetLoader{names: []string{"test"}}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	cfg := &Config{SocketPath: "/tmp/test.sock"}
 
 	d := New(cfg, presets, models)
 
@@ -274,8 +274,7 @@ func TestDaemonRun_PresetNameSuccess(t *testing.T) {
 	}
 	models := &stubModelManager{}
 	cfg := &Config{
-		LlamaServerPath: "/usr/local/bin/llama-server",
-		SocketPath:      "/tmp/test.sock",
+		SocketPath: "/tmp/test.sock",
 	}
 	d := New(cfg, presets, models)
 
@@ -312,8 +311,7 @@ func TestDaemonRun_FilePathSuccess(t *testing.T) {
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
 	cfg := &Config{
-		LlamaServerPath: "/usr/local/bin/llama-server",
-		SocketPath:      "/tmp/test.sock",
+		SocketPath: "/tmp/test.sock",
 	}
 
 	d := New(cfg, presets, models)
@@ -360,8 +358,7 @@ func TestDaemonRun_HuggingFaceSuccess(t *testing.T) {
 		exists:   true,
 	}
 	cfg := &Config{
-		LlamaServerPath: "/usr/local/bin/llama-server",
-		SocketPath:      "/tmp/test.sock",
+		SocketPath: "/tmp/test.sock",
 	}
 	d := New(cfg, presets, models)
 
@@ -401,7 +398,7 @@ func TestDaemonRun_PresetNotFound(t *testing.T) {
 		presets: map[string]*preset.Preset{},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	d := New(cfg, presets, models)
 
 	// Mock dependencies
@@ -435,7 +432,7 @@ func TestDaemonRun_ModelNotFound(t *testing.T) {
 	models := &stubModelManager{
 		exists: false,
 	}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	d := New(cfg, presets, models)
 
 	// Mock dependencies
@@ -478,7 +475,7 @@ func TestDaemonRun_ProcessStartFailure(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	d := New(cfg, presets, models)
 
 	// Mock dependencies
@@ -523,7 +520,7 @@ func TestDaemonRun_HealthCheckTimeout(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	d := New(cfg, presets, models)
 
 	// Mock dependencies
@@ -576,7 +573,7 @@ func TestDaemonRun_StopsExistingModel(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	d := New(cfg, presets, models)
 
 	// Mock dependencies
@@ -621,7 +618,7 @@ func TestDaemonRun_InvalidIdentifier(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	d := New(cfg, presets, models)
 
 	// Mock dependencies
@@ -661,7 +658,7 @@ func TestDaemonKill_WhenRunning(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	d := New(cfg, presets, models)
 
 	// Mock dependencies
@@ -699,7 +696,7 @@ func TestDaemonKill_WhenIdle(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	d := New(cfg, presets, models)
 
 	// Act
@@ -729,7 +726,7 @@ func TestDaemonKill_StopError(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	d := New(cfg, presets, models)
 
 	// Mock dependencies
@@ -777,7 +774,7 @@ func TestDaemonRun_PresetWithHFModel(t *testing.T) {
 		filePath: "/models/codellama.gguf",
 		exists:   true,
 	}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	d := New(cfg, presets, models)
 
 	// Mock dependencies
@@ -826,7 +823,7 @@ func TestDaemonRun_PresetWithHFModelNotFound(t *testing.T) {
 	models := &stubModelManager{
 		exists: false,
 	}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	d := New(cfg, presets, models)
 
 	// Mock dependencies
@@ -873,7 +870,7 @@ func TestDaemonRun_FailsToStopExistingModel(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	d := New(cfg, presets, models)
 
 	// Mock dependencies
@@ -927,7 +924,7 @@ func TestDaemonRun_ContextCancelledDuringHealthCheck(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	d := New(cfg, presets, models)
 
 	// Mock dependencies
@@ -959,7 +956,7 @@ func TestDaemonRun_ContextCancelledDuringHealthCheck(t *testing.T) {
 
 func TestResolveModel_FilePath(t *testing.T) {
 	models := &stubModelManager{filePath: "/should/not/be/used"}
-	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	cfg := &Config{SocketPath: "/tmp/test.sock"}
 	d := New(cfg, &stubPresetLoader{}, models)
 
 	p := &preset.Preset{
@@ -980,7 +977,7 @@ func TestResolveModel_FilePath(t *testing.T) {
 
 func TestResolveModel_HuggingFace(t *testing.T) {
 	models := &stubModelManager{filePath: "/resolved/path/model.gguf", exists: true}
-	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	cfg := &Config{SocketPath: "/tmp/test.sock"}
 	d := New(cfg, &stubPresetLoader{}, models)
 
 	p := &preset.Preset{
@@ -1006,7 +1003,7 @@ func TestResolveModel_HuggingFace(t *testing.T) {
 
 func TestResolveModel_HuggingFaceNotExists(t *testing.T) {
 	models := &stubModelManager{exists: false}
-	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	cfg := &Config{SocketPath: "/tmp/test.sock"}
 	d := New(cfg, &stubPresetLoader{}, models)
 
 	p := &preset.Preset{
@@ -1022,7 +1019,7 @@ func TestResolveModel_HuggingFaceNotExists(t *testing.T) {
 
 func TestResolveModel_InvalidIdentifier(t *testing.T) {
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	cfg := &Config{SocketPath: "/tmp/test.sock"}
 	d := New(cfg, &stubPresetLoader{}, models)
 
 	p := &preset.Preset{
@@ -1038,7 +1035,7 @@ func TestResolveModel_InvalidIdentifier(t *testing.T) {
 
 func TestResolveModel_OldFormatError(t *testing.T) {
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "llama-server", SocketPath: "/tmp/test.sock"}
+	cfg := &Config{SocketPath: "/tmp/test.sock"}
 	d := New(cfg, &stubPresetLoader{}, models)
 
 	p := &preset.Preset{

@@ -70,7 +70,7 @@ func TestHandleStatus_Idle(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -107,7 +107,7 @@ func TestHandleStatus_Running(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -157,7 +157,7 @@ func TestHandleLoad_Success(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -191,7 +191,7 @@ func TestHandleLoad_MissingIdentifier(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -218,7 +218,7 @@ func TestHandleLoad_PresetNotFound(t *testing.T) {
 		presets: map[string]*preset.Preset{},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -247,7 +247,7 @@ func TestHandleLoad_ModelNotFound(t *testing.T) {
 	models := &stubModelManager{
 		err: &metadata.NotFoundError{Repo: "unknown", Quant: "Q4_K_M"},
 	}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -285,7 +285,7 @@ func TestHandleLoad_ServerStartFailed(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -332,7 +332,7 @@ func TestHandleUnload_Success(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -364,7 +364,7 @@ func TestHandleUnload_WhenIdle(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -392,7 +392,7 @@ func TestHandleUnload_Error(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -428,7 +428,7 @@ func TestHandleListPresets_Success(t *testing.T) {
 		names: []string{"codellama", "mistral", "llama3"},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -459,7 +459,7 @@ func TestHandleListPresets_Error(t *testing.T) {
 		listErr: fmt.Errorf("failed to read directory"),
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -484,7 +484,7 @@ func TestHandleListModels_Success(t *testing.T) {
 			{Repo: "TheBloke/Mistral-7B-GGUF", Quant: "Q5_K_M", Size: 5242880},
 		},
 	}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -521,7 +521,7 @@ func TestHandleListModels_Error(t *testing.T) {
 	models := &stubModelManager{
 		err: fmt.Errorf("failed to read metadata"),
 	}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -541,7 +541,7 @@ func TestHandleRequest_Status(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -571,7 +571,7 @@ func TestHandleRequest_Load(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -602,7 +602,7 @@ func TestHandleRequest_Unload(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -623,7 +623,7 @@ func TestHandleRequest_ListPresets(t *testing.T) {
 		names: []string{"test"},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -642,7 +642,7 @@ func TestHandleRequest_ListModels(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 
@@ -661,7 +661,7 @@ func TestHandleRequest_UnknownCommand(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{LlamaServerPath: "/usr/local/bin/llama-server"}
+	cfg := &Config{}
 	daemon := New(cfg, presets, models)
 	server := NewServer(daemon, "/tmp/test.sock")
 

@@ -70,11 +70,14 @@ type Daemon struct {
 	waitForReady healthChecker
 }
 
+// llamaServerCommand is the command to run llama-server.
+// It relies on PATH resolution to find the binary.
+const llamaServerCommand = "llama-server"
+
 // Config holds daemon configuration.
 type Config struct {
-	LlamaServerPath string
-	SocketPath      string
-	LlamaLogWriter  io.Writer
+	SocketPath     string
+	LlamaLogWriter io.Writer
 }
 
 // New creates a new daemon instance.
@@ -238,7 +241,7 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 	d.preset.Store(p)
 
 	// Start llama-server
-	proc := d.newProcess(d.config.LlamaServerPath)
+	proc := d.newProcess(llamaServerCommand)
 	if d.llamaLogWriter != nil {
 		proc.SetLogWriter(d.llamaLogWriter)
 	}
