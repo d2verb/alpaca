@@ -20,7 +20,7 @@ const (
 	// DefaultHost is the default host for llama-server.
 	DefaultHost = "127.0.0.1"
 	// DefaultContextSize is the default context size for llama-server.
-	DefaultContextSize = 2048
+	DefaultContextSize = 4096
 )
 
 // ValidateName checks if a preset name is valid.
