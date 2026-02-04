@@ -9,7 +9,7 @@ Alpaca consists of three main components:
 │         alpaca (Go binary)          │
 │                                     │
 │  CLI Commands:                      │
-│  - alpaca start [--foreground]      │
+│  - alpaca start                     │
 │  - alpaca stop                      │
 │  - alpaca status                    │
 │  - alpaca load <model>              │
@@ -66,9 +66,7 @@ Responsibilities:
 - Listen on Unix socket for commands
 - Manage logging (daemon.log, llama.log)
 
-The daemon can run in two modes:
-- **Background mode** (default): Detaches from terminal, writes logs to files
-- **Foreground mode** (`--foreground` flag): Runs in current terminal, useful for debugging
+The daemon runs in background mode by default, detaching from the terminal and writing logs to files.
 
 ### GUI (macOS Menu Bar App)
 
@@ -133,18 +131,14 @@ Process:
 1. Check if daemon is already running (via PID file)
 2. Clean up stale socket/PID files if found
 3. Create required directories (`~/.alpaca`, `~/.alpaca/logs`, etc.)
-4. Fork background process with `--foreground` flag
+4. Fork background process with internal `--daemon` flag
 5. Background process:
    - Writes PID file (`~/.alpaca/alpaca.pid`)
    - Sets up log rotation for `daemon.log` and `llama.log`
    - Creates Unix socket listener
    - Enters idle state (no model loaded)
 
-**Foreground Mode:**
-```bash
-$ alpaca start --foreground
-```
-Runs daemon in current terminal without detaching. Useful for debugging.
+There is no foreground mode. The daemon always runs in the background.
 
 ### Stopping the Daemon
 

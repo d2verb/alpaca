@@ -55,18 +55,13 @@ func (s *stubModelManager) GetFilePath(ctx context.Context, repo, quant string) 
 	return s.filePath, nil
 }
 
-func (s *stubModelManager) Exists(ctx context.Context, repo, quant string) (bool, error) {
-	if s.err != nil {
-		return false, s.err
-	}
-	return s.exists, nil
+func newTestDaemon(presets presetLoader, models modelManager) *Daemon {
+	return New(presets, models, io.Discard, io.Discard)
 }
 
 func TestResolveHFPresetSuccess(t *testing.T) {
 	models := &stubModelManager{filePath: "/path/to/model.gguf", exists: true}
-	cfg := &Config{SocketPath: "/tmp/test.sock"}
-
-	d := New(cfg, &stubPresetLoader{}, models)
+	d := newTestDaemon(&stubPresetLoader{}, models)
 
 	p, err := d.resolveHFPreset(context.Background(), "TheBloke/CodeLlama-7B-GGUF", "Q4_K_M")
 	if err != nil {
@@ -93,9 +88,7 @@ func TestResolveHFPresetSuccess(t *testing.T) {
 
 func TestResolveHFPresetModelNotFound(t *testing.T) {
 	models := &stubModelManager{exists: false}
-	cfg := &Config{SocketPath: "/tmp/test.sock"}
-
-	d := New(cfg, &stubPresetLoader{}, models)
+	d := newTestDaemon(&stubPresetLoader{}, models)
 
 	_, err := d.resolveHFPreset(context.Background(), "unknown/repo", "Q4_K_M")
 	if err == nil {
@@ -106,9 +99,7 @@ func TestResolveHFPresetModelNotFound(t *testing.T) {
 func TestNewDaemonStartsIdle(t *testing.T) {
 	presets := &stubPresetLoader{names: []string{"test"}}
 	models := &stubModelManager{}
-	cfg := &Config{SocketPath: "/tmp/test.sock"}
-
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	if d.State() != StateIdle {
 		t.Errorf("State() = %q, want %q", d.State(), StateIdle)
@@ -121,9 +112,7 @@ func TestNewDaemonStartsIdle(t *testing.T) {
 func TestListPresetsViaInterface(t *testing.T) {
 	presets := &stubPresetLoader{names: []string{"codellama", "mistral"}}
 	models := &stubModelManager{}
-	cfg := &Config{SocketPath: "/tmp/test.sock"}
-
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	names, err := d.ListPresets()
 	if err != nil {
@@ -147,9 +136,7 @@ func TestListModelsViaInterface(t *testing.T) {
 	}
 	models := &stubModelManager{entries: entries}
 	presets := &stubPresetLoader{}
-	cfg := &Config{SocketPath: "/tmp/test.sock"}
-
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	infos, err := d.ListModels(context.Background())
 	if err != nil {
@@ -169,9 +156,7 @@ func TestStateIsLockFree(t *testing.T) {
 	// concurrently without blocking, even when Run() holds the mutex.
 	presets := &stubPresetLoader{names: []string{"test"}}
 	models := &stubModelManager{}
-	cfg := &Config{SocketPath: "/tmp/test.sock"}
-
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	// Manually acquire the mutex to simulate Run() holding it
 	d.mu.Lock()
@@ -201,9 +186,7 @@ func TestConcurrentStateAccess(t *testing.T) {
 	// The race detector (-race flag) will catch any data races.
 	presets := &stubPresetLoader{names: []string{"test"}}
 	models := &stubModelManager{}
-	cfg := &Config{SocketPath: "/tmp/test.sock"}
-
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	const numReaders = 100
 	var wg sync.WaitGroup
@@ -273,10 +256,7 @@ func TestDaemonRun_PresetNameSuccess(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{
-		SocketPath: "/tmp/test.sock",
-	}
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -310,11 +290,7 @@ func TestDaemonRun_FilePathSuccess(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{
-		SocketPath: "/tmp/test.sock",
-	}
-
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -357,10 +333,7 @@ func TestDaemonRun_HuggingFaceSuccess(t *testing.T) {
 		filePath: "/models/codellama-7b.Q4_K_M.gguf",
 		exists:   true,
 	}
-	cfg := &Config{
-		SocketPath: "/tmp/test.sock",
-	}
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -398,8 +371,7 @@ func TestDaemonRun_PresetNotFound(t *testing.T) {
 		presets: map[string]*preset.Preset{},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -432,8 +404,7 @@ func TestDaemonRun_ModelNotFound(t *testing.T) {
 	models := &stubModelManager{
 		exists: false,
 	}
-	cfg := &Config{}
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -475,8 +446,7 @@ func TestDaemonRun_ProcessStartFailure(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{
@@ -520,8 +490,7 @@ func TestDaemonRun_HealthCheckTimeout(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -573,8 +542,7 @@ func TestDaemonRun_StopsExistingModel(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	// Mock dependencies
 	firstMockProc := &mockProcess{}
@@ -618,8 +586,7 @@ func TestDaemonRun_InvalidIdentifier(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -658,8 +625,7 @@ func TestDaemonKill_WhenRunning(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -696,8 +662,7 @@ func TestDaemonKill_WhenIdle(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	// Act
 	err := d.Kill(context.Background())
@@ -726,8 +691,7 @@ func TestDaemonKill_StopError(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{
@@ -774,8 +738,7 @@ func TestDaemonRun_PresetWithHFModel(t *testing.T) {
 		filePath: "/models/codellama.gguf",
 		exists:   true,
 	}
-	cfg := &Config{}
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -823,8 +786,7 @@ func TestDaemonRun_PresetWithHFModelNotFound(t *testing.T) {
 	models := &stubModelManager{
 		exists: false,
 	}
-	cfg := &Config{}
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -870,8 +832,7 @@ func TestDaemonRun_FailsToStopExistingModel(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	// Mock dependencies
 	firstMockProc := &mockProcess{
@@ -924,8 +885,7 @@ func TestDaemonRun_ContextCancelledDuringHealthCheck(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	d := New(cfg, presets, models)
+	d := newTestDaemon(presets, models)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -956,8 +916,7 @@ func TestDaemonRun_ContextCancelledDuringHealthCheck(t *testing.T) {
 
 func TestResolveModel_FilePath(t *testing.T) {
 	models := &stubModelManager{filePath: "/should/not/be/used"}
-	cfg := &Config{SocketPath: "/tmp/test.sock"}
-	d := New(cfg, &stubPresetLoader{}, models)
+	d := newTestDaemon(&stubPresetLoader{}, models)
 
 	p := &preset.Preset{
 		Name:  "test",
@@ -977,8 +936,7 @@ func TestResolveModel_FilePath(t *testing.T) {
 
 func TestResolveModel_HuggingFace(t *testing.T) {
 	models := &stubModelManager{filePath: "/resolved/path/model.gguf", exists: true}
-	cfg := &Config{SocketPath: "/tmp/test.sock"}
-	d := New(cfg, &stubPresetLoader{}, models)
+	d := newTestDaemon(&stubPresetLoader{}, models)
 
 	p := &preset.Preset{
 		Name:  "test",
@@ -1003,8 +961,7 @@ func TestResolveModel_HuggingFace(t *testing.T) {
 
 func TestResolveModel_HuggingFaceNotExists(t *testing.T) {
 	models := &stubModelManager{exists: false}
-	cfg := &Config{SocketPath: "/tmp/test.sock"}
-	d := New(cfg, &stubPresetLoader{}, models)
+	d := newTestDaemon(&stubPresetLoader{}, models)
 
 	p := &preset.Preset{
 		Name:  "test",
@@ -1019,8 +976,7 @@ func TestResolveModel_HuggingFaceNotExists(t *testing.T) {
 
 func TestResolveModel_InvalidIdentifier(t *testing.T) {
 	models := &stubModelManager{}
-	cfg := &Config{SocketPath: "/tmp/test.sock"}
-	d := New(cfg, &stubPresetLoader{}, models)
+	d := newTestDaemon(&stubPresetLoader{}, models)
 
 	p := &preset.Preset{
 		Name:  "test",
@@ -1035,8 +991,7 @@ func TestResolveModel_InvalidIdentifier(t *testing.T) {
 
 func TestResolveModel_OldFormatError(t *testing.T) {
 	models := &stubModelManager{}
-	cfg := &Config{SocketPath: "/tmp/test.sock"}
-	d := New(cfg, &stubPresetLoader{}, models)
+	d := newTestDaemon(&stubPresetLoader{}, models)
 
 	p := &preset.Preset{
 		Name:  "test",

@@ -66,7 +66,7 @@ extra_args:
 
 | Field | Type | Default | llama-server flag |
 |-------|------|---------|-------------------|
-| `context_size` | int | 2048 | `--ctx-size` |
+| `context_size` | int | 4096 | `--ctx-size` |
 | `threads` | int | 0 (omit flag, llama-server decides) | `--threads` |
 | `port` | int | 8080 | `--port` |
 | `host` | string | "127.0.0.1" | `--host` |
@@ -224,7 +224,7 @@ Name [my-project]:
 Model: f:./models/my-model.gguf
 Host [127.0.0.1]:
 Port [8080]:
-Context [2048]: 4096
+Context [4096]:
 ✓ Created '.alpaca.yaml'
 💡 alpaca load
 ```

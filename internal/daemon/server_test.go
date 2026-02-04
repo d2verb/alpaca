@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"io"
 	"testing"
 
 	"github.com/d2verb/alpaca/internal/llama"
@@ -70,9 +71,8 @@ func TestHandleStatus_Idle(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	// Act
 	resp := server.handleStatus()
@@ -107,9 +107,8 @@ func TestHandleStatus_Running(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	// Mock dependencies to allow Run to succeed
 	mockProc := &mockProcess{}
@@ -157,9 +156,8 @@ func TestHandleLoad_Success(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -191,9 +189,8 @@ func TestHandleLoad_MissingIdentifier(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	req := &protocol.Request{
 		Command: protocol.CmdLoad,
@@ -218,9 +215,8 @@ func TestHandleLoad_PresetNotFound(t *testing.T) {
 		presets: map[string]*preset.Preset{},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	req := &protocol.Request{
 		Command: protocol.CmdLoad,
@@ -247,9 +243,8 @@ func TestHandleLoad_ModelNotFound(t *testing.T) {
 	models := &stubModelManager{
 		err: &metadata.NotFoundError{Repo: "unknown", Quant: "Q4_K_M"},
 	}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	req := &protocol.Request{
 		Command: protocol.CmdLoad,
@@ -285,9 +280,8 @@ func TestHandleLoad_ServerStartFailed(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	// Mock process that fails to start
 	mockProc := &mockProcess{
@@ -332,9 +326,8 @@ func TestHandleUnload_Success(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	// Mock dependencies and start a model first
 	mockProc := &mockProcess{}
@@ -364,9 +357,8 @@ func TestHandleUnload_WhenIdle(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	// Act
 	resp := server.handleUnload(context.Background())
@@ -392,9 +384,8 @@ func TestHandleUnload_Error(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	// Mock process that fails to stop
 	mockProc := &mockProcess{
@@ -428,9 +419,8 @@ func TestHandleListPresets_Success(t *testing.T) {
 		names: []string{"codellama", "mistral", "llama3"},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	// Act
 	resp := server.handleListPresets()
@@ -459,9 +449,8 @@ func TestHandleListPresets_Error(t *testing.T) {
 		listErr: fmt.Errorf("failed to read directory"),
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	// Act
 	resp := server.handleListPresets()
@@ -484,9 +473,8 @@ func TestHandleListModels_Success(t *testing.T) {
 			{Repo: "TheBloke/Mistral-7B-GGUF", Quant: "Q5_K_M", Size: 5242880},
 		},
 	}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	// Act
 	resp := server.handleListModels(context.Background())
@@ -521,9 +509,8 @@ func TestHandleListModels_Error(t *testing.T) {
 	models := &stubModelManager{
 		err: fmt.Errorf("failed to read metadata"),
 	}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	// Act
 	resp := server.handleListModels(context.Background())
@@ -541,9 +528,8 @@ func TestHandleRequest_Status(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	req := &protocol.Request{Command: protocol.CmdStatus}
 
@@ -571,9 +557,8 @@ func TestHandleRequest_Load(t *testing.T) {
 		},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	// Mock dependencies
 	mockProc := &mockProcess{}
@@ -602,9 +587,8 @@ func TestHandleRequest_Unload(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	req := &protocol.Request{Command: protocol.CmdUnload}
 
@@ -623,9 +607,8 @@ func TestHandleRequest_ListPresets(t *testing.T) {
 		names: []string{"test"},
 	}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	req := &protocol.Request{Command: protocol.CmdListPresets}
 
@@ -642,9 +625,8 @@ func TestHandleRequest_ListModels(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	req := &protocol.Request{Command: protocol.CmdListModels}
 
@@ -661,9 +643,8 @@ func TestHandleRequest_UnknownCommand(t *testing.T) {
 	// Arrange
 	presets := &stubPresetLoader{}
 	models := &stubModelManager{}
-	cfg := &Config{}
-	daemon := New(cfg, presets, models)
-	server := NewServer(daemon, "/tmp/test.sock")
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	req := &protocol.Request{Command: "unknown_command"}
 

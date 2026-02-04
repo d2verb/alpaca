@@ -5,10 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"log/slog"
 	"net"
 	"os"
 
 	"github.com/d2verb/alpaca/internal/llama"
+	"github.com/d2verb/alpaca/internal/logging"
 	"github.com/d2verb/alpaca/internal/metadata"
 	"github.com/d2verb/alpaca/internal/preset"
 	"github.com/d2verb/alpaca/internal/protocol"
@@ -19,13 +22,18 @@ type Server struct {
 	daemon     *Daemon
 	socketPath string
 	listener   net.Listener
+	logger     *slog.Logger
 }
 
 // NewServer creates a new daemon server.
-func NewServer(daemon *Daemon, socketPath string) *Server {
+func NewServer(daemon *Daemon, socketPath string, logWriter io.Writer) *Server {
+	if logWriter == nil {
+		panic("logWriter must not be nil")
+	}
 	return &Server{
 		daemon:     daemon,
 		socketPath: socketPath,
+		logger:     logging.NewLogger(logWriter),
 	}
 }
 
@@ -48,6 +56,7 @@ func (s *Server) Start(ctx context.Context) error {
 		return err
 	}
 
+	s.logger.Info("server started", "socket", s.socketPath)
 	go s.acceptLoop(ctx)
 	return nil
 }
@@ -55,7 +64,11 @@ func (s *Server) Start(ctx context.Context) error {
 // Stop stops the server.
 func (s *Server) Stop() error {
 	if s.listener != nil {
-		return s.listener.Close()
+		err := s.listener.Close()
+		if err == nil {
+			s.logger.Info("server stopped")
+		}
+		return err
 	}
 	return nil
 }
@@ -81,11 +94,16 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 	reader := bufio.NewReader(conn)
 	line, err := reader.ReadBytes('\n')
 	if err != nil {
+		// EOF is normal when client closes connection without sending data
+		if err != io.EOF {
+			s.logger.Warn("request read failed", "error", err)
+		}
 		return
 	}
 
 	var req protocol.Request
 	if err := json.Unmarshal(line, &req); err != nil {
+		s.logger.Warn("invalid request", "error", err)
 		s.writeResponse(conn, protocol.NewErrorResponse("invalid request"))
 		return
 	}
@@ -95,20 +113,28 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 }
 
 func (s *Server) handleRequest(ctx context.Context, req *protocol.Request) *protocol.Response {
+	s.logger.Debug("request received", "command", req.Command)
+
+	var resp *protocol.Response
 	switch req.Command {
 	case protocol.CmdStatus:
-		return s.handleStatus()
+		resp = s.handleStatus()
 	case protocol.CmdLoad:
-		return s.handleLoad(ctx, req)
+		resp = s.handleLoad(ctx, req)
 	case protocol.CmdUnload:
-		return s.handleUnload(ctx)
+		resp = s.handleUnload(ctx)
 	case protocol.CmdListPresets:
-		return s.handleListPresets()
+		resp = s.handleListPresets()
 	case protocol.CmdListModels:
-		return s.handleListModels(ctx)
+		resp = s.handleListModels(ctx)
 	default:
-		return protocol.NewErrorResponse("unknown command")
+		resp = protocol.NewErrorResponse("unknown command")
 	}
+
+	if resp.Status == protocol.StatusError {
+		s.logger.Error("request failed", "command", req.Command, "error", resp.Error)
+	}
+	return resp
 }
 
 func (s *Server) handleStatus() *protocol.Response {

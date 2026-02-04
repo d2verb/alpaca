@@ -19,7 +19,7 @@ import (
 )
 
 type StartCmd struct {
-	Foreground bool `short:"f" help:"Run in foreground (don't daemonize)"`
+	Daemon bool `name:"daemon" hidden:"" help:"Run daemon process (internal)"`
 }
 
 func (c *StartCmd) Run() error {
@@ -53,18 +53,18 @@ func (c *StartCmd) Run() error {
 		return fmt.Errorf("create directories: %w", err)
 	}
 
-	// If not foreground mode, spawn background process
-	if !c.Foreground {
-		return c.startBackground(paths)
+	// Internal daemon mode: run the actual daemon process
+	if c.Daemon {
+		return c.runDaemon(paths)
 	}
 
-	// Foreground mode: run the actual daemon
-	return c.runDaemon(paths)
+	// Default: spawn background process
+	return c.startBackground(paths)
 }
 
 func (c *StartCmd) startBackground(paths *config.Paths) error {
-	// Re-exec ourselves with --foreground flag
-	cmd := exec.Command(os.Args[0], "start", "--foreground")
+	// Re-exec ourselves with internal daemon flag
+	cmd := exec.Command(os.Args[0], "start", "--daemon")
 	cmd.Env = os.Environ()
 
 	// Detach from controlling terminal (Unix-like systems)
@@ -101,10 +101,6 @@ func (c *StartCmd) runDaemon(paths *config.Paths) error {
 	llamaLogWriter := logging.NewRotatingWriter(logging.DefaultConfig(paths.LlamaLog))
 	defer llamaLogWriter.Close()
 
-	// Create logger for daemon
-	logger := logging.NewLogger(daemonLogWriter)
-	logger.Info("daemon starting")
-
 	// Write PID file
 	if err := daemon.WritePIDFile(paths.PID); err != nil {
 		return fmt.Errorf("write PID file: %w", err)
@@ -114,31 +110,22 @@ func (c *StartCmd) runDaemon(paths *config.Paths) error {
 	// Start daemon
 	presetLoader := preset.NewLoader(paths.Presets)
 	modelManager := model.NewManager(paths.Models)
-	d := daemon.New(&daemon.Config{
-		SocketPath:     paths.Socket,
-		LlamaLogWriter: llamaLogWriter,
-	}, presetLoader, modelManager)
+	d := daemon.New(presetLoader, modelManager, daemonLogWriter, llamaLogWriter)
 
-	server := daemon.NewServer(d, paths.Socket)
-
-	logger.Info("daemon listening", "socket", paths.Socket)
+	server := daemon.NewServer(d, paths.Socket, daemonLogWriter)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	if err := server.Start(ctx); err != nil {
-		logger.Error("start server failed", "error", err)
 		return fmt.Errorf("start server: %w", err)
 	}
 
 	<-ctx.Done()
-	logger.Info("daemon stopping")
 
 	if err := server.Stop(); err != nil {
-		logger.Error("stop server failed", "error", err)
 		return fmt.Errorf("stop server: %w", err)
 	}
 
-	logger.Info("daemon stopped")
 	return nil
 }
