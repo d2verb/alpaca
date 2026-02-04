@@ -2,11 +2,13 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"os"
+	"strings"
 
 	"github.com/alecthomas/kong"
 	"github.com/willabides/kongplete"
+
+	"github.com/d2verb/alpaca/internal/ui"
 )
 
 var (
@@ -65,11 +67,30 @@ func main() {
 		var exitErr *ExitError
 		if errors.As(err, &exitErr) {
 			if exitErr.Message != "" {
-				fmt.Fprintln(os.Stderr, exitErr.Message)
+				printExitError(exitErr)
 			}
 			os.Exit(exitErr.Code)
 		}
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		ui.PrintError(err.Error())
 		os.Exit(exitError)
+	}
+}
+
+func printExitError(e *ExitError) {
+	lines := strings.Split(e.Message, "\n")
+	if len(lines) == 0 {
+		return
+	}
+
+	// Print first line with icon
+	if e.Kind == ExitKindInfo {
+		ui.PrintInfo(lines[0])
+	} else {
+		ui.PrintError(lines[0])
+	}
+
+	// Print remaining lines with indent
+	for _, line := range lines[1:] {
+		ui.PrintInfo(line)
 	}
 }

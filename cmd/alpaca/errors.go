@@ -12,9 +12,18 @@ const (
 	exitDownloadFailed   = 5
 )
 
+// ExitKind represents the kind of exit error for UI formatting.
+type ExitKind int
+
+const (
+	ExitKindError ExitKind = iota
+	ExitKindInfo
+)
+
 // ExitError represents an error that should cause the process to exit with a specific code.
 type ExitError struct {
 	Code    int
+	Kind    ExitKind
 	Message string
 }
 
@@ -23,6 +32,7 @@ func (e *ExitError) Error() string { return e.Message }
 func errDaemonNotRunning() *ExitError {
 	return &ExitError{
 		Code:    exitDaemonNotRunning,
+		Kind:    ExitKindInfo,
 		Message: "Daemon is not running.\nRun: alpaca start",
 	}
 }
@@ -30,6 +40,7 @@ func errDaemonNotRunning() *ExitError {
 func errPresetNotFound(name string) *ExitError {
 	return &ExitError{
 		Code:    exitPresetNotFound,
+		Kind:    ExitKindError,
 		Message: fmt.Sprintf("Preset '%s' not found.", name),
 	}
 }
@@ -37,6 +48,7 @@ func errPresetNotFound(name string) *ExitError {
 func errModelNotFound(id string) *ExitError {
 	return &ExitError{
 		Code:    exitModelNotFound,
+		Kind:    ExitKindError,
 		Message: fmt.Sprintf("Model '%s' not found.", id),
 	}
 }
@@ -44,6 +56,7 @@ func errModelNotFound(id string) *ExitError {
 func errDownloadFailed() *ExitError {
 	return &ExitError{
 		Code:    exitDownloadFailed,
+		Kind:    ExitKindError,
 		Message: "",
 	}
 }
@@ -51,6 +64,7 @@ func errDownloadFailed() *ExitError {
 func errServerNotRunning() *ExitError {
 	return &ExitError{
 		Code:    exitError,
+		Kind:    ExitKindInfo,
 		Message: "Server is not running.\nRun: alpaca load <preset>",
 	}
 }

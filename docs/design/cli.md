@@ -24,13 +24,7 @@ $ alpaca start
 ℹ Daemon is already running (PID: 12345).
 ```
 
-**Flags:**
-- `--foreground`, `-f`: Run in foreground (don't daemonize). Useful for debugging.
-
-```bash
-$ alpaca start --foreground
-# Runs daemon in foreground, logs to stdout
-```
+There is no foreground mode. The daemon always runs in the background.
 
 #### `alpaca stop`
 
@@ -210,7 +204,7 @@ $ alpaca load f:../shared/preset.yaml
 File paths are loaded with default settings:
 - `host`: 127.0.0.1
 - `port`: 8080
-- `context_size`: 2048
+- `context_size`: 4096
 
 **Error handling:**
 ```bash
@@ -233,7 +227,7 @@ When loading a model without a preset, the following defaults are used:
 ```yaml
 host: 127.0.0.1
 port: 8080
-context_size: 2048
+context_size: 4096
 ```
 
 These defaults are defined in the preset package constants.
@@ -466,7 +460,7 @@ The daemon runs in the background by default:
 
 Logs are rotated automatically (50MB max size, 3 backups, 7 days retention, gzip compressed).
 
-Use `--foreground` flag to run in foreground for debugging.
+Foreground mode is not supported.
 
 ## Other Commands
 

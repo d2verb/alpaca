@@ -5,11 +5,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 
 	"github.com/d2verb/alpaca/internal/identifier"
 	"github.com/d2verb/alpaca/internal/llama"
+	"github.com/d2verb/alpaca/internal/logging"
 	"github.com/d2verb/alpaca/internal/metadata"
 	"github.com/d2verb/alpaca/internal/preset"
 )
@@ -62,7 +64,7 @@ type Daemon struct {
 
 	presets        presetLoader
 	models         modelManager
-	config         *Config
+	logger         *slog.Logger
 	llamaLogWriter io.Writer
 
 	// Test hooks (optional, defaults to real implementations)
@@ -74,19 +76,21 @@ type Daemon struct {
 // It relies on PATH resolution to find the binary.
 const llamaServerCommand = "llama-server"
 
-// Config holds daemon configuration.
-type Config struct {
-	SocketPath     string
-	LlamaLogWriter io.Writer
-}
-
 // New creates a new daemon instance.
-func New(cfg *Config, presets presetLoader, models modelManager) *Daemon {
+func New(presets presetLoader, models modelManager, daemonLogWriter io.Writer, llamaLogWriter io.Writer) *Daemon {
+	if daemonLogWriter == nil {
+		panic("daemonLogWriter must not be nil")
+	}
+	if llamaLogWriter == nil {
+		panic("llamaLogWriter must not be nil")
+	}
+	logger := logging.NewLogger(daemonLogWriter)
+
 	d := &Daemon{
 		presets:        presets,
 		models:         models,
-		config:         cfg,
-		llamaLogWriter: cfg.LlamaLogWriter,
+		logger:         logger,
+		llamaLogWriter: llamaLogWriter,
 		// Default implementations (can be overridden in tests)
 		newProcess: func(path string) llamaProcess {
 			return llama.NewProcess(path)
@@ -186,11 +190,13 @@ func (d *Daemon) resolveModel(ctx context.Context, p *preset.Preset) (*preset.Pr
 // Run loads and runs a model (preset name, file path, or HuggingFace format).
 // Returns error if HuggingFace model is not downloaded (use CLI to pull first).
 func (d *Daemon) Run(ctx context.Context, input string) error {
+	d.logger.Info("run requested", "input", input)
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	// Stop current model if running
 	if d.process != nil {
+		d.logger.Info("stopping current model")
 		if err := d.stopLocked(ctx); err != nil {
 			return fmt.Errorf("stop current model: %w", err)
 		}
@@ -239,12 +245,11 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 
 	d.state.Store(StateLoading)
 	d.preset.Store(p)
+	d.logger.Info("loading model", "preset", p.Name, "model", p.Model)
 
 	// Start llama-server
 	proc := d.newProcess(llamaServerCommand)
-	if d.llamaLogWriter != nil {
-		proc.SetLogWriter(d.llamaLogWriter)
-	}
+	proc.SetLogWriter(d.llamaLogWriter)
 	if err := proc.Start(ctx, p.BuildArgs()); err != nil {
 		d.resetState()
 		return err
@@ -260,11 +265,13 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 	}
 
 	d.state.Store(StateRunning)
+	d.logger.Info("model ready", "endpoint", p.Endpoint())
 	return nil
 }
 
 // Kill stops the currently running model.
 func (d *Daemon) Kill(ctx context.Context) error {
+	d.logger.Info("kill requested")
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.stopLocked(ctx)
@@ -281,6 +288,7 @@ func (d *Daemon) stopLocked(ctx context.Context) error {
 
 	d.process = nil
 	d.resetState()
+	d.logger.Info("model stopped")
 	return nil
 }
 
