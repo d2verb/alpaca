@@ -61,11 +61,15 @@ alpaca status
 
 # Create a preset for repeated use
 alpaca new
+
+# Enable shell completion (zsh, fish also supported)
+echo "$(alpaca completion-script)" >> ~/.bashrc
 ```
 
 ## Commands
 
 ### Daemon
+
 - `alpaca start [--foreground]` - Start the daemon
 - `alpaca stop` - Stop the daemon
 - `alpaca status` - Show current status
@@ -73,6 +77,7 @@ alpaca new
 - `alpaca logs [-f] [-s]` - View logs (`-f` follow, `-s` server logs)
 
 ### Models
+
 - `alpaca load <identifier>` - Load a model (`p:preset`, `h:org/repo:quant`, `f:path`)
 - `alpaca unload` - Stop the current model
 - `alpaca pull h:org/repo:quant` - Download a model
@@ -82,9 +87,10 @@ alpaca new
 - `alpaca new` - Create a preset interactively
 
 ### Utility
+
 - `alpaca upgrade [-c]` - Upgrade to the latest version (`-c` check only)
 - `alpaca version` - Show version
-- `alpaca install-completions` - Install shell completions
+- `alpaca completion-script` - Output shell completion script
 
 ## Documentation
 
