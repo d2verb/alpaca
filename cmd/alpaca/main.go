@@ -33,7 +33,7 @@ type CLI struct {
 	Version VersionCmd `cmd:"" help:"Show version"`
 
 	// Completion commands
-	InstallCompletions kongplete.InstallCompletions `cmd:"" help:"Install shell completions"`
+	CompletionScript kongplete.InstallCompletions `cmd:"" name:"completion-script" help:"Output shell completion script"`
 }
 
 func main() {

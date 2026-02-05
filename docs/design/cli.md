@@ -535,15 +535,23 @@ To upgrade, run:
     brew upgrade alpaca
 ```
 
-### `alpaca install-completions`
+### `alpaca completion-script`
 
-Install shell completions for bash, zsh, or fish.
+Output shell completion script for bash, zsh, or fish.
 
 ```bash
-$ alpaca install-completions
+# Add to your shell config
+# bash
+echo "$(alpaca completion-script)" >> ~/.bashrc
+
+# zsh
+echo "$(alpaca completion-script)" >> ~/.zshrc
+
+# fish
+alpaca completion-script >> ~/.config/fish/config.fish
 ```
 
-This command installs shell completions using the `kongplete` library. After installation, restart your shell or source the appropriate configuration file.
+After adding, restart your shell or source the configuration file.
 
 **Supported shells:**
 - bash
