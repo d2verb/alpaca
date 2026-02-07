@@ -84,6 +84,17 @@ func TestOpenSucceedsWithTrueCommand(t *testing.T) {
 	}
 }
 
+func TestOpenReturnsErrorForEmptyEditor(t *testing.T) {
+	err := Open("", "file.txt")
+
+	if err == nil {
+		t.Fatal("expected error for empty editor")
+	}
+	if !strings.Contains(err.Error(), "editor command is empty") {
+		t.Errorf("error message %q should contain %q", err.Error(), "editor command is empty")
+	}
+}
+
 func TestOpenSplitsEditorWithArgs(t *testing.T) {
 	// "/usr/bin/env true" should be split into ["/usr/bin/env", "true", filePath]
 	err := Open("/usr/bin/env true", t.TempDir()+"/test.txt")

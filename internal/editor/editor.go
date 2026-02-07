@@ -28,6 +28,9 @@ func Find() (string, error) {
 // The editor runs in the foreground with stdin/stdout/stderr connected.
 func Open(editor, filePath string) error {
 	args := strings.Fields(editor)
+	if len(args) == 0 {
+		return fmt.Errorf("editor command is empty")
+	}
 	args = append(args, filePath)
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdin = os.Stdin
