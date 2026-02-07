@@ -28,6 +28,12 @@ func (l *Loader) Load(name string) (*Preset, error) {
 	return p, err
 }
 
+// FindPath returns the file path of a preset by name.
+func (l *Loader) FindPath(name string) (string, error) {
+	path, _, err := l.findByName(name)
+	return path, err
+}
+
 // List returns all available preset names.
 // If some preset files fail to parse, they are skipped but a warning is included
 // in the error (the list is still returned).

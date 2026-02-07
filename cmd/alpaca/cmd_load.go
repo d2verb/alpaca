@@ -36,7 +36,7 @@ func (c *LoadCmd) Run() error {
 	}
 
 	// Resolve identifier (handles empty input → .alpaca.yaml)
-	idStr, err := c.resolveIdentifier()
+	idStr, err := resolveLocalPreset(c.Identifier)
 	if err != nil {
 		return err
 	}
@@ -147,28 +147,6 @@ func extractHFModel(modelField string) (repo, quant string) {
 		return "", ""
 	}
 	return id.Repo, id.Quant
-}
-
-// resolveIdentifier resolves the identifier from input or defaults to .alpaca.yaml.
-func (c *LoadCmd) resolveIdentifier() (string, error) {
-	if c.Identifier != "" {
-		return c.Identifier, nil
-	}
-
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("get working directory: %w", err)
-	}
-
-	presetPath := filepath.Join(cwd, LocalPresetFile)
-	if _, err := os.Stat(presetPath); err != nil {
-		if os.IsNotExist(err) {
-			return "", fmt.Errorf("no %s found in current directory\nRun: alpaca new --local", LocalPresetFile)
-		}
-		return "", fmt.Errorf("check preset file: %w", err)
-	}
-
-	return "f:" + presetPath, nil
 }
 
 // loadRequest holds the prepared load request data.

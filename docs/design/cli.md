@@ -371,6 +371,59 @@ Press Enter to accept default values (shown in brackets). Only non-default value
 
 Additional settings (threads, extra_args) can be added by editing the generated YAML file.
 
+#### `alpaca edit [identifier]`
+
+Open a preset YAML file in your editor.
+
+**Identifier Format:**
+- `p:preset-name` - Edit a global preset
+- `f:path/to/preset.yaml` - Edit a preset file by path
+
+**No argument (local preset):**
+When run without arguments, opens `.alpaca.yaml` from the current directory:
+```bash
+$ cd my-project
+$ alpaca edit
+# Opens .alpaca.yaml in $EDITOR
+```
+
+If no `.alpaca.yaml` exists:
+```bash
+$ alpaca edit
+✗ Error: no .alpaca.yaml found in current directory
+ℹ Run: alpaca new --local
+```
+
+**Using preset name:**
+```bash
+$ alpaca edit p:codellama-7b-q4
+# Opens the preset file in $EDITOR
+```
+
+**Using file path:**
+```bash
+$ alpaca edit f:./custom-preset.yaml
+# Opens the file in $EDITOR
+```
+
+**Error cases:**
+
+If preset doesn't exist:
+```bash
+$ alpaca edit p:nonexistent
+✗ Preset 'nonexistent' not found.
+```
+
+Model identifiers cannot be edited:
+```bash
+$ alpaca edit h:org/repo:Q4_K_M
+✗ Error: cannot edit model files
+ℹ Use: alpaca edit p:name or alpaca edit f:path/to/preset.yaml
+```
+
+**Editor resolution:**
+The command uses `$EDITOR` environment variable. If not set, it falls back to nvim, vim, vi, or nano (first found in PATH).
+
 #### `alpaca rm p:<name>`
 
 Remove a preset.

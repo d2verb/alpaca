@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/d2verb/alpaca/internal/client"
@@ -13,6 +14,30 @@ import (
 	"github.com/d2verb/alpaca/internal/pull"
 	"github.com/d2verb/alpaca/internal/ui"
 )
+
+// resolveLocalPreset resolves an identifier string from input or defaults to .alpaca.yaml.
+// If id is non-empty, it is returned as-is. Otherwise, the current directory is checked
+// for a local preset file and its path is returned as an f: identifier.
+func resolveLocalPreset(id string) (string, error) {
+	if id != "" {
+		return id, nil
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("get working directory: %w", err)
+	}
+
+	presetPath := filepath.Join(cwd, LocalPresetFile)
+	if _, err := os.Stat(presetPath); err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("no %s found in current directory\nRun: alpaca new --local", LocalPresetFile)
+		}
+		return "", fmt.Errorf("check preset file: %w", err)
+	}
+
+	return "f:" + presetPath, nil
+}
 
 // mapPresetError converts preset package errors to user-friendly errors.
 func mapPresetError(err error, name string) error {

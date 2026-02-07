@@ -28,6 +28,7 @@ type CLI struct {
 	Remove  RemoveCmd  `cmd:"" name:"rm" help:"Remove a preset or model"`
 	Pull    PullCmd    `cmd:"" help:"Download a model"`
 	New     NewCmd     `cmd:"" help:"Create a new preset interactively"`
+	Edit    EditCmd    `cmd:"" help:"Edit a preset in your editor"`
 	Open    OpenCmd    `cmd:"" help:"Open llama-server in browser"`
 	Upgrade UpgradeCmd `cmd:"" help:"Upgrade alpaca to the latest version"`
 	Version VersionCmd `cmd:"" help:"Show version"`
@@ -55,6 +56,7 @@ func main() {
 		kongplete.WithPredictor("show-identifier", newShowIdentifierPredictor()),
 		kongplete.WithPredictor("rm-identifier", newRmIdentifierPredictor()),
 		kongplete.WithPredictor("load-identifier", newLoadIdentifierPredictor()),
+		kongplete.WithPredictor("edit-identifier", newEditIdentifierPredictor()),
 	)
 
 	ctx, err := parser.Parse(os.Args[1:])

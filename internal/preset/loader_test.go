@@ -108,6 +108,53 @@ model: "f:~/.alpaca/models/test.gguf"
 	})
 }
 
+func TestLoader_FindPath(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	preset := `name: test-preset
+model: "f:/path/to/model.gguf"
+`
+	if err := os.WriteFile(filepath.Join(tmpDir, "abc123.yaml"), []byte(preset), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	loader := NewLoader(tmpDir)
+
+	t.Run("returns path for existing preset", func(t *testing.T) {
+		path, err := loader.FindPath("test-preset")
+		if err != nil {
+			t.Fatalf("FindPath() error = %v", err)
+		}
+
+		expected := filepath.Join(tmpDir, "abc123.yaml")
+		if path != expected {
+			t.Errorf("FindPath() = %q, want %q", path, expected)
+		}
+	})
+
+	t.Run("returns error for non-existent preset", func(t *testing.T) {
+		_, err := loader.FindPath("nonexistent")
+		if err == nil {
+			t.Error("FindPath() expected error for non-existent preset")
+		}
+		if !IsNotFound(err) {
+			t.Errorf("FindPath() error should be NotFound, got: %v", err)
+		}
+	})
+
+	t.Run("returns error for non-existent directory", func(t *testing.T) {
+		loader := NewLoader("/nonexistent/path")
+
+		_, err := loader.FindPath("test-preset")
+		if err == nil {
+			t.Error("FindPath() expected error for non-existent directory")
+		}
+		if !IsNotFound(err) {
+			t.Errorf("FindPath() error should be NotFound, got: %v", err)
+		}
+	})
+}
+
 func TestLoader_List(t *testing.T) {
 	t.Run("lists preset names", func(t *testing.T) {
 		tmpDir := t.TempDir()

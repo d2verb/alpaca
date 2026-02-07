@@ -28,6 +28,12 @@ func newLoadIdentifierPredictor() complete.Predictor {
 	return newIdentifierPredictor([]string{"p:", "h:", "f:"})
 }
 
+// newEditIdentifierPredictor returns a predictor for 'edit' command.
+// Supports: p:preset-name, f:/path/to/preset.yaml
+func newEditIdentifierPredictor() complete.Predictor {
+	return newIdentifierPredictor([]string{"p:", "f:"})
+}
+
 // identifierPredictor implements complete.Predictor for identifier completion.
 type identifierPredictor struct {
 	validPrefixes []string
