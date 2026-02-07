@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 var fallbackEditors = []string{"nvim", "vim", "vi", "nano"}
@@ -23,9 +24,12 @@ func Find() (string, error) {
 }
 
 // Open opens the given file in the specified editor.
+// The editor string is split by whitespace to support values like "code --wait".
 // The editor runs in the foreground with stdin/stdout/stderr connected.
 func Open(editor, filePath string) error {
-	cmd := exec.Command(editor, filePath)
+	args := strings.Fields(editor)
+	args = append(args, filePath)
+	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

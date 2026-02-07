@@ -83,3 +83,12 @@ func TestOpenSucceedsWithTrueCommand(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestOpenSplitsEditorWithArgs(t *testing.T) {
+	// "/usr/bin/env true" should be split into ["/usr/bin/env", "true", filePath]
+	err := Open("/usr/bin/env true", t.TempDir()+"/test.txt")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
