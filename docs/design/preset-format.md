@@ -40,6 +40,9 @@ name: codellama-7b
 # Required: model identifier with explicit prefix
 model: "f:~/.alpaca/models/codellama-7b-Q4_K_M.gguf"
 
+# Optional: draft model for speculative decoding (--model-draft)
+draft_model: "f:~/.alpaca/models/codellama-1b-Q4_K_M.gguf"
+
 # Common options (mapped to llama-server arguments)
 context_size: 4096      # --ctx-size
 threads: 8              # --threads
@@ -66,12 +69,13 @@ extra_args:
 
 | Field | Type | Default | llama-server flag |
 |-------|------|---------|-------------------|
+| `draft_model` | string | (omit flag) | `--model-draft` |
 | `context_size` | int | 4096 | `--ctx-size` |
 | `threads` | int | 0 (omit flag, llama-server decides) | `--threads` |
 | `port` | int | 8080 | `--port` |
 | `host` | string | "127.0.0.1" | `--host` |
 
-**Note on defaults:** Alpaca applies explicit defaults for `context_size`, `host`, and `port`. When these fields are omitted from the YAML, the defaults are still passed to llama-server. `threads` omits the flag when not specified, allowing llama-server to decide.
+**Note on defaults:** Alpaca applies explicit defaults for `context_size`, `host`, and `port`. When these fields are omitted from the YAML, the defaults are still passed to llama-server. `threads` and `draft_model` omit the flag when not specified.
 
 ### Extra Arguments
 
@@ -137,6 +141,18 @@ context_size: 4096
 ```
 
 **Note:** HuggingFace models must be downloaded first with `alpaca pull h:org/repo:quant`. The model field will be automatically resolved to `f:/path/to/downloaded/file.gguf` at runtime.
+
+### Preset with Draft Model (Speculative Decoding)
+
+```yaml
+name: llama3-70b-speculative
+model: "f:~/.alpaca/models/llama3-70b.Q4_K_M.gguf"
+draft_model: "f:~/.alpaca/models/llama3-8b.Q4_K_M.gguf"
+context_size: 8192
+threads: 12
+```
+
+The `draft_model` field accepts the same format as `model` (`f:` for file paths, `h:` for HuggingFace). The draft model is passed to llama-server via the `--model-draft` flag for speculative decoding.
 
 ### Full-Featured Preset
 

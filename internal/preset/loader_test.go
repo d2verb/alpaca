@@ -475,6 +475,132 @@ model: h:org/repo:Q4_K_M
 			t.Error("LoadFile() expected error for model without prefix")
 		}
 	})
+
+	t.Run("loads preset with draft model", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: speculative-preset
+model: f:/path/to/model.gguf
+draft_model: f:/path/to/draft.gguf
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		if p.DraftModel != "f:/path/to/draft.gguf" {
+			t.Errorf("DraftModel = %q, want %q", p.DraftModel, "f:/path/to/draft.gguf")
+		}
+	})
+
+	t.Run("resolves relative draft model path from preset directory", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: relative-draft
+model: f:/path/to/model.gguf
+draft_model: f:./models/draft.gguf
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		expected := "f:" + filepath.Join(tmpDir, "models/draft.gguf")
+		if p.DraftModel != expected {
+			t.Errorf("DraftModel = %q, want %q", p.DraftModel, expected)
+		}
+	})
+
+	t.Run("expands tilde in draft model path", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: tilde-draft
+model: f:/path/to/model.gguf
+draft_model: f:~/models/draft.gguf
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		home, _ := os.UserHomeDir()
+		expected := "f:" + filepath.Join(home, "models/draft.gguf")
+		if p.DraftModel != expected {
+			t.Errorf("DraftModel = %q, want %q", p.DraftModel, expected)
+		}
+	})
+
+	t.Run("preserves HuggingFace draft model identifier", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: hf-draft
+model: f:/path/to/model.gguf
+draft_model: h:org/draft-repo:Q4_K_M
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		if p.DraftModel != "h:org/draft-repo:Q4_K_M" {
+			t.Errorf("DraftModel = %q, want %q", p.DraftModel, "h:org/draft-repo:Q4_K_M")
+		}
+	})
+
+	t.Run("returns error for draft model without prefix", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		content := "name: test\nmodel: f:/path/model.gguf\ndraft_model: /path/draft.gguf"
+		if err := os.WriteFile(presetPath, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		_, err := LoadFile(presetPath)
+		if err == nil {
+			t.Error("LoadFile() expected error for draft model without prefix")
+		}
+	})
+
+	t.Run("omits draft model when not specified", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: no-draft
+model: f:/path/to/model.gguf
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		if p.DraftModel != "" {
+			t.Errorf("DraftModel = %q, want empty string", p.DraftModel)
+		}
+	})
 }
 
 func TestLoader_Remove(t *testing.T) {
