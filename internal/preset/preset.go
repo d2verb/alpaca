@@ -57,6 +57,7 @@ func SanitizeName(name string) string {
 type Preset struct {
 	Name        string   `yaml:"name"` // Required, used as identifier
 	Model       string   `yaml:"model"`
+	DraftModel  string   `yaml:"draft_model,omitempty"`
 	ContextSize int      `yaml:"context_size,omitempty"`
 	Threads     int      `yaml:"threads,omitempty"`
 	Port        int      `yaml:"port,omitempty"`
@@ -100,6 +101,11 @@ func (p *Preset) BuildArgs() []string {
 
 	args := []string{
 		"-m", modelPath,
+	}
+
+	if p.DraftModel != "" {
+		draftModelPath := strings.TrimPrefix(p.DraftModel, "f:")
+		args = append(args, "--model-draft", draftModelPath)
 	}
 
 	// Always include context size with default

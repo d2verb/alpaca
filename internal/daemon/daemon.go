@@ -162,8 +162,9 @@ func (d *Daemon) resolveHFPreset(ctx context.Context, repo, quant string) (*pres
 	return newDefaultPreset(fmt.Sprintf("h:%s:%s", repo, quant), "f:"+modelPath), nil
 }
 
-// resolveModel resolves the model field in a preset if it's HuggingFace format.
-// Returns a new preset with the resolved model path without mutating the original.
+// resolveModel resolves the model and draft_model fields in a preset if they use HuggingFace format.
+// Returns a new preset with the resolved model paths without mutating the original.
+// Returns the original preset as-is if no resolution is needed.
 // Returns error if HuggingFace model is not downloaded.
 func (d *Daemon) resolveModel(ctx context.Context, p *preset.Preset) (*preset.Preset, error) {
 	id, err := identifier.Parse(p.Model)
@@ -171,20 +172,44 @@ func (d *Daemon) resolveModel(ctx context.Context, p *preset.Preset) (*preset.Pr
 		return nil, fmt.Errorf("invalid model field in preset: %w", err)
 	}
 
+	needsResolve := id.Type == identifier.TypeHuggingFace
+
+	var draftID *identifier.Identifier
+	if p.DraftModel != "" {
+		parsed, err := identifier.Parse(p.DraftModel)
+		if err != nil {
+			return nil, fmt.Errorf("invalid draft_model field in preset: %w", err)
+		}
+		draftID = parsed
+		if parsed.Type == identifier.TypeHuggingFace {
+			needsResolve = true
+		}
+	}
+
+	if !needsResolve {
+		return p, nil
+	}
+
+	// Create copy to avoid mutating the original
+	resolved := *p
+
 	if id.Type == identifier.TypeHuggingFace {
-		// Resolve HF identifier to file path (returns error if not downloaded)
 		modelPath, err := d.models.GetFilePath(ctx, id.Repo, id.Quant)
 		if err != nil {
 			return nil, fmt.Errorf("resolve model %s:%s: %w", id.Repo, id.Quant, err)
 		}
-		// Create new preset with resolved path (with f: prefix, don't mutate original)
-		resolved := *p
 		resolved.Model = "f:" + modelPath
-		return &resolved, nil
 	}
 
-	// Already a file path (f:...), return as-is
-	return p, nil
+	if draftID != nil && draftID.Type == identifier.TypeHuggingFace {
+		draftPath, err := d.models.GetFilePath(ctx, draftID.Repo, draftID.Quant)
+		if err != nil {
+			return nil, fmt.Errorf("resolve draft model %s:%s: %w", draftID.Repo, draftID.Quant, err)
+		}
+		resolved.DraftModel = "f:" + draftPath
+	}
+
+	return &resolved, nil
 }
 
 // Run loads and runs a model (preset name, file path, or HuggingFace format).

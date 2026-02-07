@@ -249,9 +249,50 @@ func TestPreset_BuildArgs(t *testing.T) {
 			},
 		},
 		{
+			name: "with draft model",
+			preset: Preset{
+				Model:      "/path/to/model.gguf",
+				DraftModel: "f:/path/to/draft.gguf",
+			},
+			want: []string{
+				"-m", "/path/to/model.gguf",
+				"--model-draft", "/path/to/draft.gguf",
+				"--ctx-size", "4096",
+				"--port", "8080",
+				"--host", "127.0.0.1",
+			},
+		},
+		{
+			name: "with draft model without prefix",
+			preset: Preset{
+				Model:      "/path/to/model.gguf",
+				DraftModel: "/path/to/draft.gguf",
+			},
+			want: []string{
+				"-m", "/path/to/model.gguf",
+				"--model-draft", "/path/to/draft.gguf",
+				"--ctx-size", "4096",
+				"--port", "8080",
+				"--host", "127.0.0.1",
+			},
+		},
+		{
+			name: "without draft model",
+			preset: Preset{
+				Model: "/path/to/model.gguf",
+			},
+			want: []string{
+				"-m", "/path/to/model.gguf",
+				"--ctx-size", "4096",
+				"--port", "8080",
+				"--host", "127.0.0.1",
+			},
+		},
+		{
 			name: "full preset",
 			preset: Preset{
 				Model:       "/path/to/model.gguf",
+				DraftModel:  "f:/path/to/draft.gguf",
 				ContextSize: 2048,
 				Threads:     4,
 				Port:        3000,
@@ -260,6 +301,7 @@ func TestPreset_BuildArgs(t *testing.T) {
 			},
 			want: []string{
 				"-m", "/path/to/model.gguf",
+				"--model-draft", "/path/to/draft.gguf",
 				"--ctx-size", "2048",
 				"--threads", "4",
 				"--port", "3000",

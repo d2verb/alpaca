@@ -1003,3 +1003,83 @@ func TestResolveModel_OldFormatError(t *testing.T) {
 		t.Fatal("expected error for old format without prefix, got nil")
 	}
 }
+
+func TestResolveModel_DraftModelFilePath(t *testing.T) {
+	models := &stubModelManager{filePath: "/should/not/be/used"}
+	d := newTestDaemon(&stubPresetLoader{}, models)
+
+	p := &preset.Preset{
+		Name:       "test",
+		Model:      "f:/abs/path/model.gguf",
+		DraftModel: "f:/abs/path/draft.gguf",
+	}
+
+	resolved, err := d.resolveModel(context.Background(), p)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resolved.DraftModel != "f:/abs/path/draft.gguf" {
+		t.Errorf("DraftModel = %q, want %q", resolved.DraftModel, "f:/abs/path/draft.gguf")
+	}
+}
+
+func TestResolveModel_DraftModelHuggingFace(t *testing.T) {
+	models := &stubModelManager{filePath: "/resolved/path/draft.gguf", exists: true}
+	d := newTestDaemon(&stubPresetLoader{}, models)
+
+	p := &preset.Preset{
+		Name:       "test",
+		Model:      "f:/abs/path/model.gguf",
+		DraftModel: "h:org/draft-repo:Q4_K_M",
+	}
+
+	resolved, err := d.resolveModel(context.Background(), p)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resolved.DraftModel != "f:/resolved/path/draft.gguf" {
+		t.Errorf("DraftModel = %q, want %q", resolved.DraftModel, "f:/resolved/path/draft.gguf")
+	}
+
+	// Original preset should not be mutated
+	if p.DraftModel != "h:org/draft-repo:Q4_K_M" {
+		t.Errorf("Original preset mutated: DraftModel = %q, want %q", p.DraftModel, "h:org/draft-repo:Q4_K_M")
+	}
+}
+
+func TestResolveModel_DraftModelHuggingFaceNotExists(t *testing.T) {
+	models := &stubModelManager{exists: false}
+	d := newTestDaemon(&stubPresetLoader{}, models)
+
+	p := &preset.Preset{
+		Name:       "test",
+		Model:      "f:/abs/path/model.gguf",
+		DraftModel: "h:org/draft-repo:Q4_K_M",
+	}
+
+	_, err := d.resolveModel(context.Background(), p)
+	if err == nil {
+		t.Fatal("expected error when draft model not found, got nil")
+	}
+}
+
+func TestResolveModel_NoDraftModel(t *testing.T) {
+	models := &stubModelManager{filePath: "/resolved/path/model.gguf", exists: true}
+	d := newTestDaemon(&stubPresetLoader{}, models)
+
+	p := &preset.Preset{
+		Name:  "test",
+		Model: "f:/abs/path/model.gguf",
+	}
+
+	resolved, err := d.resolveModel(context.Background(), p)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resolved.DraftModel != "" {
+		t.Errorf("DraftModel = %q, want empty string", resolved.DraftModel)
+	}
+}

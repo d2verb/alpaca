@@ -219,6 +219,15 @@ func loadFromPath(absPath string) (*Preset, error) {
 	}
 	preset.Model = resolvedModel
 
+	// Resolve draft model path if specified
+	if preset.DraftModel != "" {
+		resolvedDraft, err := resolveModelPath(preset.DraftModel, baseDir)
+		if err != nil {
+			return nil, fmt.Errorf("resolve draft model path: %w", err)
+		}
+		preset.DraftModel = resolvedDraft
+	}
+
 	return &preset, nil
 }
 
