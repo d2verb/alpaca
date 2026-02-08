@@ -122,8 +122,7 @@ $ alpaca logs
 
 **Flags:**
 - `-f, --follow`: Follow log output in real-time (like `tail -f`)
-- `-d, --daemon`: Show daemon logs (default)
-- `-s, --server`: Show llama-server logs
+- `-s, --server`: Show llama-server logs (default: daemon logs)
 
 **Examples:**
 
@@ -146,7 +145,7 @@ Follow llama-server logs:
 $ alpaca logs -f -s
 ```
 
-**Note:** This command uses `/usr/bin/tail` under the hood. Log files are located at:
+**Note:** This command uses `tail` (found via PATH lookup) under the hood. Log files are located at:
 - Daemon: `~/.alpaca/logs/daemon.log`
 - llama-server: `~/.alpaca/logs/llama.log`
 
@@ -437,7 +436,7 @@ The command will prompt for:
 - **Model**: Model identifier (must include `f:` or `h:` prefix) - **required** (single mode)
 - **Host**: Server host address (default: 127.0.0.1)
 - **Port**: Server port (default: 8080)
-- **Context**: Context window size (default: 2048) (single mode) or per-model (router mode)
+- **Context**: Context window size (default: 4096) (single mode) or per-model (router mode)
 - **Models**: Interactive model addition loop (router mode) — enter blank name to finish
 
 Press Enter to accept default values (shown in brackets). Only non-default values are written to the YAML file.
@@ -703,7 +702,4 @@ After adding, restart your shell or source the configuration file.
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ALPACA_HOME` | Alpaca home directory | `~/.alpaca` |
-| `ALPACA_SOCKET` | Unix socket path | `$ALPACA_HOME/alpaca.sock` |
+Currently, Alpaca does not support environment variables for configuration. All paths are derived from the user's home directory (`~/.alpaca/`).
