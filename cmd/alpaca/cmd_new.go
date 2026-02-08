@@ -117,7 +117,7 @@ func (c *NewCmd) collectInputs(name string) (*preset.Preset, error) {
 	}
 
 	switch modeStr {
-	case "single", "":
+	case "single":
 		return c.collectSingleInputs(name)
 	case "router":
 		return c.collectRouterInputs(name)
