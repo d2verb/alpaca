@@ -98,9 +98,11 @@ func (c *ShowCmd) showModel(id *identifier.Identifier, modelsDir string) error {
 	if err != nil {
 		var notFound *metadata.NotFoundError
 		if errors.As(err, &notFound) {
-			ui.PrintError(fmt.Sprintf("Model '%s' not downloaded", id.Raw))
-			ui.PrintInfo(fmt.Sprintf("Run: alpaca pull %s", id.Raw))
-			return errModelNotFound(id.Raw)
+			return &ExitError{
+				Code:    exitModelNotFound,
+				Kind:    ExitKindError,
+				Message: fmt.Sprintf("Model '%s' not found.\nRun: alpaca pull %s", id.Raw, id.Raw),
+			}
 		}
 		return fmt.Errorf("get model details: %w", err)
 	}
