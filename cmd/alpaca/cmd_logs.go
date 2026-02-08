@@ -9,7 +9,6 @@ import (
 
 type LogsCmd struct {
 	Follow bool `short:"f" help:"Follow log output in real-time (tail -f)"`
-	Daemon bool `short:"d" help:"Show daemon logs (default)"`
 	Server bool `short:"s" help:"Show llama-server logs"`
 }
 
