@@ -3,11 +3,13 @@ package selfupdate
 import (
 	"archive/tar"
 	"compress/gzip"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -23,6 +25,10 @@ const (
 	repoName             = "alpaca"
 	apiTimeout           = 30 * time.Second
 	defaultGitHubBaseURL = "https://api.github.com"
+
+	// releasePublicKey is the hex-encoded Ed25519 public key used to verify release signatures.
+	// TODO: Replace with the real release signing key when CI/CD signing is set up.
+	releasePublicKey = "b0f178713e4a6c514809250cbe1e75eafc1603e28e4bc3b8ed4a61f4f23f441a"
 )
 
 // Updater handles self-update operations.
@@ -30,6 +36,7 @@ type Updater struct {
 	currentVersion string
 	client         *http.Client
 	baseURL        string
+	publicKey      ed25519.PublicKey // overridable for testing
 }
 
 // Release represents a GitHub release.
@@ -46,12 +53,19 @@ type Asset struct {
 
 // New creates a new Updater.
 func New(currentVersion string) *Updater {
+	pubKey, err := hex.DecodeString(releasePublicKey)
+	if err != nil {
+		// This should never happen with a valid embedded key.
+		panic(fmt.Sprintf("invalid embedded public key: %v", err))
+	}
+
 	return &Updater{
 		currentVersion: currentVersion,
 		client: &http.Client{
 			Timeout: apiTimeout,
 		},
-		baseURL: defaultGitHubBaseURL,
+		baseURL:   defaultGitHubBaseURL,
+		publicKey: ed25519.PublicKey(pubKey),
 	}
 }
 
@@ -107,12 +121,24 @@ func (u *Updater) Update(currentBinaryPath string) error {
 		return fmt.Errorf("no asset found for %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 
-	// Download checksums
-	checksums, err := u.downloadChecksums(release)
+	// Download checksums (raw bytes for signature verification)
+	checksumsRaw, err := u.downloadChecksumsRaw(release)
 	if err != nil {
 		return fmt.Errorf("download checksums: %w", err)
 	}
 
+	// Download and verify signature
+	sig, err := u.downloadSignature(release)
+	if err != nil {
+		// TODO: Remove this fallback once all releases are signed.
+		log.Printf("WARNING: signature file not found, skipping signature verification: %v", err)
+	} else {
+		if err := u.verifySignature(checksumsRaw, sig); err != nil {
+			return fmt.Errorf("verify checksums signature: %w", err)
+		}
+	}
+
+	checksums := parseChecksums(checksumsRaw)
 	expectedChecksum, ok := checksums[assetName]
 	if !ok {
 		return fmt.Errorf("checksum not found for %s", assetName)
@@ -185,7 +211,7 @@ func (u *Updater) getAssetName(tagName string) string {
 	return fmt.Sprintf("alpaca_%s_%s_%s.tar.gz", version, runtime.GOOS, runtime.GOARCH)
 }
 
-func (u *Updater) downloadChecksums(release *Release) (map[string]string, error) {
+func (u *Updater) downloadChecksumsRaw(release *Release) ([]byte, error) {
 	var checksumURL string
 	for _, asset := range release.Assets {
 		if asset.Name == "checksums.txt" {
@@ -207,20 +233,50 @@ func (u *Updater) downloadChecksums(release *Release) (map[string]string, error)
 		return nil, fmt.Errorf("failed to download checksums: status %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
+	return io.ReadAll(resp.Body)
+}
 
+func parseChecksums(data []byte) map[string]string {
 	checksums := make(map[string]string)
-	for _, line := range strings.Split(string(body), "\n") {
+	for _, line := range strings.Split(string(data), "\n") {
 		parts := strings.Fields(line)
 		if len(parts) == 2 {
 			checksums[parts[1]] = parts[0]
 		}
 	}
+	return checksums
+}
 
-	return checksums, nil
+func (u *Updater) downloadSignature(release *Release) ([]byte, error) {
+	var sigURL string
+	for _, asset := range release.Assets {
+		if asset.Name == "checksums.txt.sig" {
+			sigURL = asset.BrowserDownloadURL
+			break
+		}
+	}
+	if sigURL == "" {
+		return nil, fmt.Errorf("checksums.txt.sig not found in release")
+	}
+
+	resp, err := u.client.Get(sigURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to download signature: status %d", resp.StatusCode)
+	}
+
+	return io.ReadAll(resp.Body)
+}
+
+func (u *Updater) verifySignature(data, signature []byte) error {
+	if !ed25519.Verify(u.publicKey, data, signature) {
+		return fmt.Errorf("Ed25519 signature verification failed")
+	}
+	return nil
 }
 
 func (u *Updater) downloadFile(url, destPath string) error {
