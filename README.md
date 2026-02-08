@@ -71,7 +71,7 @@ echo "$(alpaca completion-script)" >> ~/.bashrc
 
 ### Daemon
 
-- `alpaca start [--foreground]` - Start the daemon
+- `alpaca start` - Start the daemon
 - `alpaca stop` - Stop the daemon
 - `alpaca status` - Show current status
 - `alpaca open` - Open llama-server in browser
