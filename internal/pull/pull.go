@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -84,15 +83,14 @@ func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, err
 		return nil, err
 	}
 
-	// Verify SHA256 integrity if hash is available from API
-	if fileInfo.SHA256 != "" {
-		if err := p.verifyFileHash(fileInfo.Filename, fileInfo.SHA256); err != nil {
-			// Clean up the corrupted file
-			p.removeDownloadedFile(fileInfo.Filename)
-			return nil, fmt.Errorf("integrity verification failed for %s: %w", fileInfo.Filename, err)
-		}
-	} else {
-		slog.Warn("no SHA256 hash available from API, skipping integrity verification", "filename", fileInfo.Filename)
+	// Verify SHA256 integrity (fail-closed: reject if hash is missing or mismatched)
+	if fileInfo.SHA256 == "" {
+		p.removeDownloadedFile(fileInfo.Filename)
+		return nil, fmt.Errorf("integrity verification failed for %s: no SHA256 hash available from API", fileInfo.Filename)
+	}
+	if err := p.verifyFileHash(fileInfo.Filename, fileInfo.SHA256); err != nil {
+		p.removeDownloadedFile(fileInfo.Filename)
+		return nil, fmt.Errorf("integrity verification failed for %s: %w", fileInfo.Filename, err)
 	}
 
 	destPath := filepath.Join(p.modelsDir, fileInfo.Filename)

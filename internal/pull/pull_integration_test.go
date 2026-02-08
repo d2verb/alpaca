@@ -350,22 +350,19 @@ func TestPull_NoHashAvailable(t *testing.T) {
 	puller := newTestPuller(tmpDir, srv.URL)
 
 	// Act
-	result, err := puller.Pull(context.Background(), "test/model", "Q4_K_M")
+	_, err := puller.Pull(context.Background(), "test/model", "Q4_K_M")
 
-	// Assert - should succeed even without hash (graceful degradation)
-	if err != nil {
-		t.Fatalf("Pull() error = %v, want nil (graceful degradation)", err)
+	// Assert - should fail because hash is missing (fail-closed)
+	if err == nil {
+		t.Fatal("Pull() error = nil, want error for missing SHA256 hash")
 	}
-	if result.Filename != "model-Q4_K_M.gguf" {
-		t.Errorf("Filename = %q, want %q", result.Filename, "model-Q4_K_M.gguf")
+	if !strings.Contains(err.Error(), "no SHA256 hash available") {
+		t.Errorf("error = %q, want it to contain %q", err.Error(), "no SHA256 hash available")
 	}
 
-	// Verify file was written
-	content, err := os.ReadFile(result.Path)
-	if err != nil {
-		t.Fatalf("failed to read downloaded file: %v", err)
-	}
-	if string(content) != string(modelContent) {
-		t.Error("downloaded content mismatch")
+	// Verify file was cleaned up
+	filePath := filepath.Join(tmpDir, "model-Q4_K_M.gguf")
+	if _, err := os.Stat(filePath); !os.IsNotExist(err) {
+		t.Error("downloaded file should have been cleaned up")
 	}
 }

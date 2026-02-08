@@ -54,17 +54,24 @@ func createTestTarGz(content []byte) ([]byte, error) {
 
 func TestUpdate_EndToEnd(t *testing.T) {
 	// Arrange
+	pub, priv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
 	newBinaryContent := []byte("#!/bin/sh\necho 'new version'")
 	archiveBytes, err := createTestTarGz(newBinaryContent)
 	if err != nil {
 		t.Fatalf("failed to create test archive: %v", err)
 	}
 
-	// Compute checksum
+	// Compute checksum and sign
 	h := sha256.New()
 	h.Write(archiveBytes)
 	checksum := hex.EncodeToString(h.Sum(nil))
 	assetName := fmt.Sprintf("alpaca_1.2.3_%s_%s.tar.gz", runtime.GOOS, runtime.GOARCH)
+	checksumsContent := fmt.Sprintf("%s  %s\n", checksum, assetName)
+	sig := ed25519.Sign(priv, []byte(checksumsContent))
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -74,12 +81,16 @@ func TestUpdate_EndToEnd(t *testing.T) {
 				Assets: []Asset{
 					{Name: assetName, BrowserDownloadURL: "http://" + r.Host + "/" + assetName},
 					{Name: "checksums.txt", BrowserDownloadURL: "http://" + r.Host + "/checksums.txt"},
+					{Name: "checksums.txt.sig", BrowserDownloadURL: "http://" + r.Host + "/checksums.txt.sig"},
 				},
 			}
 			json.NewEncoder(w).Encode(release)
 
 		case r.URL.Path == "/checksums.txt":
-			fmt.Fprintf(w, "%s  %s\n", checksum, assetName)
+			w.Write([]byte(checksumsContent))
+
+		case r.URL.Path == "/checksums.txt.sig":
+			w.Write(sig)
 
 		case r.URL.Path == "/"+assetName:
 			w.Header().Set("Content-Type", "application/gzip")
@@ -99,6 +110,7 @@ func TestUpdate_EndToEnd(t *testing.T) {
 	}
 
 	updater := newTestUpdater("v1.0.0", srv.URL)
+	updater.publicKey = pub
 
 	// Act
 	err = updater.Update(currentBinary)
@@ -280,7 +292,7 @@ func TestUpdate_WithInvalidSignature(t *testing.T) {
 }
 
 func TestUpdate_WithoutSignatureFile(t *testing.T) {
-	// Arrange - release without checksums.txt.sig (backward compatibility)
+	// Arrange - release without checksums.txt.sig
 	newBinaryContent := []byte("#!/bin/sh\necho 'unsigned version'")
 	archiveBytes, err := createTestTarGz(newBinaryContent)
 	if err != nil {
@@ -326,20 +338,24 @@ func TestUpdate_WithoutSignatureFile(t *testing.T) {
 
 	updater := newTestUpdater("v1.0.0", srv.URL)
 
-	// Act - should succeed with warning (backward compat)
+	// Act - should fail because signature file is missing (fail-closed)
 	err = updater.Update(currentBinary)
 
 	// Assert
-	if err != nil {
-		t.Fatalf("Update() error = %v, want nil (backward compat should allow unsigned releases)", err)
+	if err == nil {
+		t.Fatal("Update() error = nil, want error for missing signature file")
+	}
+	if !strings.Contains(err.Error(), "download signature") {
+		t.Errorf("error = %q, want it to contain %q", err.Error(), "download signature")
 	}
 
+	// Verify binary was NOT replaced
 	content, err := os.ReadFile(currentBinary)
 	if err != nil {
-		t.Fatalf("failed to read updated binary: %v", err)
+		t.Fatalf("failed to read binary: %v", err)
 	}
-	if string(content) != string(newBinaryContent) {
-		t.Errorf("binary content = %q, want %q", string(content), string(newBinaryContent))
+	if string(content) != "old version" {
+		t.Error("binary was replaced despite missing signature")
 	}
 }
 

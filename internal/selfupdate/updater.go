@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -127,15 +126,13 @@ func (u *Updater) Update(currentBinaryPath string) error {
 		return fmt.Errorf("download checksums: %w", err)
 	}
 
-	// Download and verify signature
+	// Download and verify signature (fail-closed: reject if signature is missing or invalid)
 	sig, err := u.downloadSignature(release)
 	if err != nil {
-		// TODO: Remove this fallback once all releases are signed.
-		log.Printf("WARNING: signature file not found, skipping signature verification: %v", err)
-	} else {
-		if err := u.verifySignature(checksumsRaw, sig); err != nil {
-			return fmt.Errorf("verify checksums signature: %w", err)
-		}
+		return fmt.Errorf("download signature: %w", err)
+	}
+	if err := u.verifySignature(checksumsRaw, sig); err != nil {
+		return fmt.Errorf("verify checksums signature: %w", err)
 	}
 
 	checksums := parseChecksums(checksumsRaw)
