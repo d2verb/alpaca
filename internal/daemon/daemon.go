@@ -230,15 +230,25 @@ func (d *Daemon) resolveModel(ctx context.Context, p *preset.Preset) (*preset.Pr
 
 // resolveRouterModels resolves HuggingFace model references in router mode Models[].
 func (d *Daemon) resolveRouterModels(ctx context.Context, p *preset.Preset) (*preset.Preset, error) {
+	// Validate all model identifiers and check if any need HF resolution.
 	needsResolve := false
-	for _, m := range p.Models {
-		if isHFIdentifier(m.Model) {
-			needsResolve = true
-			break
+	for i, m := range p.Models {
+		id, err := identifier.Parse(m.Model)
+		if err != nil {
+			return nil, fmt.Errorf("invalid model field in models[%d]: %w", i, err)
 		}
-		if m.DraftModel != "" && isHFIdentifier(m.DraftModel) {
+		if id.Type == identifier.TypeHuggingFace {
 			needsResolve = true
-			break
+		}
+
+		if m.DraftModel != "" {
+			did, err := identifier.Parse(m.DraftModel)
+			if err != nil {
+				return nil, fmt.Errorf("invalid draft_model field in models[%d]: %w", i, err)
+			}
+			if did.Type == identifier.TypeHuggingFace {
+				needsResolve = true
+			}
 		}
 	}
 
@@ -256,11 +266,9 @@ func (d *Daemon) resolveRouterModels(ctx context.Context, p *preset.Preset) (*pr
 	}
 
 	for i, m := range resolved.Models {
-		if isHFIdentifier(m.Model) {
-			id, err := identifier.Parse(m.Model)
-			if err != nil {
-				return nil, fmt.Errorf("invalid model field in models[%d]: %w", i, err)
-			}
+		// Parse already validated in the loop above; safe to ignore error.
+		id, _ := identifier.Parse(m.Model)
+		if id.Type == identifier.TypeHuggingFace {
 			modelPath, err := d.models.GetFilePath(ctx, id.Repo, id.Quant)
 			if err != nil {
 				return nil, fmt.Errorf("resolve model %s:%s in models[%d]: %w", id.Repo, id.Quant, i, err)
@@ -268,29 +276,19 @@ func (d *Daemon) resolveRouterModels(ctx context.Context, p *preset.Preset) (*pr
 			resolved.Models[i].Model = "f:" + modelPath
 		}
 
-		if m.DraftModel != "" && isHFIdentifier(m.DraftModel) {
-			id, err := identifier.Parse(m.DraftModel)
-			if err != nil {
-				return nil, fmt.Errorf("invalid draft_model field in models[%d]: %w", i, err)
+		if m.DraftModel != "" {
+			did, _ := identifier.Parse(m.DraftModel)
+			if did.Type == identifier.TypeHuggingFace {
+				draftPath, err := d.models.GetFilePath(ctx, did.Repo, did.Quant)
+				if err != nil {
+					return nil, fmt.Errorf("resolve draft model %s:%s in models[%d]: %w", did.Repo, did.Quant, i, err)
+				}
+				resolved.Models[i].DraftModel = "f:" + draftPath
 			}
-			draftPath, err := d.models.GetFilePath(ctx, id.Repo, id.Quant)
-			if err != nil {
-				return nil, fmt.Errorf("resolve draft model %s:%s in models[%d]: %w", id.Repo, id.Quant, i, err)
-			}
-			resolved.Models[i].DraftModel = "f:" + draftPath
 		}
 	}
 
 	return &resolved, nil
-}
-
-// isHFIdentifier returns true if the identifier string uses HuggingFace format (h: prefix).
-func isHFIdentifier(s string) bool {
-	id, err := identifier.Parse(s)
-	if err != nil {
-		return false
-	}
-	return id.Type == identifier.TypeHuggingFace
 }
 
 // Run loads and runs a model (preset name, file path, or HuggingFace format).

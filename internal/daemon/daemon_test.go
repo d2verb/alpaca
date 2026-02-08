@@ -1359,6 +1359,59 @@ func TestResolveModel_RouterModeDraftModel(t *testing.T) {
 	}
 }
 
+func TestResolveModel_RouterModeInvalidModel(t *testing.T) {
+	// Arrange
+	d := newTestDaemon(&stubPresetLoader{}, &stubModelManager{})
+
+	p := &preset.Preset{
+		Name: "router-invalid-test",
+		Mode: "router",
+		Models: []preset.ModelEntry{
+			{Name: "good", Model: "f:/path/to/model.gguf"},
+			{Name: "bad", Model: "no-prefix"},
+		},
+	}
+
+	// Act
+	_, err := d.resolveModel(context.Background(), p)
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error for invalid identifier, got nil")
+	}
+	if !strings.Contains(err.Error(), "models[1]") {
+		t.Errorf("error should reference models[1], got: %v", err)
+	}
+}
+
+func TestResolveModel_RouterModeInvalidDraftModel(t *testing.T) {
+	// Arrange
+	d := newTestDaemon(&stubPresetLoader{}, &stubModelManager{})
+
+	p := &preset.Preset{
+		Name: "router-invalid-draft-test",
+		Mode: "router",
+		Models: []preset.ModelEntry{
+			{
+				Name:       "model-a",
+				Model:      "f:/path/to/model.gguf",
+				DraftModel: "no-prefix",
+			},
+		},
+	}
+
+	// Act
+	_, err := d.resolveModel(context.Background(), p)
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error for invalid draft_model identifier, got nil")
+	}
+	if !strings.Contains(err.Error(), "draft_model") {
+		t.Errorf("error should mention draft_model, got: %v", err)
+	}
+}
+
 func TestAtomicWriteFile(t *testing.T) {
 	// Arrange
 	dir := t.TempDir()
