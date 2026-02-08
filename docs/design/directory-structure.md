@@ -8,6 +8,7 @@ All Alpaca data is stored under `~/.alpaca/`:
 ~/.alpaca/
 ├── alpaca.sock          # Unix socket for daemon communication
 ├── alpaca.pid           # Daemon PID file
+├── router-config.ini    # Router mode config (generated at runtime)
 ├── presets/             # Preset definitions (random filenames)
 │   ├── a1b2c3d4e5f67890.yaml
 │   ├── 1234567890abcdef.yaml
@@ -38,6 +39,10 @@ Contains the PID of the running daemon process.
 
 - Used to check if daemon is running
 - Used to send signals to daemon
+
+### router-config.ini
+
+Generated config file for router mode. Written atomically (temp file + rename) when loading a router preset, and cleaned up on model stop (best-effort).
 
 ## Directories
 
@@ -75,7 +80,7 @@ Log files for debugging. Created automatically when daemon starts.
 Models downloaded via `alpaca pull` are stored in `~/.alpaca/models/`.
 
 ```
-$ alpaca pull TheBloke/CodeLlama-7B-GGUF
+$ alpaca pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 Downloading codellama-7b-Q4_K_M.gguf...
 Saved to: ~/.alpaca/models/codellama-7b-Q4_K_M.gguf
 ```

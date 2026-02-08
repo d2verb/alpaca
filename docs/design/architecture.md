@@ -28,7 +28,7 @@ Alpaca consists of three main components:
                   │
 ┌─────────────────┼───────────────────┐
 │                 ▼                   │
-│          GUI (SwiftUI)              │
+│       GUI (AppKit/SwiftUI)          │
 │       macOS Menu Bar App            │
 └─────────────────────────────────────┘
                   │
@@ -47,7 +47,7 @@ Command-line interface written in Go. Communicates with the daemon via Unix sock
 
 Primary interface for:
 - Starting/stopping the daemon (`alpaca start`, `alpaca stop`)
-- Managing presets (show, new)
+- Managing presets (show, new, edit, rm)
 - Listing resources (`alpaca ls`)
 - Downloading models (`alpaca pull`)
 - Removing resources (`alpaca rm`)
@@ -70,7 +70,7 @@ The daemon runs in background mode by default, detaching from the terminal and w
 
 ### GUI (macOS Menu Bar App)
 
-Native macOS app written in SwiftUI. Provides quick access to common operations.
+Native macOS app using AppKit (NSStatusItem, NSMenu) with SwiftUI app lifecycle. Provides quick access to common operations.
 
 Features:
 - Show current status in menu bar
@@ -260,7 +260,7 @@ idle → loading → running
 
 - **CLI and Daemon**: Written in Go, naturally cross-platform
 - **GUI**: OS-specific implementation
-  - macOS: SwiftUI (current)
+  - macOS: AppKit/SwiftUI (current)
   - Windows: Future (WinUI or similar)
   - Linux: Future (GTK or similar)
 
