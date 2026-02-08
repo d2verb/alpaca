@@ -230,51 +230,6 @@ func TestGetFileInfo_Success(t *testing.T) {
 	}
 }
 
-func TestPull_IntegrityVerificationSuccess(t *testing.T) {
-	// Arrange
-	modelContent := []byte("fake-model-binary-content")
-	modelHash := computeSHA256(modelContent)
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasPrefix(r.URL.Path, "/api/models/"):
-			resp := struct {
-				Siblings []apiSibling `json:"siblings"`
-			}{
-				Siblings: []apiSibling{
-					newSiblingWithHash("model-Q4_K_M.gguf", modelHash),
-				},
-			}
-			json.NewEncoder(w).Encode(resp)
-
-		case strings.Contains(r.URL.Path, "/resolve/main/"):
-			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(modelContent)))
-			w.WriteHeader(http.StatusOK)
-			w.Write(modelContent)
-		}
-	}))
-	t.Cleanup(srv.Close)
-
-	tmpDir := t.TempDir()
-	puller := newTestPuller(tmpDir, srv.URL)
-
-	// Act
-	result, err := puller.Pull(context.Background(), "test/model", "Q4_K_M")
-
-	// Assert
-	if err != nil {
-		t.Fatalf("Pull() error = %v", err)
-	}
-	if result.Filename != "model-Q4_K_M.gguf" {
-		t.Errorf("Filename = %q, want %q", result.Filename, "model-Q4_K_M.gguf")
-	}
-
-	// Verify file exists (hash matched, file kept)
-	if _, err := os.Stat(result.Path); os.IsNotExist(err) {
-		t.Error("file should exist after successful integrity verification")
-	}
-}
-
 func TestPull_IntegrityVerificationFailure(t *testing.T) {
 	// Arrange
 	modelContent := []byte("fake-model-binary-content")

@@ -229,7 +229,8 @@ func (u *Updater) downloadChecksumsRaw(release *Release) ([]byte, error) {
 		return nil, fmt.Errorf("failed to download checksums: status %d", resp.StatusCode)
 	}
 
-	return io.ReadAll(resp.Body)
+	// Checksums file is small (a few KB at most); limit to 1 MB as a safeguard.
+	return io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 }
 
 func parseChecksums(data []byte) map[string]string {
@@ -265,7 +266,8 @@ func (u *Updater) downloadSignature(release *Release) ([]byte, error) {
 		return nil, fmt.Errorf("failed to download signature: status %d", resp.StatusCode)
 	}
 
-	return io.ReadAll(resp.Body)
+	// Ed25519 signatures are exactly 64 bytes; limit to 1 KB as a safeguard.
+	return io.ReadAll(io.LimitReader(resp.Body, 1024))
 }
 
 func (u *Updater) verifySignature(data, signature []byte) error {
