@@ -11,7 +11,7 @@ Presets define a model + argument combination that can be loaded with a single c
 
 ### Global Presets
 
-```
+```text
 ~/.alpaca/presets/
 ├── a1b2c3d4e5f67890.yaml
 ├── 1234567890abcdef.yaml
@@ -22,7 +22,7 @@ Global preset files are stored with random filenames (16 hex characters). The `n
 
 ### Local Presets
 
-```
+```text
 my-project/
 ├── .alpaca.yaml     # Local preset
 ├── src/

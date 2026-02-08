@@ -4,7 +4,7 @@
 
 Alpaca consists of three main components:
 
-```
+```text
 ┌─────────────────────────────────────┐
 │         alpaca (Go binary)          │
 │                                     │
@@ -85,7 +85,7 @@ Alpaca supports running multiple models simultaneously via llama-server's router
 
 In router mode, a single llama-server process manages multiple models as child processes:
 
-```
+```text
 alpaca daemon
   └── llama-server (router process)
         ├── Child: Model A (qwen3)          ← independent KV-cache
@@ -102,7 +102,7 @@ Key properties:
 
 Alpaca generates a `config.ini` file from the router preset YAML and passes it via `--models-preset`:
 
-```
+```text
 Preset YAML → GenerateConfigINI() → ~/.alpaca/router-config.ini → llama-server --models-preset
 ```
 
@@ -114,7 +114,7 @@ Preset YAML → GenerateConfigINI() → ~/.alpaca/router-config.ini → llama-se
 
 In router mode, the daemon queries llama-server's `/models` API to get per-model status (loaded/loading/unloaded). This information is included in the status IPC response for both CLI and GUI.
 
-```
+```text
 CLI → [IPC: status] → Daemon → [HTTP: GET /models] → llama-server
                              ← merged response with model statuses
 ```
@@ -245,7 +245,7 @@ When switching models (loading while another is running):
 
 ### State Transitions
 
-```
+```text
 idle → loading → running
   ↑                ↓
   └────────────────┘
