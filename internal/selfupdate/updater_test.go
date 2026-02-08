@@ -3,6 +3,7 @@ package selfupdate
 import (
 	"archive/tar"
 	"compress/gzip"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -314,6 +315,124 @@ func TestVersionComparison(t *testing.T) {
 			if hasUpdate != tt.expectHasUpdate {
 				t.Errorf("hasUpdate = %v, want %v (current=%s, latest=%s)",
 					hasUpdate, tt.expectHasUpdate, current, latest)
+			}
+		})
+	}
+}
+
+func TestVerifySignatureWithValidSignature(t *testing.T) {
+	// Arrange
+	pub, priv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
+	u := New("v1.0.0")
+	u.publicKey = pub
+
+	data := []byte("checksums content")
+	sig := ed25519.Sign(priv, data)
+
+	// Act
+	err = u.verifySignature(data, sig)
+
+	// Assert
+	if err != nil {
+		t.Errorf("verifySignature should succeed with valid signature: %v", err)
+	}
+}
+
+func TestVerifySignatureWithTamperedContent(t *testing.T) {
+	// Arrange
+	pub, priv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
+	u := New("v1.0.0")
+	u.publicKey = pub
+
+	data := []byte("checksums content")
+	sig := ed25519.Sign(priv, data)
+	tampered := []byte("tampered content")
+
+	// Act
+	err = u.verifySignature(tampered, sig)
+
+	// Assert
+	if err == nil {
+		t.Error("verifySignature should fail with tampered content")
+	}
+}
+
+func TestVerifySignatureWithWrongKey(t *testing.T) {
+	// Arrange
+	_, priv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("failed to generate signing key: %v", err)
+	}
+	wrongPub, _, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("failed to generate wrong key: %v", err)
+	}
+
+	u := New("v1.0.0")
+	u.publicKey = wrongPub
+
+	data := []byte("checksums content")
+	sig := ed25519.Sign(priv, data)
+
+	// Act
+	err = u.verifySignature(data, sig)
+
+	// Assert
+	if err == nil {
+		t.Error("verifySignature should fail with wrong public key")
+	}
+}
+
+func TestParseChecksums(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  map[string]string
+	}{
+		{
+			name:  "single entry",
+			input: "abc123  file.tar.gz\n",
+			want:  map[string]string{"file.tar.gz": "abc123"},
+		},
+		{
+			name:  "multiple entries",
+			input: "abc123  file1.tar.gz\ndef456  file2.tar.gz\n",
+			want:  map[string]string{"file1.tar.gz": "abc123", "file2.tar.gz": "def456"},
+		},
+		{
+			name:  "empty input",
+			input: "",
+			want:  map[string]string{},
+		},
+		{
+			name:  "trailing newlines",
+			input: "abc123  file.tar.gz\n\n",
+			want:  map[string]string{"file.tar.gz": "abc123"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Act
+			got := parseChecksums([]byte(tt.input))
+
+			// Assert
+			if len(got) != len(tt.want) {
+				t.Errorf("parseChecksums() returned %d entries, want %d", len(got), len(tt.want))
+				return
+			}
+			for k, v := range tt.want {
+				if got[k] != v {
+					t.Errorf("parseChecksums()[%s] = %s, want %s", k, got[k], v)
+				}
 			}
 		})
 	}

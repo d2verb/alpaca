@@ -2,10 +2,14 @@ package pull
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -17,32 +21,52 @@ func newTestPuller(modelsDir, baseURL string) *Puller {
 	return p
 }
 
+// computeSHA256 returns the hex-encoded SHA256 hash of data.
+func computeSHA256(data []byte) string {
+	h := sha256.Sum256(data)
+	return hex.EncodeToString(h[:])
+}
+
+// apiSibling represents a file entry in the HuggingFace API response.
+type apiSibling struct {
+	Filename string `json:"rfilename"`
+	LFS      *struct {
+		SHA256 string `json:"sha256"`
+	} `json:"lfs,omitempty"`
+}
+
+// newSiblingWithHash creates an apiSibling with an LFS SHA256 hash.
+func newSiblingWithHash(filename, sha string) apiSibling {
+	s := apiSibling{Filename: filename}
+	if sha != "" {
+		s.LFS = &struct {
+			SHA256 string `json:"sha256"`
+		}{SHA256: sha}
+	}
+	return s
+}
+
 func TestPull_Success(t *testing.T) {
 	// Arrange
 	modelContent := []byte("fake-model-binary-content")
+	modelHash := computeSHA256(modelContent)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/api/models/"):
-			// Return repo info with GGUF files
 			resp := struct {
-				Siblings []struct {
-					Filename string `json:"rfilename"`
-				} `json:"siblings"`
+				Siblings []apiSibling `json:"siblings"`
 			}{
-				Siblings: []struct {
-					Filename string `json:"rfilename"`
-				}{
-					{Filename: "model-Q4_K_M.gguf"},
-					{Filename: "model-Q8_0.gguf"},
+				Siblings: []apiSibling{
+					newSiblingWithHash("model-Q4_K_M.gguf", modelHash),
+					newSiblingWithHash("model-Q8_0.gguf", "abc123"),
 					{Filename: "README.md"},
 				},
 			}
 			json.NewEncoder(w).Encode(resp)
 
 		case strings.Contains(r.URL.Path, "/resolve/main/"):
-			// Return model file
-			w.Header().Set("Content-Length", "25")
+			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(modelContent)))
 			w.WriteHeader(http.StatusOK)
 			w.Write(modelContent)
 
@@ -105,14 +129,10 @@ func TestPull_NoMatchingQuant(t *testing.T) {
 	// Arrange
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := struct {
-			Siblings []struct {
-				Filename string `json:"rfilename"`
-			} `json:"siblings"`
+			Siblings []apiSibling `json:"siblings"`
 		}{
-			Siblings: []struct {
-				Filename string `json:"rfilename"`
-			}{
-				{Filename: "model-Q4_K_M.gguf"},
+			Siblings: []apiSibling{
+				newSiblingWithHash("model-Q4_K_M.gguf", "abc123"),
 			},
 		}
 		json.NewEncoder(w).Encode(resp)
@@ -140,14 +160,10 @@ func TestPull_DownloadError(t *testing.T) {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/api/models/"):
 			resp := struct {
-				Siblings []struct {
-					Filename string `json:"rfilename"`
-				} `json:"siblings"`
+				Siblings []apiSibling `json:"siblings"`
 			}{
-				Siblings: []struct {
-					Filename string `json:"rfilename"`
-				}{
-					{Filename: "model-Q4_K_M.gguf"},
+				Siblings: []apiSibling{
+					newSiblingWithHash("model-Q4_K_M.gguf", "abc123"),
 				},
 			}
 			json.NewEncoder(w).Encode(resp)
@@ -179,14 +195,10 @@ func TestGetFileInfo_Success(t *testing.T) {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/api/models/"):
 			resp := struct {
-				Siblings []struct {
-					Filename string `json:"rfilename"`
-				} `json:"siblings"`
+				Siblings []apiSibling `json:"siblings"`
 			}{
-				Siblings: []struct {
-					Filename string `json:"rfilename"`
-				}{
-					{Filename: "model-Q4_K_M.gguf"},
+				Siblings: []apiSibling{
+					newSiblingWithHash("model-Q4_K_M.gguf", "abc123"),
 				},
 			}
 			json.NewEncoder(w).Encode(resp)
@@ -215,5 +227,97 @@ func TestGetFileInfo_Success(t *testing.T) {
 	}
 	if size != 1234567890 {
 		t.Errorf("size = %d, want 1234567890", size)
+	}
+}
+
+func TestPull_IntegrityVerificationFailure(t *testing.T) {
+	// Arrange
+	modelContent := []byte("fake-model-binary-content")
+	wrongHash := "0000000000000000000000000000000000000000000000000000000000000000"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/models/"):
+			resp := struct {
+				Siblings []apiSibling `json:"siblings"`
+			}{
+				Siblings: []apiSibling{
+					newSiblingWithHash("model-Q4_K_M.gguf", wrongHash),
+				},
+			}
+			json.NewEncoder(w).Encode(resp)
+
+		case strings.Contains(r.URL.Path, "/resolve/main/"):
+			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(modelContent)))
+			w.WriteHeader(http.StatusOK)
+			w.Write(modelContent)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	tmpDir := t.TempDir()
+	puller := newTestPuller(tmpDir, srv.URL)
+
+	// Act
+	_, err := puller.Pull(context.Background(), "test/model", "Q4_K_M")
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error for hash mismatch")
+	}
+	if !strings.Contains(err.Error(), "integrity verification failed") {
+		t.Errorf("error = %q, want to contain 'integrity verification failed'", err.Error())
+	}
+
+	// Verify file was cleaned up
+	modelPath := filepath.Join(tmpDir, "model-Q4_K_M.gguf")
+	if _, err := os.Stat(modelPath); !os.IsNotExist(err) {
+		t.Error("corrupted file should be removed after hash mismatch")
+	}
+}
+
+func TestPull_NoHashAvailable(t *testing.T) {
+	// Arrange
+	modelContent := []byte("fake-model-binary-content")
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/models/"):
+			// Return siblings WITHOUT lfs field (no hash available)
+			resp := struct {
+				Siblings []apiSibling `json:"siblings"`
+			}{
+				Siblings: []apiSibling{
+					{Filename: "model-Q4_K_M.gguf"}, // no LFS field
+				},
+			}
+			json.NewEncoder(w).Encode(resp)
+
+		case strings.Contains(r.URL.Path, "/resolve/main/"):
+			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(modelContent)))
+			w.WriteHeader(http.StatusOK)
+			w.Write(modelContent)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	tmpDir := t.TempDir()
+	puller := newTestPuller(tmpDir, srv.URL)
+
+	// Act
+	_, err := puller.Pull(context.Background(), "test/model", "Q4_K_M")
+
+	// Assert - should fail because hash is missing (fail-closed)
+	if err == nil {
+		t.Fatal("Pull() error = nil, want error for missing SHA256 hash")
+	}
+	if !strings.Contains(err.Error(), "no SHA256 hash available") {
+		t.Errorf("error = %q, want it to contain %q", err.Error(), "no SHA256 hash available")
+	}
+
+	// Verify file was cleaned up
+	filePath := filepath.Join(tmpDir, "model-Q4_K_M.gguf")
+	if _, err := os.Stat(filePath); !os.IsNotExist(err) {
+		t.Error("downloaded file should have been cleaned up")
 	}
 }

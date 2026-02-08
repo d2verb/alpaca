@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -53,17 +54,24 @@ func createTestTarGz(content []byte) ([]byte, error) {
 
 func TestUpdate_EndToEnd(t *testing.T) {
 	// Arrange
+	pub, priv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
 	newBinaryContent := []byte("#!/bin/sh\necho 'new version'")
 	archiveBytes, err := createTestTarGz(newBinaryContent)
 	if err != nil {
 		t.Fatalf("failed to create test archive: %v", err)
 	}
 
-	// Compute checksum
+	// Compute checksum and sign
 	h := sha256.New()
 	h.Write(archiveBytes)
 	checksum := hex.EncodeToString(h.Sum(nil))
 	assetName := fmt.Sprintf("alpaca_1.2.3_%s_%s.tar.gz", runtime.GOOS, runtime.GOARCH)
+	checksumsContent := fmt.Sprintf("%s  %s\n", checksum, assetName)
+	sig := ed25519.Sign(priv, []byte(checksumsContent))
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -73,12 +81,16 @@ func TestUpdate_EndToEnd(t *testing.T) {
 				Assets: []Asset{
 					{Name: assetName, BrowserDownloadURL: "http://" + r.Host + "/" + assetName},
 					{Name: "checksums.txt", BrowserDownloadURL: "http://" + r.Host + "/checksums.txt"},
+					{Name: "checksums.txt.sig", BrowserDownloadURL: "http://" + r.Host + "/checksums.txt.sig"},
 				},
 			}
 			json.NewEncoder(w).Encode(release)
 
 		case r.URL.Path == "/checksums.txt":
-			fmt.Fprintf(w, "%s  %s\n", checksum, assetName)
+			w.Write([]byte(checksumsContent))
+
+		case r.URL.Path == "/checksums.txt.sig":
+			w.Write(sig)
 
 		case r.URL.Path == "/"+assetName:
 			w.Header().Set("Content-Type", "application/gzip")
@@ -98,6 +110,7 @@ func TestUpdate_EndToEnd(t *testing.T) {
 	}
 
 	updater := newTestUpdater("v1.0.0", srv.URL)
+	updater.publicKey = pub
 
 	// Act
 	err = updater.Update(currentBinary)
@@ -126,14 +139,94 @@ func TestUpdate_EndToEnd(t *testing.T) {
 	}
 }
 
-func TestUpdate_ChecksumMismatch(t *testing.T) {
+func TestUpdate_WithInvalidSignature(t *testing.T) {
 	// Arrange
-	newBinaryContent := []byte("new version")
+	pub, _, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+	_, attackerPriv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("failed to generate attacker key: %v", err)
+	}
+
+	newBinaryContent := []byte("malicious binary")
 	archiveBytes, err := createTestTarGz(newBinaryContent)
 	if err != nil {
 		t.Fatalf("failed to create test archive: %v", err)
 	}
 
+	h := sha256.New()
+	h.Write(archiveBytes)
+	checksum := hex.EncodeToString(h.Sum(nil))
+	assetName := fmt.Sprintf("alpaca_1.2.3_%s_%s.tar.gz", runtime.GOOS, runtime.GOARCH)
+	checksumsContent := fmt.Sprintf("%s  %s\n", checksum, assetName)
+	// Sign with attacker's key (not the expected key)
+	badSig := ed25519.Sign(attackerPriv, []byte(checksumsContent))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "/releases/latest"):
+			release := Release{
+				TagName: "v1.2.3",
+				Assets: []Asset{
+					{Name: assetName, BrowserDownloadURL: "http://" + r.Host + "/" + assetName},
+					{Name: "checksums.txt", BrowserDownloadURL: "http://" + r.Host + "/checksums.txt"},
+					{Name: "checksums.txt.sig", BrowserDownloadURL: "http://" + r.Host + "/checksums.txt.sig"},
+				},
+			}
+			json.NewEncoder(w).Encode(release)
+
+		case r.URL.Path == "/checksums.txt":
+			w.Write([]byte(checksumsContent))
+
+		case r.URL.Path == "/checksums.txt.sig":
+			w.Write(badSig)
+
+		case r.URL.Path == "/"+assetName:
+			w.Write(archiveBytes)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	tmpDir := t.TempDir()
+	currentBinary := filepath.Join(tmpDir, "alpaca")
+	if err := os.WriteFile(currentBinary, []byte("old version"), 0755); err != nil {
+		t.Fatalf("failed to create current binary: %v", err)
+	}
+
+	updater := newTestUpdater("v1.0.0", srv.URL)
+	updater.publicKey = pub
+
+	// Act
+	err = updater.Update(currentBinary)
+
+	// Assert
+	if err == nil {
+		t.Fatal("expected error for invalid signature")
+	}
+	if !strings.Contains(err.Error(), "signature") {
+		t.Errorf("error = %q, want to contain 'signature'", err.Error())
+	}
+
+	// Verify original binary is untouched
+	content, _ := os.ReadFile(currentBinary)
+	if string(content) != "old version" {
+		t.Error("original binary should be untouched after failed update")
+	}
+}
+
+func TestUpdate_WithoutSignatureFile(t *testing.T) {
+	// Arrange - release without checksums.txt.sig
+	newBinaryContent := []byte("#!/bin/sh\necho 'unsigned version'")
+	archiveBytes, err := createTestTarGz(newBinaryContent)
+	if err != nil {
+		t.Fatalf("failed to create test archive: %v", err)
+	}
+
+	h := sha256.New()
+	h.Write(archiveBytes)
+	checksum := hex.EncodeToString(h.Sum(nil))
 	assetName := fmt.Sprintf("alpaca_1.2.3_%s_%s.tar.gz", runtime.GOOS, runtime.GOARCH)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -144,13 +237,91 @@ func TestUpdate_ChecksumMismatch(t *testing.T) {
 				Assets: []Asset{
 					{Name: assetName, BrowserDownloadURL: "http://" + r.Host + "/" + assetName},
 					{Name: "checksums.txt", BrowserDownloadURL: "http://" + r.Host + "/checksums.txt"},
+					// No checksums.txt.sig asset
 				},
 			}
 			json.NewEncoder(w).Encode(release)
 
 		case r.URL.Path == "/checksums.txt":
-			// Return wrong checksum
-			fmt.Fprintf(w, "%s  %s\n", "0000000000000000000000000000000000000000000000000000000000000000", assetName)
+			fmt.Fprintf(w, "%s  %s\n", checksum, assetName)
+
+		case r.URL.Path == "/"+assetName:
+			w.Header().Set("Content-Type", "application/gzip")
+			w.Write(archiveBytes)
+
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	tmpDir := t.TempDir()
+	currentBinary := filepath.Join(tmpDir, "alpaca")
+	if err := os.WriteFile(currentBinary, []byte("old version"), 0755); err != nil {
+		t.Fatalf("failed to create current binary: %v", err)
+	}
+
+	updater := newTestUpdater("v1.0.0", srv.URL)
+
+	// Act - should fail because signature file is missing (fail-closed)
+	err = updater.Update(currentBinary)
+
+	// Assert
+	if err == nil {
+		t.Fatal("Update() error = nil, want error for missing signature file")
+	}
+	if !strings.Contains(err.Error(), "download signature") {
+		t.Errorf("error = %q, want it to contain %q", err.Error(), "download signature")
+	}
+
+	// Verify binary was NOT replaced
+	content, err := os.ReadFile(currentBinary)
+	if err != nil {
+		t.Fatalf("failed to read binary: %v", err)
+	}
+	if string(content) != "old version" {
+		t.Error("binary was replaced despite missing signature")
+	}
+}
+
+func TestUpdate_ChecksumMismatch(t *testing.T) {
+	// Arrange
+	pub, priv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
+	newBinaryContent := []byte("new version")
+	archiveBytes, err := createTestTarGz(newBinaryContent)
+	if err != nil {
+		t.Fatalf("failed to create test archive: %v", err)
+	}
+
+	assetName := fmt.Sprintf("alpaca_1.2.3_%s_%s.tar.gz", runtime.GOOS, runtime.GOARCH)
+
+	// Wrong checksum, but validly signed
+	wrongChecksum := "0000000000000000000000000000000000000000000000000000000000000000"
+	checksumsContent := fmt.Sprintf("%s  %s\n", wrongChecksum, assetName)
+	sig := ed25519.Sign(priv, []byte(checksumsContent))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "/releases/latest"):
+			release := Release{
+				TagName: "v1.2.3",
+				Assets: []Asset{
+					{Name: assetName, BrowserDownloadURL: "http://" + r.Host + "/" + assetName},
+					{Name: "checksums.txt", BrowserDownloadURL: "http://" + r.Host + "/checksums.txt"},
+					{Name: "checksums.txt.sig", BrowserDownloadURL: "http://" + r.Host + "/checksums.txt.sig"},
+				},
+			}
+			json.NewEncoder(w).Encode(release)
+
+		case r.URL.Path == "/checksums.txt":
+			w.Write([]byte(checksumsContent))
+
+		case r.URL.Path == "/checksums.txt.sig":
+			w.Write(sig)
 
 		case r.URL.Path == "/"+assetName:
 			w.Write(archiveBytes)
@@ -165,6 +336,7 @@ func TestUpdate_ChecksumMismatch(t *testing.T) {
 	}
 
 	updater := newTestUpdater("v1.0.0", srv.URL)
+	updater.publicKey = pub
 
 	// Act
 	err = updater.Update(currentBinary)
@@ -173,8 +345,8 @@ func TestUpdate_ChecksumMismatch(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for checksum mismatch")
 	}
-	if !strings.Contains(err.Error(), "checksum") {
-		t.Errorf("error = %q, want to contain 'checksum'", err.Error())
+	if !strings.Contains(err.Error(), "checksum mismatch") {
+		t.Errorf("error = %q, want to contain 'checksum mismatch'", err.Error())
 	}
 
 	// Verify original binary is untouched
@@ -191,7 +363,7 @@ func TestUpdate_AssetNotFound(t *testing.T) {
 		release := Release{
 			TagName: "v1.2.3",
 			Assets: []Asset{
-				{Name: "alpaca_1.2.3_windows_amd64.tar.gz", BrowserDownloadURL: "http://example.com/windows"},
+				{Name: "alpaca_1.2.3_fakeos_fakearch.tar.gz", BrowserDownloadURL: "http://example.com/fake"},
 			},
 		}
 		json.NewEncoder(w).Encode(release)
