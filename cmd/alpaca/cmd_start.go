@@ -110,7 +110,7 @@ func (c *StartCmd) runDaemon(paths *config.Paths) error {
 	// Start daemon
 	presetLoader := preset.NewLoader(paths.Presets)
 	modelManager := model.NewManager(paths.Models)
-	d := daemon.New(presetLoader, modelManager, daemonLogWriter, llamaLogWriter)
+	d := daemon.New(presetLoader, modelManager, paths.RouterConfig, daemonLogWriter, llamaLogWriter)
 
 	server := daemon.NewServer(d, paths.Socket, daemonLogWriter)
 

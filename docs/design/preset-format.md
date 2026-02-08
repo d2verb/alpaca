@@ -11,7 +11,7 @@ Presets define a model + argument combination that can be loaded with a single c
 
 ### Global Presets
 
-```
+```text
 ~/.alpaca/presets/
 ├── a1b2c3d4e5f67890.yaml
 ├── 1234567890abcdef.yaml
@@ -22,7 +22,7 @@ Global preset files are stored with random filenames (16 hex characters). The `n
 
 ### Local Presets
 
-```
+```text
 my-project/
 ├── .alpaca.yaml     # Local preset
 ├── src/
@@ -105,6 +105,77 @@ extra_args:
 ```
 
 **Limitation:** Values containing spaces are not supported in the space-separated format. For such cases, use the separate elements format or consider alternative approaches (e.g., file-based templates for `--chat-template`).
+
+## Router Mode
+
+Presets can define multiple models to run simultaneously using llama-server's router mode. This is useful for scenarios like chat + embedding, role-based model assignment, or A/B testing.
+
+### Router Mode Format
+
+```yaml
+name: my-workspace
+mode: router                   # "single" (default) or "router"
+port: 8080                     # Router's listening port
+host: 127.0.0.1
+models_max: 3                  # Max simultaneously loaded models (optional)
+sleep_idle_seconds: 300        # Auto-unload idle models in seconds (optional)
+server_options:                # Global options applied to all models ([*] section)
+  flash-attn: "on"
+  cache-type-k: q8_0
+models:                        # Required for router mode
+  - name: qwen3
+    model: "h:Qwen/Qwen3-8B-GGUF:Q4_K_M"
+    draft_model: "h:Qwen/Qwen3-1B-GGUF:Q4_K_M"
+    context_size: 8192
+  - name: nomic-embed
+    model: "h:nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M"
+    context_size: 2048
+    server_options:
+      embeddings: "true"
+```
+
+### Router Mode Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mode` | string | Must be `"router"` to enable router mode. |
+| `models_max` | int | Max simultaneously loaded models (`--models-max`). Omit to use llama-server default. |
+| `sleep_idle_seconds` | int | Auto-unload after N seconds idle (`--sleep-idle-seconds`). Omit to use llama-server default. |
+| `server_options` | map[string]string | Global llama-server options applied to all models (output as `[*]` section in config.ini). |
+| `models` | []ModelEntry | List of models to serve. At least one required. |
+
+### ModelEntry Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Model identifier (section name in config.ini). Must match `[a-zA-Z0-9_-]+`. |
+| `model` | string | Model path with `h:` or `f:` prefix. |
+| `draft_model` | string | Draft model for speculative decoding (optional). |
+| `context_size` | int | Context window size (optional). |
+| `threads` | int | Thread count (optional). |
+| `server_options` | map[string]string | Per-model llama-server options (overrides global options). |
+
+### server_options vs extra_args
+
+| | `extra_args` | `server_options` |
+|--|-------------|---------|
+| Mode | Single mode only | Router mode only |
+| Format | CLI argument strings | INI key-value pairs |
+| Scope | Passed as CLI args to llama-server | Written to config.ini sections |
+
+### Validation Rules (Router Mode)
+
+- `models` must contain at least one entry
+- Top-level `model`, `extra_args`, `draft_model` are not allowed (use per-model fields instead)
+- Top-level `context_size`, `threads` are not allowed (define per model)
+- Model names must be unique and match `[a-zA-Z0-9_-]+`
+- Dedicated fields (`context_size`, `threads`, `draft_model`) cannot overlap with `server_options` keys (`ctx-size`, `threads`, `model-draft`)
+
+### Backward Compatibility
+
+- `mode` defaults to `"single"` when omitted — existing presets work unchanged
+- Single mode presets cannot use `models` or `server_options`
+- Router mode presets cannot use `model`, `extra_args`, or top-level `draft_model`
 
 ## Examples
 

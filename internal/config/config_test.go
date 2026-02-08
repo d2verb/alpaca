@@ -30,6 +30,7 @@ func TestGetPaths(t *testing.T) {
 		{"Logs", paths.Logs, logsDir},
 		{"DaemonLog", paths.DaemonLog, filepath.Join(logsDir, "daemon.log")},
 		{"LlamaLog", paths.LlamaLog, filepath.Join(logsDir, "llama.log")},
+		{"RouterConfig", paths.RouterConfig, filepath.Join(alpacaHome, "router-config.ini")},
 	}
 
 	for _, tt := range tests {
@@ -68,6 +69,9 @@ func TestGetPaths_ContainsAlpacaDir(t *testing.T) {
 	}
 	if !strings.HasPrefix(paths.LlamaLog, paths.Home) {
 		t.Errorf("LlamaLog should be under Home: %q", paths.LlamaLog)
+	}
+	if !strings.HasPrefix(paths.RouterConfig, paths.Home) {
+		t.Errorf("RouterConfig should be under Home: %q", paths.RouterConfig)
 	}
 }
 

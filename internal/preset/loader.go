@@ -87,6 +87,9 @@ func (l *Loader) Create(p *Preset) error {
 	if err := ValidateName(p.Name); err != nil {
 		return err
 	}
+	if err := p.Validate(); err != nil {
+		return fmt.Errorf("invalid preset: %w", err)
+	}
 
 	// Ensure directory exists
 	if err := os.MkdirAll(l.presetsDir, 0755); err != nil {
@@ -217,24 +220,65 @@ func loadFromPath(absPath string) (*Preset, error) {
 		return nil, fmt.Errorf("invalid preset: %w", err)
 	}
 
-	// Resolve model path relative to preset file directory
+	if err := preset.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid preset: %w", err)
+	}
+
 	baseDir := filepath.Dir(absPath)
+
+	if preset.IsRouter() {
+		if err := resolveRouterModelPaths(&preset, baseDir); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := resolveSingleModelPaths(&preset, baseDir); err != nil {
+			return nil, err
+		}
+	}
+
+	return &preset, nil
+}
+
+// resolveSingleModelPaths resolves model paths for single mode presets.
+func resolveSingleModelPaths(preset *Preset, baseDir string) error {
 	resolvedModel, err := resolveModelPath(preset.Model, baseDir)
 	if err != nil {
-		return nil, fmt.Errorf("resolve model path: %w", err)
+		return fmt.Errorf("resolve model path: %w", err)
 	}
 	preset.Model = resolvedModel
 
-	// Resolve draft model path if specified
 	if preset.DraftModel != "" {
 		resolvedDraft, err := resolveModelPath(preset.DraftModel, baseDir)
 		if err != nil {
-			return nil, fmt.Errorf("resolve draft model path: %w", err)
+			return fmt.Errorf("resolve draft model path: %w", err)
 		}
 		preset.DraftModel = resolvedDraft
 	}
 
-	return &preset, nil
+	return nil
+}
+
+// resolveRouterModelPaths resolves model paths for all models in router mode.
+func resolveRouterModelPaths(preset *Preset, baseDir string) error {
+	for i := range preset.Models {
+		m := &preset.Models[i]
+
+		resolvedModel, err := resolveModelPath(m.Model, baseDir)
+		if err != nil {
+			return fmt.Errorf("resolve model path for '%s': %w", m.Name, err)
+		}
+		m.Model = resolvedModel
+
+		if m.DraftModel != "" {
+			resolvedDraft, err := resolveModelPath(m.DraftModel, baseDir)
+			if err != nil {
+				return fmt.Errorf("resolve draft model path for '%s': %w", m.Name, err)
+			}
+			m.DraftModel = resolvedDraft
+		}
+	}
+
+	return nil
 }
 
 // WriteFile writes a preset to the specified file path.

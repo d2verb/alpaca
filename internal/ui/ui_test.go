@@ -544,6 +544,333 @@ func TestFormatPresetOrModel(t *testing.T) {
 	}
 }
 
+func TestModelStatusBadge(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	tests := []struct {
+		name     string
+		status   string
+		contains string
+	}{
+		{
+			name:     "loaded status",
+			status:   "loaded",
+			contains: "● loaded",
+		},
+		{
+			name:     "loading status",
+			status:   "loading",
+			contains: "◐ loading",
+		},
+		{
+			name:     "unloaded status",
+			status:   "unloaded",
+			contains: "○ unloaded",
+		},
+		{
+			name:     "unknown status shows as error",
+			status:   "exit code 1",
+			contains: "✗ exit code 1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ModelStatusBadge(tt.status)
+			if !strings.Contains(result, tt.contains) {
+				t.Errorf("ModelStatusBadge(%q) = %q, want to contain %q", tt.status, result, tt.contains)
+			}
+		})
+	}
+}
+
+func TestPrintRouterStatus(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	// Arrange
+	var buf bytes.Buffer
+	Output = &buf
+	defer func() { Output = nil }()
+
+	models := []RouterModelInfo{
+		{ID: "qwen3", Status: "loaded"},
+		{ID: "nomic-embed", Status: "loaded"},
+		{ID: "gemma3", Status: "unloaded"},
+	}
+
+	// Act
+	PrintRouterStatus("running", "p:my-workspace", "http://127.0.0.1:8080", "~/.alpaca/logs/llama.log", models)
+
+	// Assert
+	output := buf.String()
+	if !strings.Contains(output, "🚀 Status") {
+		t.Error("Output should contain status header")
+	}
+	if !strings.Contains(output, "● Running") {
+		t.Error("Output should contain running badge")
+	}
+	if !strings.Contains(output, "p:my-workspace") {
+		t.Error("Output should contain preset name")
+	}
+	if !strings.Contains(output, "Mode") {
+		t.Error("Output should contain 'Mode' label")
+	}
+	if !strings.Contains(output, "router") {
+		t.Error("Output should contain 'router' mode")
+	}
+	if !strings.Contains(output, "http://127.0.0.1:8080") {
+		t.Error("Output should contain endpoint")
+	}
+	if !strings.Contains(output, "~/.alpaca/logs/llama.log") {
+		t.Error("Output should contain log path")
+	}
+	if !strings.Contains(output, "Models (3)") {
+		t.Error("Output should contain model count")
+	}
+	if !strings.Contains(output, "qwen3") {
+		t.Error("Output should contain qwen3 model")
+	}
+	if !strings.Contains(output, "nomic-embed") {
+		t.Error("Output should contain nomic-embed model")
+	}
+	if !strings.Contains(output, "gemma3") {
+		t.Error("Output should contain gemma3 model")
+	}
+	if !strings.Contains(output, "● loaded") {
+		t.Error("Output should contain loaded badge")
+	}
+	if !strings.Contains(output, "○ unloaded") {
+		t.Error("Output should contain unloaded badge")
+	}
+}
+
+func TestPrintRouterStatus_NoModels(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	// Arrange
+	var buf bytes.Buffer
+	Output = &buf
+	defer func() { Output = nil }()
+
+	// Act
+	PrintRouterStatus("running", "p:test", "http://127.0.0.1:8080", "/log", nil)
+
+	// Assert
+	output := buf.String()
+	if !strings.Contains(output, "router") {
+		t.Error("Output should contain 'router' mode")
+	}
+	if strings.Contains(output, "Models (") {
+		t.Error("Output should not contain model section when no models")
+	}
+}
+
+func TestPrintRouterPresetDetails(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	// Arrange
+	var buf bytes.Buffer
+	Output = &buf
+	defer func() { Output = nil }()
+
+	details := RouterPresetDetails{
+		Name:             "my-workspace",
+		Host:             "127.0.0.1",
+		Port:             8080,
+		ModelsMax:        3,
+		SleepIdleSeconds: 300,
+		ServerOptions: map[string]string{
+			"flash-attn":   "on",
+			"cache-type-k": "q8_0",
+		},
+		Models: []RouterModelDetail{
+			{
+				Name:        "qwen3",
+				Model:       "h:Qwen/Qwen3-8B-GGUF",
+				DraftModel:  "h:Qwen/Qwen3-1B-GGUF",
+				ContextSize: 8192,
+			},
+			{
+				Name:        "nomic-embed",
+				Model:       "h:nomic-ai/nomic-embed-text-v2-moe-GGUF",
+				ContextSize: 2048,
+				ServerOptions: map[string]string{
+					"embeddings": "true",
+				},
+			},
+			{
+				Name:        "gemma3",
+				Model:       "f:/path/to/gemma3.gguf",
+				ContextSize: 4096,
+				Threads:     4,
+			},
+		},
+	}
+
+	// Act
+	PrintRouterPresetDetails(details)
+
+	// Assert
+	output := buf.String()
+	if !strings.Contains(output, "📦 Preset: p:my-workspace") {
+		t.Error("Output should contain preset header")
+	}
+	if !strings.Contains(output, "router") {
+		t.Error("Output should contain 'router' mode")
+	}
+	if !strings.Contains(output, "127.0.0.1:8080") {
+		t.Error("Output should contain endpoint")
+	}
+	if !strings.Contains(output, "Max Models") {
+		t.Error("Output should contain 'Max Models' label")
+	}
+	if !strings.Contains(output, "3") {
+		t.Error("Output should contain max models value")
+	}
+	if !strings.Contains(output, "Idle Timeout") {
+		t.Error("Output should contain 'Idle Timeout' label")
+	}
+	if !strings.Contains(output, "300s") {
+		t.Error("Output should contain idle timeout value")
+	}
+	if !strings.Contains(output, "Server Options") {
+		t.Error("Output should contain 'Server Options' label")
+	}
+	if !strings.Contains(output, "cache-type-k=q8_0") {
+		t.Error("Output should contain cache-type-k option")
+	}
+	if !strings.Contains(output, "flash-attn=on") {
+		t.Error("Output should contain flash-attn option")
+	}
+	if !strings.Contains(output, "Models (3)") {
+		t.Error("Output should contain model count")
+	}
+	if !strings.Contains(output, "qwen3") {
+		t.Error("Output should contain qwen3 model name")
+	}
+	if !strings.Contains(output, "h:Qwen/Qwen3-8B-GGUF") {
+		t.Error("Output should contain qwen3 model path")
+	}
+	if !strings.Contains(output, "Draft Model") {
+		t.Error("Output should contain 'Draft Model' label")
+	}
+	if !strings.Contains(output, "h:Qwen/Qwen3-1B-GGUF") {
+		t.Error("Output should contain draft model path")
+	}
+	if !strings.Contains(output, "8192") {
+		t.Error("Output should contain qwen3 context size")
+	}
+	if !strings.Contains(output, "nomic-embed") {
+		t.Error("Output should contain nomic-embed model name")
+	}
+	if !strings.Contains(output, "embeddings=true") {
+		t.Error("Output should contain per-model server option")
+	}
+	if !strings.Contains(output, "gemma3") {
+		t.Error("Output should contain gemma3 model name")
+	}
+	if !strings.Contains(output, "f:/path/to/gemma3.gguf") {
+		t.Error("Output should contain gemma3 model path")
+	}
+	if !strings.Contains(output, "Threads") {
+		t.Error("Output should contain 'Threads' label for gemma3")
+	}
+}
+
+func TestPrintRouterPresetDetails_Minimal(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	// Arrange
+	var buf bytes.Buffer
+	Output = &buf
+	defer func() { Output = nil }()
+
+	details := RouterPresetDetails{
+		Name: "minimal",
+		Host: "127.0.0.1",
+		Port: 8080,
+		Models: []RouterModelDetail{
+			{
+				Name:  "model1",
+				Model: "h:org/model:Q4_K_M",
+			},
+		},
+	}
+
+	// Act
+	PrintRouterPresetDetails(details)
+
+	// Assert
+	output := buf.String()
+	if !strings.Contains(output, "📦 Preset: p:minimal") {
+		t.Error("Output should contain preset header")
+	}
+	if !strings.Contains(output, "router") {
+		t.Error("Output should contain 'router' mode")
+	}
+	if strings.Contains(output, "Max Models") {
+		t.Error("Output should not contain 'Max Models' when zero")
+	}
+	if strings.Contains(output, "Idle Timeout") {
+		t.Error("Output should not contain 'Idle Timeout' when zero")
+	}
+	if strings.Contains(output, "Server Options") {
+		t.Error("Output should not contain 'Server Options' when empty")
+	}
+	if strings.Contains(output, "Draft Model") {
+		t.Error("Output should not contain 'Draft Model' when empty")
+	}
+	if strings.Contains(output, "Threads") {
+		t.Error("Output should not contain 'Threads' when zero")
+	}
+}
+
+func TestFormatServerOptions(t *testing.T) {
+	tests := []struct {
+		name string
+		opts map[string]string
+		want string
+	}{
+		{
+			name: "single option",
+			opts: map[string]string{"flash-attn": "on"},
+			want: "flash-attn=on",
+		},
+		{
+			name: "multiple options sorted",
+			opts: map[string]string{
+				"flash-attn":   "on",
+				"cache-type-k": "q8_0",
+			},
+			want: "cache-type-k=q8_0 flash-attn=on",
+		},
+		{
+			name: "empty options",
+			opts: map[string]string{},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatServerOptions(tt.opts)
+			if got != tt.want {
+				t.Errorf("formatServerOptions() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestPrintModelDetails(t *testing.T) {
 	// Disable color for testing
 	color.NoColor = true

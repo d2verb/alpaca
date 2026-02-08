@@ -318,6 +318,24 @@ func TestLoader_Create(t *testing.T) {
 		}
 	})
 
+	t.Run("rejects invalid preset configuration", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		loader := NewLoader(tmpDir)
+
+		p := &Preset{
+			Name: "invalid-preset",
+			// Missing model field
+		}
+
+		err := loader.Create(p)
+		if err == nil {
+			t.Error("Create() expected error for invalid preset")
+		}
+		if !strings.Contains(err.Error(), "model field is required") {
+			t.Errorf("Create() error = %q, want to contain 'model field is required'", err.Error())
+		}
+	})
+
 	t.Run("rejects invalid name", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		loader := NewLoader(tmpDir)
@@ -646,6 +664,154 @@ model: f:/path/to/model.gguf
 
 		if p.DraftModel != "" {
 			t.Errorf("DraftModel = %q, want empty string", p.DraftModel)
+		}
+	})
+}
+
+func TestLoadFile_RouterMode(t *testing.T) {
+	t.Run("resolves relative model paths in router mode", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: router-relative
+mode: router
+models:
+  - name: model1
+    model: f:./models/model1.gguf
+  - name: model2
+    model: f:./models/model2.gguf
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		if len(p.Models) != 2 {
+			t.Fatalf("Models count = %d, want 2", len(p.Models))
+		}
+
+		expected1 := "f:" + filepath.Join(tmpDir, "models/model1.gguf")
+		if p.Models[0].Model != expected1 {
+			t.Errorf("Models[0].Model = %q, want %q", p.Models[0].Model, expected1)
+		}
+
+		expected2 := "f:" + filepath.Join(tmpDir, "models/model2.gguf")
+		if p.Models[1].Model != expected2 {
+			t.Errorf("Models[1].Model = %q, want %q", p.Models[1].Model, expected2)
+		}
+	})
+
+	t.Run("expands tilde in router model paths", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: router-tilde
+mode: router
+models:
+  - name: model1
+    model: f:~/models/model1.gguf
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		home, _ := os.UserHomeDir()
+		expected := "f:" + filepath.Join(home, "models/model1.gguf")
+		if p.Models[0].Model != expected {
+			t.Errorf("Models[0].Model = %q, want %q", p.Models[0].Model, expected)
+		}
+	})
+
+	t.Run("preserves HuggingFace identifiers in router mode", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: router-hf
+mode: router
+models:
+  - name: qwen3
+    model: h:Qwen/Qwen3-8B-GGUF:Q4_K_M
+  - name: nomic
+    model: h:nomic-ai/nomic-embed-text:Q4_K_M
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		if p.Models[0].Model != "h:Qwen/Qwen3-8B-GGUF:Q4_K_M" {
+			t.Errorf("Models[0].Model = %q, want %q", p.Models[0].Model, "h:Qwen/Qwen3-8B-GGUF:Q4_K_M")
+		}
+		if p.Models[1].Model != "h:nomic-ai/nomic-embed-text:Q4_K_M" {
+			t.Errorf("Models[1].Model = %q, want %q", p.Models[1].Model, "h:nomic-ai/nomic-embed-text:Q4_K_M")
+		}
+	})
+
+	t.Run("resolves draft model paths in router mode", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: router-draft
+mode: router
+models:
+  - name: qwen3
+    model: f:/abs/path/model.gguf
+    draft_model: f:./drafts/draft.gguf
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		if p.Models[0].Model != "f:/abs/path/model.gguf" {
+			t.Errorf("Models[0].Model = %q, want %q", p.Models[0].Model, "f:/abs/path/model.gguf")
+		}
+
+		expectedDraft := "f:" + filepath.Join(tmpDir, "drafts/draft.gguf")
+		if p.Models[0].DraftModel != expectedDraft {
+			t.Errorf("Models[0].DraftModel = %q, want %q", p.Models[0].DraftModel, expectedDraft)
+		}
+	})
+
+	t.Run("preserves HuggingFace draft model in router mode", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: router-hf-draft
+mode: router
+models:
+  - name: qwen3
+    model: h:Qwen/Qwen3-8B-GGUF:Q4_K_M
+    draft_model: h:Qwen/Qwen3-1B-GGUF:Q4_K_M
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		if p.Models[0].DraftModel != "h:Qwen/Qwen3-1B-GGUF:Q4_K_M" {
+			t.Errorf("Models[0].DraftModel = %q, want %q", p.Models[0].DraftModel, "h:Qwen/Qwen3-1B-GGUF:Q4_K_M")
 		}
 	})
 }

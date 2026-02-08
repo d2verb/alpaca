@@ -4,7 +4,7 @@
 
 Alpaca consists of three main components:
 
-```
+```text
 ┌─────────────────────────────────────┐
 │         alpaca (Go binary)          │
 │                                     │
@@ -76,6 +76,48 @@ Features:
 - Show current status in menu bar
 - Quick model switching
 - Minimal preferences window
+
+## Router Mode (Multi-Model)
+
+Alpaca supports running multiple models simultaneously via llama-server's router mode (requires llama-server b7350+).
+
+### Architecture
+
+In router mode, a single llama-server process manages multiple models as child processes:
+
+```text
+alpaca daemon
+  └── llama-server (router process)
+        ├── Child: Model A (qwen3)          ← independent KV-cache
+        ├── Child: Model B (nomic-embed)    ← independent KV-cache
+        └── Child: Model C (gemma3)         ← independent KV-cache
+```
+
+Key properties:
+- **Crash isolation**: One model crashing doesn't affect others
+- **LRU eviction**: When `--models-max` is reached, the least recently used model is auto-unloaded
+- **Single endpoint**: All models served from one port with model selection via API
+
+### Config Generation
+
+Alpaca generates a `config.ini` file from the router preset YAML and passes it via `--models-preset`:
+
+```text
+Preset YAML → GenerateConfigINI() → ~/.alpaca/router-config.ini → llama-server --models-preset
+```
+
+- The config file is atomically written (temp file + rename) on each `daemon.Run()`
+- Cleaned up on `daemon.Kill()` (best-effort)
+- HuggingFace model references (`h:`) are resolved to file paths before config generation
+
+### Model Status
+
+In router mode, the daemon queries llama-server's `/models` API to get per-model status (loaded/loading/unloaded). This information is included in the status IPC response for both CLI and GUI.
+
+```text
+CLI → [IPC: status] → Daemon → [HTTP: GET /models] → llama-server
+                             ← merged response with model statuses
+```
 
 ## Communication
 
@@ -203,7 +245,7 @@ When switching models (loading while another is running):
 
 ### State Transitions
 
-```
+```text
 idle → loading → running
   ↑                ↓
   └────────────────┘

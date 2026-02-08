@@ -23,8 +23,30 @@ func (c *StatusCmd) Run() error {
 	state, _ := resp.Data["state"].(string)
 	preset, _ := resp.Data["preset"].(string)
 	endpoint, _ := resp.Data["endpoint"].(string)
+	mode, _ := resp.Data["mode"].(string)
 
-	ui.PrintStatus(state, preset, endpoint, paths.LlamaLog)
+	if mode == "router" {
+		var models []ui.RouterModelInfo
+		if rawModels, ok := resp.Data["models"].([]any); ok {
+			for _, rm := range rawModels {
+				if m, ok := rm.(map[string]any); ok {
+					models = append(models, ui.RouterModelInfo{
+						ID:     stringVal(m, "id"),
+						Status: stringVal(m, "status"),
+					})
+				}
+			}
+		}
+		ui.PrintRouterStatus(state, preset, endpoint, paths.LlamaLog, models)
+	} else {
+		ui.PrintStatus(state, preset, endpoint, paths.LlamaLog)
+	}
 
 	return nil
+}
+
+// stringVal extracts a string value from a map, returning empty string if not found.
+func stringVal(m map[string]any, key string) string {
+	v, _ := m[key].(string)
+	return v
 }

@@ -49,17 +49,44 @@ func (c *ShowCmd) showPreset(name, presetsDir string) error {
 		return mapPresetError(err, name)
 	}
 
-	ui.PrintPresetDetails(ui.PresetDetails{
-		Name:        p.Name,
-		Model:       p.Model,
-		ContextSize: p.ContextSize,
-		Threads:     p.Threads,
-		Host:        p.GetHost(),
-		Port:        p.GetPort(),
-		ExtraArgs:   p.ExtraArgs,
-	})
+	if p.IsRouter() {
+		c.showRouterPreset(p)
+	} else {
+		ui.PrintPresetDetails(ui.PresetDetails{
+			Name:        p.Name,
+			Model:       p.Model,
+			DraftModel:  p.DraftModel,
+			ContextSize: p.ContextSize,
+			Threads:     p.Threads,
+			Host:        p.GetHost(),
+			Port:        p.GetPort(),
+			ExtraArgs:   p.ExtraArgs,
+		})
+	}
 
 	return nil
+}
+
+func (c *ShowCmd) showRouterPreset(p *preset.Preset) {
+	details := ui.RouterPresetDetails{
+		Name:             p.Name,
+		Host:             p.GetHost(),
+		Port:             p.GetPort(),
+		ModelsMax:        p.ModelsMax,
+		SleepIdleSeconds: p.SleepIdleSeconds,
+		ServerOptions:    p.ServerOptions,
+	}
+	for _, m := range p.Models {
+		details.Models = append(details.Models, ui.RouterModelDetail{
+			Name:          m.Name,
+			Model:         m.Model,
+			DraftModel:    m.DraftModel,
+			ContextSize:   m.ContextSize,
+			Threads:       m.Threads,
+			ServerOptions: m.ServerOptions,
+		})
+	}
+	ui.PrintRouterPresetDetails(details)
 }
 
 func (c *ShowCmd) showModel(id *identifier.Identifier, modelsDir string) error {

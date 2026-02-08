@@ -8,14 +8,15 @@ import (
 
 // Paths holds common paths used by Alpaca.
 type Paths struct {
-	Home      string
-	Socket    string
-	PID       string
-	Presets   string
-	Models    string
-	Logs      string
-	DaemonLog string
-	LlamaLog  string
+	Home         string
+	Socket       string
+	PID          string
+	Presets      string
+	Models       string
+	Logs         string
+	DaemonLog    string
+	LlamaLog     string
+	RouterConfig string
 }
 
 // GetPaths returns the paths for the current user.
@@ -28,14 +29,15 @@ func GetPaths() (*Paths, error) {
 	alpacaHome := filepath.Join(home, ".alpaca")
 	logsDir := filepath.Join(alpacaHome, "logs")
 	return &Paths{
-		Home:      alpacaHome,
-		Socket:    filepath.Join(alpacaHome, "alpaca.sock"),
-		PID:       filepath.Join(alpacaHome, "alpaca.pid"),
-		Presets:   filepath.Join(alpacaHome, "presets"),
-		Models:    filepath.Join(alpacaHome, "models"),
-		Logs:      logsDir,
-		DaemonLog: filepath.Join(logsDir, "daemon.log"),
-		LlamaLog:  filepath.Join(logsDir, "llama.log"),
+		Home:         alpacaHome,
+		Socket:       filepath.Join(alpacaHome, "alpaca.sock"),
+		PID:          filepath.Join(alpacaHome, "alpaca.pid"),
+		Presets:      filepath.Join(alpacaHome, "presets"),
+		Models:       filepath.Join(alpacaHome, "models"),
+		Logs:         logsDir,
+		DaemonLog:    filepath.Join(logsDir, "daemon.log"),
+		LlamaLog:     filepath.Join(logsDir, "llama.log"),
+		RouterConfig: filepath.Join(alpacaHome, "router-config.ini"),
 	}, nil
 }
 
