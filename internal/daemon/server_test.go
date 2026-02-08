@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/d2verb/alpaca/internal/llama"
@@ -63,6 +65,9 @@ func TestClassifyLoadError(t *testing.T) {
 			if msg != tt.err.Error() {
 				t.Errorf("classifyLoadError() msg = %q, want %q", msg, tt.err.Error())
 			}
+			if tt.wantContains != "" && !strings.Contains(msg, tt.wantContains) {
+				t.Errorf("message %q does not contain %q", msg, tt.wantContains)
+			}
 		})
 	}
 }
@@ -75,7 +80,7 @@ func TestHandleStatus_Idle(t *testing.T) {
 	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	// Act
-	resp := server.handleStatus()
+	resp := server.handleStatus(context.Background())
 
 	// Assert
 	if resp.Status != protocol.StatusOK {
@@ -124,7 +129,7 @@ func TestHandleStatus_Running(t *testing.T) {
 	}
 
 	// Act
-	resp := server.handleStatus()
+	resp := server.handleStatus(context.Background())
 
 	// Assert
 	if resp.Status != protocol.StatusOK {
@@ -138,6 +143,104 @@ func TestHandleStatus_Running(t *testing.T) {
 	}
 	if resp.Data["endpoint"] != "http://127.0.0.1:8080" {
 		t.Errorf("endpoint = %v, want %q", resp.Data["endpoint"], "http://127.0.0.1:8080")
+	}
+}
+
+func TestHandleStatus_RouterMode(t *testing.T) {
+	// Arrange
+	configDir := t.TempDir()
+	configPath := filepath.Join(configDir, "router-config.ini")
+
+	routerPreset := &preset.Preset{
+		Name: "multi-model",
+		Mode: "router",
+		Host: "127.0.0.1",
+		Port: 8080,
+		Models: []preset.ModelEntry{
+			{Name: "codellama", Model: "f:/models/codellama.gguf"},
+			{Name: "mistral", Model: "f:/models/mistral.gguf"},
+		},
+	}
+
+	presets := &stubPresetLoader{
+		presets: map[string]*preset.Preset{
+			"multi-model": routerPreset,
+		},
+	}
+	models := &stubModelManager{}
+	daemon := newTestDaemonWithConfigPath(presets, models, configPath)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
+
+	mockProc := &mockProcess{}
+	daemon.newProcess = func(path string) llamaProcess {
+		return mockProc
+	}
+	daemon.waitForReady = mockHealthChecker(nil)
+
+	// Load router preset
+	err := daemon.Run(context.Background(), "p:multi-model")
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// Act
+	resp := server.handleStatus(context.Background())
+
+	// Assert
+	if resp.Status != protocol.StatusOK {
+		t.Errorf("Status = %q, want %q", resp.Status, protocol.StatusOK)
+	}
+	if resp.Data["state"] != string(StateRunning) {
+		t.Errorf("state = %v, want %q", resp.Data["state"], StateRunning)
+	}
+	if resp.Data["preset"] != "multi-model" {
+		t.Errorf("preset = %v, want %q", resp.Data["preset"], "multi-model")
+	}
+	if resp.Data["mode"] != "router" {
+		t.Errorf("mode = %v, want %q", resp.Data["mode"], "router")
+	}
+
+	// No mode field for non-router presets is verified in TestHandleStatus_Running
+}
+
+func TestHandleStatus_SingleModeNoModeField(t *testing.T) {
+	// Arrange - single mode should not have a "mode" field
+	testPreset := &preset.Preset{
+		Name:  "single-preset",
+		Model: "f:/path/to/model.gguf",
+		Host:  "127.0.0.1",
+		Port:  8080,
+	}
+
+	presets := &stubPresetLoader{
+		presets: map[string]*preset.Preset{
+			"single-preset": testPreset,
+		},
+	}
+	models := &stubModelManager{}
+	daemon := newTestDaemon(presets, models)
+	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
+
+	mockProc := &mockProcess{}
+	daemon.newProcess = func(path string) llamaProcess {
+		return mockProc
+	}
+	daemon.waitForReady = mockHealthChecker(nil)
+
+	err := daemon.Run(context.Background(), "p:single-preset")
+	if err != nil {
+		t.Fatalf("Run() failed: %v", err)
+	}
+
+	// Act
+	resp := server.handleStatus(context.Background())
+
+	// Assert
+	if _, exists := resp.Data["mode"]; exists {
+		t.Error("mode should not exist for single mode presets")
+	}
+	if _, exists := resp.Data["models"]; exists {
+		t.Error("models should not exist for single mode presets")
 	}
 }
 

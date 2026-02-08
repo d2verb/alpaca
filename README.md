@@ -10,8 +10,9 @@
 ## Why Alpaca?
 
 - **Preset system**: Save model + argument combinations as reusable presets
+- **Router mode**: Run multiple models simultaneously (chat + embedding, A/B testing)
 - **Easy model switching**: Switch models without manually restarting servers
-- **Full llama-server options**: Pass any llama-server argument via `extra_args`
+- **Full llama-server options**: Pass any llama-server argument via `extra_args` or `server_options`
 - **HuggingFace integration**: Download models directly with `alpaca pull`
 
 ## Demo
@@ -84,7 +85,8 @@ echo "$(alpaca completion-script)" >> ~/.bashrc
 - `alpaca ls` - List presets and models
 - `alpaca show <identifier>` - Show preset or model details
 - `alpaca rm <identifier>` - Remove a preset or model
-- `alpaca new` - Create a preset interactively
+- `alpaca new` - Create a preset interactively (single or router mode)
+- `alpaca edit [identifier]` - Open a preset in your editor
 
 ### Utility
 

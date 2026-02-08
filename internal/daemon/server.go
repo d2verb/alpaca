@@ -118,7 +118,7 @@ func (s *Server) handleRequest(ctx context.Context, req *protocol.Request) *prot
 	var resp *protocol.Response
 	switch req.Command {
 	case protocol.CmdStatus:
-		resp = s.handleStatus()
+		resp = s.handleStatus(ctx)
 	case protocol.CmdLoad:
 		resp = s.handleLoad(ctx, req)
 	case protocol.CmdUnload:
@@ -137,7 +137,7 @@ func (s *Server) handleRequest(ctx context.Context, req *protocol.Request) *prot
 	return resp
 }
 
-func (s *Server) handleStatus() *protocol.Response {
+func (s *Server) handleStatus(ctx context.Context) *protocol.Response {
 	state := s.daemon.State()
 	data := map[string]any{
 		"state": string(state),
@@ -145,6 +145,19 @@ func (s *Server) handleStatus() *protocol.Response {
 	if preset := s.daemon.CurrentPreset(); preset != nil {
 		data["preset"] = preset.Name
 		data["endpoint"] = preset.Endpoint()
+		if preset.IsRouter() {
+			data["mode"] = "router"
+			if statuses := s.daemon.FetchModelStatuses(ctx); statuses != nil {
+				models := []map[string]any{}
+				for _, m := range statuses {
+					models = append(models, map[string]any{
+						"id":     m.ID,
+						"status": m.Status,
+					})
+				}
+				data["models"] = models
+			}
+		}
 	}
 	return protocol.NewOKResponse(data)
 }
