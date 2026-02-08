@@ -26,8 +26,7 @@ const (
 	defaultGitHubBaseURL = "https://api.github.com"
 
 	// releasePublicKey is the hex-encoded Ed25519 public key used to verify release signatures.
-	// TODO: Replace with the real release signing key when CI/CD signing is set up.
-	releasePublicKey = "b0f178713e4a6c514809250cbe1e75eafc1603e28e4bc3b8ed4a61f4f23f441a"
+	releasePublicKey = "394cf6c1b1ca12afda257e5338c7e6aa10d811c3054b5c16e341d0e97f3246e5"
 )
 
 // Updater handles self-update operations.
