@@ -361,6 +361,11 @@ func TestUpdate_WithoutSignatureFile(t *testing.T) {
 
 func TestUpdate_ChecksumMismatch(t *testing.T) {
 	// Arrange
+	pub, priv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
 	newBinaryContent := []byte("new version")
 	archiveBytes, err := createTestTarGz(newBinaryContent)
 	if err != nil {
@@ -368,6 +373,11 @@ func TestUpdate_ChecksumMismatch(t *testing.T) {
 	}
 
 	assetName := fmt.Sprintf("alpaca_1.2.3_%s_%s.tar.gz", runtime.GOOS, runtime.GOARCH)
+
+	// Wrong checksum, but validly signed
+	wrongChecksum := "0000000000000000000000000000000000000000000000000000000000000000"
+	checksumsContent := fmt.Sprintf("%s  %s\n", wrongChecksum, assetName)
+	sig := ed25519.Sign(priv, []byte(checksumsContent))
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -377,13 +387,16 @@ func TestUpdate_ChecksumMismatch(t *testing.T) {
 				Assets: []Asset{
 					{Name: assetName, BrowserDownloadURL: "http://" + r.Host + "/" + assetName},
 					{Name: "checksums.txt", BrowserDownloadURL: "http://" + r.Host + "/checksums.txt"},
+					{Name: "checksums.txt.sig", BrowserDownloadURL: "http://" + r.Host + "/checksums.txt.sig"},
 				},
 			}
 			json.NewEncoder(w).Encode(release)
 
 		case r.URL.Path == "/checksums.txt":
-			// Return wrong checksum
-			fmt.Fprintf(w, "%s  %s\n", "0000000000000000000000000000000000000000000000000000000000000000", assetName)
+			w.Write([]byte(checksumsContent))
+
+		case r.URL.Path == "/checksums.txt.sig":
+			w.Write(sig)
 
 		case r.URL.Path == "/"+assetName:
 			w.Write(archiveBytes)
@@ -398,6 +411,7 @@ func TestUpdate_ChecksumMismatch(t *testing.T) {
 	}
 
 	updater := newTestUpdater("v1.0.0", srv.URL)
+	updater.publicKey = pub
 
 	// Act
 	err = updater.Update(currentBinary)
@@ -406,8 +420,8 @@ func TestUpdate_ChecksumMismatch(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for checksum mismatch")
 	}
-	if !strings.Contains(err.Error(), "checksum") {
-		t.Errorf("error = %q, want to contain 'checksum'", err.Error())
+	if !strings.Contains(err.Error(), "checksum mismatch") {
+		t.Errorf("error = %q, want to contain 'checksum mismatch'", err.Error())
 	}
 
 	// Verify original binary is untouched
