@@ -363,7 +363,7 @@ func TestUpdate_AssetNotFound(t *testing.T) {
 		release := Release{
 			TagName: "v1.2.3",
 			Assets: []Asset{
-				{Name: "alpaca_1.2.3_windows_amd64.tar.gz", BrowserDownloadURL: "http://example.com/windows"},
+				{Name: "alpaca_1.2.3_fakeos_fakearch.tar.gz", BrowserDownloadURL: "http://example.com/fake"},
 			},
 		}
 		json.NewEncoder(w).Encode(release)
