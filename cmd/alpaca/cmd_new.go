@@ -182,7 +182,7 @@ func (c *NewCmd) collectRouterInputs(name string) (*preset.Preset, error) {
 		return nil, err
 	}
 
-	fmt.Fprintf(ui.Output, "\n🤖 %s\n\n", ui.Heading("Add Models (enter blank name to finish)"))
+	fmt.Fprintf(ui.Output, "\n🤖 %s\n", ui.Heading("Add Models (enter blank name to finish)"))
 
 	var models []preset.ModelEntry
 	for i := 1; ; {

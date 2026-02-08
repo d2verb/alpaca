@@ -1444,8 +1444,8 @@ func TestFetchModelStatuses_Success(t *testing.T) {
 		}
 		resp := map[string]any{
 			"data": []map[string]any{
-				{"id": "qwen3", "status": "loaded"},
-				{"id": "gemma3", "status": "unloaded"},
+				{"id": "qwen3", "status": map[string]any{"value": "loaded"}},
+				{"id": "gemma3", "status": map[string]any{"value": "unloaded"}},
 			},
 		}
 		json.NewEncoder(w).Encode(resp)
@@ -1476,11 +1476,11 @@ func TestFetchModelStatuses_Success(t *testing.T) {
 	if len(statuses) != 2 {
 		t.Fatalf("len(statuses) = %d, want 2", len(statuses))
 	}
-	if statuses[0].ID != "qwen3" || statuses[0].Status != "loaded" {
-		t.Errorf("statuses[0] = %+v, want {ID:qwen3, Status:loaded}", statuses[0])
+	if statuses[0].ID != "qwen3" || statuses[0].Status.Value != "loaded" {
+		t.Errorf("statuses[0] = {ID:%s, Status:%s}, want {ID:qwen3, Status:loaded}", statuses[0].ID, statuses[0].Status.Value)
 	}
-	if statuses[1].ID != "gemma3" || statuses[1].Status != "unloaded" {
-		t.Errorf("statuses[1] = %+v, want {ID:gemma3, Status:unloaded}", statuses[1])
+	if statuses[1].ID != "gemma3" || statuses[1].Status.Value != "unloaded" {
+		t.Errorf("statuses[1] = {ID:%s, Status:%s}, want {ID:gemma3, Status:unloaded}", statuses[1].ID, statuses[1].Status.Value)
 	}
 }
 

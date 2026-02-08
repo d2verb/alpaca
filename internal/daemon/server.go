@@ -152,7 +152,7 @@ func (s *Server) handleStatus(ctx context.Context) *protocol.Response {
 				for _, m := range statuses {
 					models = append(models, map[string]any{
 						"id":     m.ID,
-						"status": m.Status,
+						"status": m.Status.Value,
 					})
 				}
 				data["models"] = models

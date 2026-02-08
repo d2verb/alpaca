@@ -54,9 +54,9 @@ var stdin = bufio.NewReader(os.Stdin)
 // If defaultVal is provided, it's shown in brackets and returned if input is empty.
 func promptLine(label, defaultVal string) (string, error) {
 	if defaultVal != "" {
-		fmt.Printf("%s [%s]: ", label, defaultVal)
+		fmt.Fprintf(ui.Output, "%s [%s]: ", label, defaultVal)
 	} else {
-		fmt.Printf("%s: ", label)
+		fmt.Fprintf(ui.Output, "%s: ", label)
 	}
 	input, err := stdin.ReadString('\n')
 	if err != nil {
@@ -72,7 +72,7 @@ func promptLine(label, defaultVal string) (string, error) {
 // promptConfirm prompts the user for a yes/no confirmation.
 // Returns true only if user enters "y" or "Y".
 func promptConfirm(message string) bool {
-	fmt.Printf("%s (y/N): ", message)
+	ui.PrintConfirm(message)
 	input, err := stdin.ReadString('\n')
 	if err != nil {
 		return false

@@ -442,8 +442,14 @@ func (d *Daemon) resetState() {
 
 // RouterModelStatus represents the status of a single model in router mode.
 type RouterModelStatus struct {
-	ID     string `json:"id"`
-	Status string `json:"status"` // "loaded", "loading", "unloaded"
+	ID     string            `json:"id"`
+	Status routerModelStatus `json:"status"`
+}
+
+// routerModelStatus wraps the status object from llama-server's /models API.
+// The API returns {"status": {"value": "loaded", ...}} not a plain string.
+type routerModelStatus struct {
+	Value string `json:"value"` // "loaded", "loading", "unloaded"
 }
 
 // FetchModelStatuses queries the running llama-server's /models endpoint

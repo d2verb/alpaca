@@ -186,6 +186,11 @@ func PrintInfo(message string) {
 	fmt.Fprintf(Output, "%s %s\n", Info("ℹ"), message)
 }
 
+// PrintConfirm prints a confirmation prompt with question mark icon (no newline).
+func PrintConfirm(message string) {
+	fmt.Fprintf(Output, "%s %s (y/N): ", Warning("?"), message)
+}
+
 // PresetDetails contains preset information for display.
 type PresetDetails struct {
 	Name        string
@@ -352,7 +357,7 @@ func PrintRouterPresetDetails(p RouterPresetDetails) {
 		fmt.Fprintln(Output)
 		fmt.Fprintf(Output, "  %s\n", Heading(fmt.Sprintf("Models (%d)", len(p.Models))))
 		fmt.Fprintf(Output, "  %s\n", Muted("──────────"))
-		for _, m := range p.Models {
+		for i, m := range p.Models {
 			fmt.Fprintf(Output, "  %s\n", Primary(m.Name))
 			PrintKeyValue("  Model", Link(m.Model))
 			if m.DraftModel != "" {
@@ -367,7 +372,9 @@ func PrintRouterPresetDetails(p RouterPresetDetails) {
 			if len(m.ServerOptions) > 0 {
 				PrintKeyValue("  Server Options", formatServerOptions(m.ServerOptions))
 			}
-			fmt.Fprintln(Output)
+			if i < len(p.Models)-1 {
+				fmt.Fprintln(Output)
+			}
 		}
 	}
 }
