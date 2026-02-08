@@ -1,8 +1,15 @@
 package main
 
 import (
+	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/d2verb/alpaca/internal/preset"
+	"github.com/d2verb/alpaca/internal/ui"
+	"github.com/fatih/color"
 )
 
 func TestShowCmd_InvalidIdentifierType(t *testing.T) {
@@ -39,5 +46,169 @@ func TestShowCmd_InvalidIdentifierType(t *testing.T) {
 				t.Errorf("expected error containing %q, got: %v", tt.wantErr, err)
 			}
 		})
+	}
+}
+
+func TestShowCmd_RouterPreset(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	// Arrange: create a temp preset dir with a router preset
+	tmpDir := t.TempDir()
+	p := &preset.Preset{
+		Name:             "my-workspace",
+		Mode:             "router",
+		Port:             8080,
+		ModelsMax:        3,
+		SleepIdleSeconds: 300,
+		ServerOptions: map[string]string{
+			"flash-attn": "on",
+		},
+		Models: []preset.ModelEntry{
+			{
+				Name:        "qwen3",
+				Model:       "h:Qwen/Qwen3-8B-GGUF",
+				DraftModel:  "h:Qwen/Qwen3-1B-GGUF",
+				ContextSize: 8192,
+			},
+			{
+				Name:        "nomic-embed",
+				Model:       "h:nomic-ai/nomic-embed-text-v2-moe-GGUF",
+				ContextSize: 2048,
+				ServerOptions: map[string]string{
+					"embeddings": "true",
+				},
+			},
+		},
+	}
+
+	presetPath := filepath.Join(tmpDir, "test.yaml")
+	if err := preset.WriteFile(presetPath, p); err != nil {
+		t.Fatalf("write preset: %v", err)
+	}
+
+	var buf bytes.Buffer
+	ui.Output = &buf
+	defer func() { ui.Output = os.Stdout }()
+
+	// Act
+	cmd := &ShowCmd{}
+	err := cmd.showPreset("my-workspace", tmpDir)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "p:my-workspace") {
+		t.Error("Output should contain preset name")
+	}
+	if !strings.Contains(output, "router") {
+		t.Error("Output should contain 'router' mode")
+	}
+	if !strings.Contains(output, "Max Models") {
+		t.Error("Output should contain 'Max Models'")
+	}
+	if !strings.Contains(output, "3") {
+		t.Error("Output should contain max models value")
+	}
+	if !strings.Contains(output, "300s") {
+		t.Error("Output should contain idle timeout value")
+	}
+	if !strings.Contains(output, "flash-attn=on") {
+		t.Error("Output should contain server options")
+	}
+	if !strings.Contains(output, "qwen3") {
+		t.Error("Output should contain qwen3 model")
+	}
+	if !strings.Contains(output, "nomic-embed") {
+		t.Error("Output should contain nomic-embed model")
+	}
+	if !strings.Contains(output, "Draft Model") {
+		t.Error("Output should contain 'Draft Model' for qwen3")
+	}
+}
+
+func TestShowCmd_SinglePresetWithDraftModel(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	// Arrange: create a single mode preset with draft_model
+	tmpDir := t.TempDir()
+	p := &preset.Preset{
+		Name:       "with-draft",
+		Model:      "h:org/model:Q4_K_M",
+		DraftModel: "h:org/draft:Q4_K_M",
+	}
+
+	presetPath := filepath.Join(tmpDir, "draft.yaml")
+	if err := preset.WriteFile(presetPath, p); err != nil {
+		t.Fatalf("write preset: %v", err)
+	}
+
+	var buf bytes.Buffer
+	ui.Output = &buf
+	defer func() { ui.Output = os.Stdout }()
+
+	// Act
+	cmd := &ShowCmd{}
+	err := cmd.showPreset("with-draft", tmpDir)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "Draft Model") {
+		t.Error("Output should contain 'Draft Model' label")
+	}
+	if !strings.Contains(output, "h:org/draft:Q4_K_M") {
+		t.Error("Output should contain draft model path")
+	}
+}
+
+func TestShowCmd_SinglePresetStillWorks(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	// Arrange: create a single mode preset
+	tmpDir := t.TempDir()
+	p := &preset.Preset{
+		Name:  "my-single",
+		Model: "h:org/model:Q4_K_M",
+	}
+
+	presetPath := filepath.Join(tmpDir, "single.yaml")
+	if err := preset.WriteFile(presetPath, p); err != nil {
+		t.Fatalf("write preset: %v", err)
+	}
+
+	var buf bytes.Buffer
+	ui.Output = &buf
+	defer func() { ui.Output = os.Stdout }()
+
+	// Act
+	cmd := &ShowCmd{}
+	err := cmd.showPreset("my-single", tmpDir)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "p:my-single") {
+		t.Error("Output should contain preset name")
+	}
+	if !strings.Contains(output, "h:org/model:Q4_K_M") {
+		t.Error("Output should contain model")
+	}
+	if strings.Contains(output, "router") {
+		t.Error("Output should not contain 'router' for single mode preset")
 	}
 }

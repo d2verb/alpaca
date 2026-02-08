@@ -109,8 +109,25 @@ func (c *NewCmd) runLocal() error {
 	return nil
 }
 
-// collectInputs prompts for model and optional fields, returns a preset.
+// collectInputs prompts for mode, then delegates to single or router flow.
 func (c *NewCmd) collectInputs(name string) (*preset.Preset, error) {
+	modeStr, err := promptLine("Mode (single/router)", "single")
+	if err != nil {
+		return nil, err
+	}
+
+	switch modeStr {
+	case "single":
+		return c.collectSingleInputs(name)
+	case "router":
+		return c.collectRouterInputs(name)
+	default:
+		return nil, fmt.Errorf("invalid mode '%s': must be 'single' or 'router'", modeStr)
+	}
+}
+
+// collectSingleInputs prompts for model and optional fields for single mode.
+func (c *NewCmd) collectSingleInputs(name string) (*preset.Preset, error) {
 	model, err := promptLine("Model", "")
 	if err != nil {
 		return nil, err
@@ -149,6 +166,98 @@ func (c *NewCmd) collectInputs(name string) (*preset.Preset, error) {
 	}
 	if ctx, err := strconv.Atoi(ctxStr); err == nil && ctx != preset.DefaultContextSize {
 		p.ContextSize = ctx
+	}
+
+	return p, nil
+}
+
+// collectRouterInputs prompts for host, port, and models for router mode.
+func (c *NewCmd) collectRouterInputs(name string) (*preset.Preset, error) {
+	hostStr, err := promptLine("Host", preset.DefaultHost)
+	if err != nil {
+		return nil, err
+	}
+	portStr, err := promptLine("Port", strconv.Itoa(preset.DefaultPort))
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Fprintf(ui.Output, "\n🤖 %s\n", ui.Heading("Add Models (enter blank name to finish)"))
+
+	var models []preset.ModelEntry
+	for i := 1; ; {
+		fmt.Fprintf(ui.Output, "  Model %d:\n", i)
+
+		modelName, err := promptLine("    Name", "")
+		if err != nil {
+			return nil, err
+		}
+		if modelName == "" {
+			break
+		}
+		if err := preset.ValidateName(modelName); err != nil {
+			ui.PrintWarning(fmt.Sprintf("invalid model name: %v", err))
+			continue
+		}
+		isDuplicate := false
+		for _, existing := range models {
+			if existing.Name == modelName {
+				ui.PrintWarning(fmt.Sprintf("model name '%s' already added", modelName))
+				isDuplicate = true
+				break
+			}
+		}
+		if isDuplicate {
+			continue
+		}
+
+		modelRef, err := promptLine("    Model", "")
+		if err != nil {
+			return nil, err
+		}
+		if modelRef == "" {
+			ui.PrintWarning(fmt.Sprintf("model is required for '%s'", modelName))
+			continue
+		}
+		if !strings.HasPrefix(modelRef, "h:") && !strings.HasPrefix(modelRef, "f:") {
+			ui.PrintWarning(fmt.Sprintf("model for '%s' must have h: or f: prefix\nExamples: h:unsloth/gemma3:Q4_K_M, f:~/models/model.gguf", modelName))
+			continue
+		}
+
+		ctxStr, err := promptLine("    Context", strconv.Itoa(preset.DefaultContextSize))
+		if err != nil {
+			return nil, err
+		}
+
+		entry := preset.ModelEntry{
+			Name:  modelName,
+			Model: modelRef,
+		}
+		if ctx, err := strconv.Atoi(ctxStr); err == nil && ctx != preset.DefaultContextSize {
+			entry.ContextSize = ctx
+		}
+
+		models = append(models, entry)
+		i++
+		fmt.Fprintln(ui.Output)
+	}
+
+	if len(models) == 0 {
+		return nil, fmt.Errorf("at least one model is required for router mode")
+	}
+
+	fmt.Fprintf(ui.Output, "  %d model(s) added.\n\n", len(models))
+
+	p := &preset.Preset{
+		Name:   name,
+		Mode:   "router",
+		Models: models,
+	}
+	if hostStr != "" && hostStr != preset.DefaultHost {
+		p.Host = hostStr
+	}
+	if port, err := strconv.Atoi(portStr); err == nil && port != preset.DefaultPort {
+		p.Port = port
 	}
 
 	return p, nil

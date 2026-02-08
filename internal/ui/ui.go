@@ -4,7 +4,9 @@ package ui
 import (
 	"fmt"
 	"io"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/fatih/color"
@@ -184,10 +186,16 @@ func PrintInfo(message string) {
 	fmt.Fprintf(Output, "%s %s\n", Info("ℹ"), message)
 }
 
+// PrintConfirm prints a confirmation prompt with question mark icon (no newline).
+func PrintConfirm(message string) {
+	fmt.Fprintf(Output, "%s %s (y/N): ", Warning("?"), message)
+}
+
 // PresetDetails contains preset information for display.
 type PresetDetails struct {
 	Name        string
 	Model       string
+	DraftModel  string
 	ContextSize int
 	Threads     int
 	Host        string
@@ -212,13 +220,16 @@ func PrintPresetDetails(p PresetDetails) {
 	PrintDetailHeader("📦", "Preset", identifier)
 
 	PrintKeyValue("Model", Link(p.Model))
+	if p.DraftModel != "" {
+		PrintKeyValue("Draft Model", Link(p.DraftModel))
+	}
 	if p.ContextSize > 0 {
 		PrintKeyValue("Context Size", fmt.Sprintf("%d", p.ContextSize))
 	}
 	if p.Threads > 0 {
 		PrintKeyValue("Threads", fmt.Sprintf("%d", p.Threads))
 	}
-	PrintKeyValue("Endpoint", Link(fmt.Sprintf("%s:%d", p.Host, p.Port)))
+	PrintKeyValue("Endpoint", Link(fmt.Sprintf("http://%s:%d", p.Host, p.Port)))
 	if len(p.ExtraArgs) > 0 {
 		PrintKeyValue("Extra Args", strings.Join(p.ExtraArgs, " "))
 	}
@@ -256,5 +267,123 @@ func PrintDetailHeader(icon, title, identifier string) {
 
 // PrintKeyValue prints a key-value pair with aligned formatting.
 func PrintKeyValue(key, value string) {
-	fmt.Fprintf(Output, "  %-14s %s\n", key, value)
+	fmt.Fprintf(Output, "  %-16s %s\n", key, value)
+}
+
+// RouterModelInfo represents a model in router mode status display.
+type RouterModelInfo struct {
+	ID     string
+	Status string
+}
+
+// ModelStatusBadge returns a colored badge for a model status.
+func ModelStatusBadge(status string) string {
+	switch status {
+	case "loaded":
+		return Green("●") + " loaded"
+	case "loading":
+		return Yellow("◐") + " loading"
+	case "unloaded":
+		return Muted("○") + " unloaded"
+	default:
+		return Red("✗") + " " + status
+	}
+}
+
+// PrintRouterStatus prints router mode daemon status in a formatted style.
+func PrintRouterStatus(state, preset, endpoint, logPath string, models []RouterModelInfo) {
+	fmt.Fprintf(Output, "🚀 %s\n", Heading("Status"))
+
+	PrintKeyValue("State", StatusBadge(state))
+	if preset != "" {
+		label, formatted := formatPresetOrModel(preset)
+		PrintKeyValue(label, formatted)
+	}
+	PrintKeyValue("Mode", "router")
+	if endpoint != "" {
+		PrintKeyValue("Endpoint", Link(endpoint))
+	}
+	PrintKeyValue("Logs", logPath)
+
+	if len(models) > 0 {
+		fmt.Fprintln(Output)
+		fmt.Fprintf(Output, "  %s\n", Heading(fmt.Sprintf("Models (%d)", len(models))))
+		fmt.Fprintf(Output, "  %s\n", Muted("──────────"))
+		for _, m := range models {
+			fmt.Fprintf(Output, "  %-24s %s\n", m.ID, ModelStatusBadge(m.Status))
+		}
+	}
+}
+
+// RouterPresetDetails contains router preset information for display.
+type RouterPresetDetails struct {
+	Name             string
+	Host             string
+	Port             int
+	ModelsMax        int
+	SleepIdleSeconds int
+	ServerOptions    map[string]string
+	Models           []RouterModelDetail
+}
+
+// RouterModelDetail contains a single model's details in a router preset.
+type RouterModelDetail struct {
+	Name          string
+	Model         string
+	DraftModel    string
+	ContextSize   int
+	Threads       int
+	ServerOptions map[string]string
+}
+
+// PrintRouterPresetDetails prints router preset details in a formatted style.
+func PrintRouterPresetDetails(p RouterPresetDetails) {
+	identifier := fmt.Sprintf("%s%s", Primary("p:"), Primary(p.Name))
+	PrintDetailHeader("📦", "Preset", identifier)
+
+	PrintKeyValue("Mode", "router")
+	PrintKeyValue("Endpoint", Link(fmt.Sprintf("http://%s:%d", p.Host, p.Port)))
+	if p.ModelsMax > 0 {
+		PrintKeyValue("Max Models", fmt.Sprintf("%d", p.ModelsMax))
+	}
+	if p.SleepIdleSeconds > 0 {
+		PrintKeyValue("Idle Timeout", fmt.Sprintf("%ds", p.SleepIdleSeconds))
+	}
+	if len(p.ServerOptions) > 0 {
+		PrintKeyValue("Server Options", formatServerOptions(p.ServerOptions))
+	}
+
+	if len(p.Models) > 0 {
+		fmt.Fprintln(Output)
+		fmt.Fprintf(Output, "  %s\n", Heading(fmt.Sprintf("Models (%d)", len(p.Models))))
+		fmt.Fprintf(Output, "  %s\n", Muted("──────────"))
+		for i, m := range p.Models {
+			fmt.Fprintf(Output, "  %s\n", Primary(m.Name))
+			PrintKeyValue("  Model", Link(m.Model))
+			if m.DraftModel != "" {
+				PrintKeyValue("  Draft Model", Link(m.DraftModel))
+			}
+			if m.ContextSize > 0 {
+				PrintKeyValue("  Context Size", fmt.Sprintf("%d", m.ContextSize))
+			}
+			if m.Threads > 0 {
+				PrintKeyValue("  Threads", fmt.Sprintf("%d", m.Threads))
+			}
+			if len(m.ServerOptions) > 0 {
+				PrintKeyValue("  Server Options", formatServerOptions(m.ServerOptions))
+			}
+			if i < len(p.Models)-1 {
+				fmt.Fprintln(Output)
+			}
+		}
+	}
+}
+
+// formatServerOptions formats server options as sorted key=value pairs.
+func formatServerOptions(opts map[string]string) string {
+	parts := make([]string, 0, len(opts))
+	for _, k := range slices.Sorted(maps.Keys(opts)) {
+		parts = append(parts, fmt.Sprintf("%s=%s", k, opts[k]))
+	}
+	return strings.Join(parts, " ")
 }
