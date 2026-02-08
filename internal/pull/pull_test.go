@@ -2,6 +2,8 @@ package pull
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -621,6 +623,69 @@ func TestParseContentRangeStart(t *testing.T) {
 				t.Errorf("parseContentRangeStart() = %d, want %d", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestVerifyFileHash_MatchingHash(t *testing.T) {
+	// Arrange
+	content := []byte("test file content for hashing")
+	h := sha256.Sum256(content)
+	expectedHash := hex.EncodeToString(h[:])
+
+	modelsDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(modelsDir, "model.gguf"), content, 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	puller := NewPuller(modelsDir)
+
+	// Act
+	err := puller.verifyFileHash("model.gguf", expectedHash)
+
+	// Assert
+	if err != nil {
+		t.Errorf("verifyFileHash() error = %v, want nil", err)
+	}
+}
+
+func TestVerifyFileHash_MismatchedHash(t *testing.T) {
+	// Arrange
+	content := []byte("test file content for hashing")
+	wrongHash := "0000000000000000000000000000000000000000000000000000000000000000"
+
+	modelsDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(modelsDir, "model.gguf"), content, 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	puller := NewPuller(modelsDir)
+
+	// Act
+	err := puller.verifyFileHash("model.gguf", wrongHash)
+
+	// Assert
+	if err == nil {
+		t.Fatal("verifyFileHash() error = nil, want error for mismatched hash")
+	}
+	if !strings.Contains(err.Error(), "expected SHA256") {
+		t.Errorf("error = %q, want to contain 'expected SHA256'", err.Error())
+	}
+}
+
+func TestVerifyFileHash_FileNotFound(t *testing.T) {
+	// Arrange
+	modelsDir := t.TempDir()
+	puller := NewPuller(modelsDir)
+
+	// Act
+	err := puller.verifyFileHash("nonexistent.gguf", "abc123")
+
+	// Assert
+	if err == nil {
+		t.Fatal("verifyFileHash() error = nil, want error for missing file")
+	}
+	if !strings.Contains(err.Error(), "open file for verification") {
+		t.Errorf("error = %q, want to contain 'open file for verification'", err.Error())
 	}
 }
 

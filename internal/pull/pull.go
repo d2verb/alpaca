@@ -3,9 +3,12 @@ package pull
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -51,6 +54,12 @@ type PullResult struct {
 	Size     int64
 }
 
+// ggufFileInfo holds a GGUF filename and its optional LFS SHA256 hash.
+type ggufFileInfo struct {
+	Filename string
+	SHA256   string // empty if not available from API
+}
+
 // Pull downloads a model from HuggingFace.
 func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, error) {
 	// Load existing metadata
@@ -59,29 +68,40 @@ func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, err
 	}
 
 	// Find matching file
-	filename, err := p.findMatchingFile(ctx, repo, quant)
+	fileInfo, err := p.findMatchingFile(ctx, repo, quant)
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate filename (for clear error messages)
-	if !filepath.IsLocal(filename) {
-		return nil, fmt.Errorf("invalid filename from API: %s", filename)
+	if !filepath.IsLocal(fileInfo.Filename) {
+		return nil, fmt.Errorf("invalid filename from API: %s", fileInfo.Filename)
 	}
 
 	// Download file with OS-level path confinement
-	size, err := p.downloadFile(ctx, repo, filename)
+	size, err := p.downloadFile(ctx, repo, fileInfo.Filename)
 	if err != nil {
 		return nil, err
 	}
 
-	destPath := filepath.Join(p.modelsDir, filename)
+	// Verify SHA256 integrity if hash is available from API
+	if fileInfo.SHA256 != "" {
+		if err := p.verifyFileHash(fileInfo.Filename, fileInfo.SHA256); err != nil {
+			// Clean up the corrupted file
+			p.removeDownloadedFile(fileInfo.Filename)
+			return nil, fmt.Errorf("integrity verification failed for %s: %w", fileInfo.Filename, err)
+		}
+	} else {
+		slog.Warn("no SHA256 hash available from API, skipping integrity verification", "filename", fileInfo.Filename)
+	}
+
+	destPath := filepath.Join(p.modelsDir, fileInfo.Filename)
 
 	// Save metadata entry
 	entry := metadata.ModelEntry{
 		Repo:         repo,
 		Quant:        quant,
-		Filename:     filename,
+		Filename:     fileInfo.Filename,
 		Size:         size,
 		DownloadedAt: time.Now().UTC(),
 	}
@@ -94,17 +114,18 @@ func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, err
 
 	return &PullResult{
 		Path:     destPath,
-		Filename: filename,
+		Filename: fileInfo.Filename,
 		Size:     size,
 	}, nil
 }
 
 // GetFileInfo fetches info about the model file without downloading.
 func (p *Puller) GetFileInfo(ctx context.Context, repo, quant string) (filename string, size int64, err error) {
-	filename, err = p.findMatchingFile(ctx, repo, quant)
+	fileInfo, err := p.findMatchingFile(ctx, repo, quant)
 	if err != nil {
 		return "", 0, err
 	}
+	filename = fileInfo.Filename
 
 	// Get file size via HEAD request
 	url := fmt.Sprintf("%s/%s/resolve/main/%s", p.baseURL, repo, filename)
@@ -126,29 +147,33 @@ func (p *Puller) GetFileInfo(ctx context.Context, repo, quant string) (filename 
 	return filename, resp.ContentLength, nil
 }
 
-func (p *Puller) findMatchingFile(ctx context.Context, repo, quant string) (string, error) {
+func (p *Puller) findMatchingFile(ctx context.Context, repo, quant string) (ggufFileInfo, error) {
 	files, err := p.listGGUFFiles(ctx, repo)
 	if err != nil {
-		return "", err
+		return ggufFileInfo{}, err
 	}
 
 	// Find GGUF file matching quant
 	quantUpper := strings.ToUpper(quant)
-	for _, filename := range files {
-		if strings.Contains(strings.ToUpper(filename), quantUpper) {
-			return filename, nil
+	for _, fi := range files {
+		if strings.Contains(strings.ToUpper(fi.Filename), quantUpper) {
+			return fi, nil
 		}
 	}
 
 	// Build available quants for error message
-	available := extractQuants(files)
-	if len(available) > 0 {
-		return "", fmt.Errorf("no matching file found for quant '%s'\nAvailable: %s", quant, strings.Join(available, ", "))
+	filenames := make([]string, len(files))
+	for i, fi := range files {
+		filenames[i] = fi.Filename
 	}
-	return "", fmt.Errorf("no GGUF files found in repository '%s'", repo)
+	available := extractQuants(filenames)
+	if len(available) > 0 {
+		return ggufFileInfo{}, fmt.Errorf("no matching file found for quant '%s'\nAvailable: %s", quant, strings.Join(available, ", "))
+	}
+	return ggufFileInfo{}, fmt.Errorf("no GGUF files found in repository '%s'", repo)
 }
 
-func (p *Puller) listGGUFFiles(ctx context.Context, repo string) ([]string, error) {
+func (p *Puller) listGGUFFiles(ctx context.Context, repo string) ([]ggufFileInfo, error) {
 	url := fmt.Sprintf("%s/api/models/%s", p.baseURL, repo)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -171,16 +196,23 @@ func (p *Puller) listGGUFFiles(ctx context.Context, repo string) ([]string, erro
 	var repoInfo struct {
 		Siblings []struct {
 			Filename string `json:"rfilename"`
+			LFS      *struct {
+				SHA256 string `json:"sha256"`
+			} `json:"lfs"`
 		} `json:"siblings"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&repoInfo); err != nil {
 		return nil, fmt.Errorf("parse repo info: %w", err)
 	}
 
-	var files []string
+	var files []ggufFileInfo
 	for _, sibling := range repoInfo.Siblings {
 		if strings.HasSuffix(strings.ToLower(sibling.Filename), ".gguf") {
-			files = append(files, sibling.Filename)
+			fi := ggufFileInfo{Filename: sibling.Filename}
+			if sibling.LFS != nil {
+				fi.SHA256 = sibling.LFS.SHA256
+			}
+			files = append(files, fi)
 		}
 	}
 	return files, nil
@@ -401,4 +433,41 @@ func readETagFile(root *os.Root, filename string) string {
 	defer f.Close()
 	data, _ := io.ReadAll(f)
 	return string(data)
+}
+
+// verifyFileHash computes the SHA256 hash of a downloaded file and compares it
+// against the expected hash from the HuggingFace API.
+func (p *Puller) verifyFileHash(filename, expectedSHA256 string) error {
+	root, err := os.OpenRoot(p.modelsDir)
+	if err != nil {
+		return fmt.Errorf("open models dir: %w", err)
+	}
+	defer root.Close()
+
+	f, err := root.Open(filename)
+	if err != nil {
+		return fmt.Errorf("open file for verification: %w", err)
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return fmt.Errorf("compute hash: %w", err)
+	}
+
+	actual := hex.EncodeToString(h.Sum(nil))
+	if actual != expectedSHA256 {
+		return fmt.Errorf("expected SHA256 %s, got %s", expectedSHA256, actual)
+	}
+	return nil
+}
+
+// removeDownloadedFile removes a downloaded file from the models directory.
+func (p *Puller) removeDownloadedFile(filename string) {
+	root, err := os.OpenRoot(p.modelsDir)
+	if err != nil {
+		return
+	}
+	defer root.Close()
+	root.Remove(filename)
 }
