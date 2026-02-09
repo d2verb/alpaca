@@ -53,14 +53,12 @@ func (c *ShowCmd) showPreset(name, presetsDir string) error {
 		c.showRouterPreset(p)
 	} else {
 		ui.PrintPresetDetails(ui.PresetDetails{
-			Name:        p.Name,
-			Model:       p.Model,
-			DraftModel:  p.DraftModel,
-			ContextSize: p.ContextSize,
-			Threads:     p.Threads,
-			Host:        p.GetHost(),
-			Port:        p.GetPort(),
-			ExtraArgs:   p.ExtraArgs,
+			Name:       p.Name,
+			Model:      p.Model,
+			DraftModel: p.DraftModel,
+			Host:       p.GetHost(),
+			Port:       p.GetPort(),
+			Options:    p.Options,
 		})
 	}
 
@@ -69,21 +67,19 @@ func (c *ShowCmd) showPreset(name, presetsDir string) error {
 
 func (c *ShowCmd) showRouterPreset(p *preset.Preset) {
 	details := ui.RouterPresetDetails{
-		Name:             p.Name,
-		Host:             p.GetHost(),
-		Port:             p.GetPort(),
-		ModelsMax:        p.ModelsMax,
-		SleepIdleSeconds: p.SleepIdleSeconds,
-		ServerOptions:    p.ServerOptions,
+		Name:        p.Name,
+		Host:        p.GetHost(),
+		Port:        p.GetPort(),
+		MaxModels:   p.MaxModels,
+		IdleTimeout: p.IdleTimeout,
+		Options:     p.Options,
 	}
 	for _, m := range p.Models {
 		details.Models = append(details.Models, ui.RouterModelDetail{
-			Name:          m.Name,
-			Model:         m.Model,
-			DraftModel:    m.DraftModel,
-			ContextSize:   m.ContextSize,
-			Threads:       m.Threads,
-			ServerOptions: m.ServerOptions,
+			Name:       m.Name,
+			Model:      m.Model,
+			DraftModel: m.DraftModel,
+			Options:    m.Options,
 		})
 	}
 	ui.PrintRouterPresetDetails(details)

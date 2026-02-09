@@ -4,6 +4,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestSanitizeName(t *testing.T) {
@@ -106,27 +108,6 @@ func TestPreset_GetHost(t *testing.T) {
 	}
 }
 
-func TestPreset_GetContextSize(t *testing.T) {
-	tests := []struct {
-		name        string
-		contextSize int
-		want        int
-	}{
-		{"returns custom context size", 4096, 4096},
-		{"returns default when zero", 0, DefaultContextSize},
-		{"returns default when negative", -1, DefaultContextSize},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			p := &Preset{ContextSize: tt.contextSize}
-			if got := p.GetContextSize(); got != tt.want {
-				t.Errorf("GetContextSize() = %d, want %d", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestPreset_Endpoint(t *testing.T) {
 	tests := []struct {
 		name string
@@ -161,34 +142,6 @@ func TestPreset_BuildArgs(t *testing.T) {
 			preset: Preset{Model: "/path/to/model.gguf"},
 			want: []string{
 				"-m", "/path/to/model.gguf",
-				"--ctx-size", "4096",
-				"--port", "8080",
-				"--host", "127.0.0.1",
-			},
-		},
-		{
-			name: "with context size",
-			preset: Preset{
-				Model:       "/path/to/model.gguf",
-				ContextSize: 4096,
-			},
-			want: []string{
-				"-m", "/path/to/model.gguf",
-				"--ctx-size", "4096",
-				"--port", "8080",
-				"--host", "127.0.0.1",
-			},
-		},
-		{
-			name: "with threads",
-			preset: Preset{
-				Model:   "/path/to/model.gguf",
-				Threads: 8,
-			},
-			want: []string{
-				"-m", "/path/to/model.gguf",
-				"--ctx-size", "4096",
-				"--threads", "8",
 				"--port", "8080",
 				"--host", "127.0.0.1",
 			},
@@ -202,51 +155,8 @@ func TestPreset_BuildArgs(t *testing.T) {
 			},
 			want: []string{
 				"-m", "/path/to/model.gguf",
-				"--ctx-size", "4096",
 				"--port", "9090",
 				"--host", "0.0.0.0",
-			},
-		},
-		{
-			name: "with extra args",
-			preset: Preset{
-				Model:     "/path/to/model.gguf",
-				ExtraArgs: []string{"--verbose", "--log-disable"},
-			},
-			want: []string{
-				"-m", "/path/to/model.gguf",
-				"--ctx-size", "4096",
-				"--port", "8080",
-				"--host", "127.0.0.1",
-				"--verbose", "--log-disable",
-			},
-		},
-		{
-			name: "with space-separated extra args",
-			preset: Preset{
-				Model:     "/path/to/model.gguf",
-				ExtraArgs: []string{"-b 2048", "-ub 2048", "--jinja"},
-			},
-			want: []string{
-				"-m", "/path/to/model.gguf",
-				"--ctx-size", "4096",
-				"--port", "8080",
-				"--host", "127.0.0.1",
-				"-b", "2048", "-ub", "2048", "--jinja",
-			},
-		},
-		{
-			name: "with mixed extra args formats",
-			preset: Preset{
-				Model:     "/path/to/model.gguf",
-				ExtraArgs: []string{"-b", "2048", "--temp 0.7", "--jinja"},
-			},
-			want: []string{
-				"-m", "/path/to/model.gguf",
-				"--ctx-size", "4096",
-				"--port", "8080",
-				"--host", "127.0.0.1",
-				"-b", "2048", "--temp", "0.7", "--jinja",
 			},
 		},
 		{
@@ -258,56 +168,95 @@ func TestPreset_BuildArgs(t *testing.T) {
 			want: []string{
 				"-m", "/path/to/model.gguf",
 				"--model-draft", "/path/to/draft.gguf",
-				"--ctx-size", "4096",
 				"--port", "8080",
 				"--host", "127.0.0.1",
 			},
 		},
 		{
-			name: "with draft model without prefix",
+			name: "with boolean true option becomes flag",
 			preset: Preset{
-				Model:      "/path/to/model.gguf",
-				DraftModel: "/path/to/draft.gguf",
+				Model:   "/path/to/model.gguf",
+				Options: Options{"mlock": "true"},
 			},
 			want: []string{
 				"-m", "/path/to/model.gguf",
-				"--model-draft", "/path/to/draft.gguf",
-				"--ctx-size", "4096",
+				"--port", "8080",
+				"--host", "127.0.0.1",
+				"--mlock",
+			},
+		},
+		{
+			name: "with boolean false option is skipped",
+			preset: Preset{
+				Model:   "/path/to/model.gguf",
+				Options: Options{"mlock": "false"},
+			},
+			want: []string{
+				"-m", "/path/to/model.gguf",
 				"--port", "8080",
 				"--host", "127.0.0.1",
 			},
 		},
 		{
-			name: "without draft model",
+			name: "with value options",
+			preset: Preset{
+				Model:   "/path/to/model.gguf",
+				Options: Options{"ctx-size": "4096", "threads": "8"},
+			},
+			want: []string{
+				"-m", "/path/to/model.gguf",
+				"--port", "8080",
+				"--host", "127.0.0.1",
+				"--ctx-size", "4096",
+				"--threads", "8",
+			},
+		},
+		{
+			name: "options are sorted alphabetically",
 			preset: Preset{
 				Model: "/path/to/model.gguf",
+				Options: Options{
+					"threads":    "8",
+					"ctx-size":   "4096",
+					"flash-attn": "on",
+					"mlock":      "true",
+					"no-mmap":    "true",
+					"temp":       "0.7",
+				},
 			},
 			want: []string{
 				"-m", "/path/to/model.gguf",
-				"--ctx-size", "4096",
 				"--port", "8080",
 				"--host", "127.0.0.1",
+				"--ctx-size", "4096",
+				"--flash-attn", "on",
+				"--mlock",
+				"--no-mmap",
+				"--temp", "0.7",
+				"--threads", "8",
 			},
 		},
 		{
-			name: "full preset",
+			name: "full preset with all features",
 			preset: Preset{
-				Model:       "/path/to/model.gguf",
-				DraftModel:  "f:/path/to/draft.gguf",
-				ContextSize: 2048,
-				Threads:     4,
-				Port:        3000,
-				Host:        "localhost",
-				ExtraArgs:   []string{"--mlock"},
+				Model:      "/path/to/model.gguf",
+				DraftModel: "f:/path/to/draft.gguf",
+				Port:       3000,
+				Host:       "localhost",
+				Options: Options{
+					"ctx-size": "2048",
+					"threads":  "4",
+					"mlock":    "true",
+				},
 			},
 			want: []string{
 				"-m", "/path/to/model.gguf",
 				"--model-draft", "/path/to/draft.gguf",
-				"--ctx-size", "2048",
-				"--threads", "4",
 				"--port", "3000",
 				"--host", "localhost",
+				"--ctx-size", "2048",
 				"--mlock",
+				"--threads", "4",
 			},
 		},
 	}
@@ -361,10 +310,10 @@ func TestPreset_BuildRouterArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "with models_max",
+			name: "with max-models",
 			preset: Preset{
 				Mode:      "router",
-				ModelsMax: 3,
+				MaxModels: 3,
 			},
 			configPath: "/tmp/config.ini",
 			want: []string{
@@ -375,10 +324,10 @@ func TestPreset_BuildRouterArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "with sleep_idle_seconds",
+			name: "with idle-timeout",
 			preset: Preset{
-				Mode:             "router",
-				SleepIdleSeconds: 300,
+				Mode:        "router",
+				IdleTimeout: 300,
 			},
 			configPath: "/tmp/config.ini",
 			want: []string{
@@ -391,11 +340,11 @@ func TestPreset_BuildRouterArgs(t *testing.T) {
 		{
 			name: "with custom port and host",
 			preset: Preset{
-				Mode:             "router",
-				Port:             9090,
-				Host:             "0.0.0.0",
-				ModelsMax:        2,
-				SleepIdleSeconds: 60,
+				Mode:        "router",
+				Port:        9090,
+				Host:        "0.0.0.0",
+				MaxModels:   2,
+				IdleTimeout: 60,
 			},
 			configPath: "/tmp/models.ini",
 			want: []string{
@@ -435,10 +384,10 @@ func TestPreset_GenerateConfigINI(t *testing.T) {
 			want: "[llama]\nmodel = /path/to/llama.gguf\n",
 		},
 		{
-			name: "single model with global server_options",
+			name: "single model with global options",
 			preset: Preset{
-				Mode:          "router",
-				ServerOptions: map[string]string{"ctx-size": "4096"},
+				Mode:    "router",
+				Options: Options{"ctx-size": "4096"},
 				Models: []ModelEntry{
 					{Name: "llama", Model: "f:/path/to/llama.gguf"},
 				},
@@ -451,17 +400,14 @@ func TestPreset_GenerateConfigINI(t *testing.T) {
 				Mode: "router",
 				Models: []ModelEntry{
 					{
-						Name:        "llama",
-						Model:       "f:/path/to/llama.gguf",
-						ContextSize: 2048,
-						Threads:     4,
+						Name:    "llama",
+						Model:   "f:/path/to/llama.gguf",
+						Options: Options{"ctx-size": "2048", "threads": "4"},
 					},
 					{
-						Name:  "codellama",
-						Model: "f:/path/to/codellama.gguf",
-						ServerOptions: map[string]string{
-							"gpu-layers": "32",
-						},
+						Name:    "codellama",
+						Model:   "f:/path/to/codellama.gguf",
+						Options: Options{"gpu-layers": "32"},
 					},
 				},
 			},
@@ -485,7 +431,7 @@ func TestPreset_GenerateConfigINI(t *testing.T) {
 			name: "global options sorted alphabetically",
 			preset: Preset{
 				Mode: "router",
-				ServerOptions: map[string]string{
+				Options: Options{
 					"threads":  "8",
 					"ctx-size": "4096",
 					"mlock":    "true",
@@ -523,6 +469,13 @@ func TestPreset_Validate(t *testing.T) {
 			preset: Preset{Mode: "single", Model: "f:/path/to/model.gguf"},
 		},
 		{
+			name: "valid single mode with options",
+			preset: Preset{
+				Model:   "f:/path/to/model.gguf",
+				Options: Options{"ctx-size": "4096", "mlock": "true"},
+			},
+		},
+		{
 			name: "valid router mode preset",
 			preset: Preset{
 				Mode: "router",
@@ -552,12 +505,20 @@ func TestPreset_Validate(t *testing.T) {
 			wantErr: "single mode uses 'model' field, not 'models' list",
 		},
 		{
-			name: "single mode with server_options",
+			name: "single mode with max-models",
 			preset: Preset{
-				Model:         "f:/path/to/model.gguf",
-				ServerOptions: map[string]string{"key": "val"},
+				Model:     "f:/path/to/model.gguf",
+				MaxModels: 3,
 			},
-			wantErr: "single mode uses 'extra_args' instead of 'server_options'",
+			wantErr: "max-models is only valid in router mode",
+		},
+		{
+			name: "single mode with idle-timeout",
+			preset: Preset{
+				Model:       "f:/path/to/model.gguf",
+				IdleTimeout: 300,
+			},
+			wantErr: "idle-timeout is only valid in router mode",
 		},
 		{
 			name: "router mode with top-level model",
@@ -571,18 +532,7 @@ func TestPreset_Validate(t *testing.T) {
 			wantErr: "router mode defines models in the 'models' list, not as a top-level field",
 		},
 		{
-			name: "router mode with extra_args",
-			preset: Preset{
-				Mode:      "router",
-				ExtraArgs: []string{"--verbose"},
-				Models: []ModelEntry{
-					{Name: "llama", Model: "f:/llama.gguf"},
-				},
-			},
-			wantErr: "router mode uses 'server_options' instead of 'extra_args'",
-		},
-		{
-			name: "router mode with top-level draft_model",
+			name: "router mode with top-level draft-model",
 			preset: Preset{
 				Mode:       "router",
 				DraftModel: "f:/draft.gguf",
@@ -590,7 +540,7 @@ func TestPreset_Validate(t *testing.T) {
 					{Name: "llama", Model: "f:/llama.gguf"},
 				},
 			},
-			wantErr: "router mode defines draft_model per model in the 'models' list, not as a top-level field",
+			wantErr: "router mode defines draft-model per model in the 'models' list, not as a top-level field",
 		},
 		{
 			name:    "router mode with no models",
@@ -629,79 +579,79 @@ func TestPreset_Validate(t *testing.T) {
 			wantErr: "model field is required for model 'llama'",
 		},
 		{
-			name: "router mode with newline in global server_options value",
+			name: "router mode with newline in global options value",
 			preset: Preset{
-				Mode:          "router",
-				ServerOptions: map[string]string{"key": "val\nue"},
+				Mode:    "router",
+				Options: Options{"key": "val\nue"},
 				Models: []ModelEntry{
 					{Name: "llama", Model: "f:/llama.gguf"},
 				},
 			},
-			wantErr: "server_options value must not contain newline characters",
+			wantErr: "options value must not contain newline characters",
 		},
 		{
-			name: "router mode with newline in global server_options key",
+			name: "router mode with newline in global options key",
 			preset: Preset{
-				Mode:          "router",
-				ServerOptions: map[string]string{"ke\ny": "value"},
+				Mode:    "router",
+				Options: Options{"ke\ny": "value"},
 				Models: []ModelEntry{
 					{Name: "llama", Model: "f:/llama.gguf"},
 				},
 			},
-			wantErr: "server_options key must not contain newline characters",
+			wantErr: "options key must not contain newline characters",
 		},
 		{
-			name: "router mode with carriage return in global server_options key",
+			name: "router mode with carriage return in global options key",
 			preset: Preset{
-				Mode:          "router",
-				ServerOptions: map[string]string{"ke\ry": "value"},
+				Mode:    "router",
+				Options: Options{"ke\ry": "value"},
 				Models: []ModelEntry{
 					{Name: "llama", Model: "f:/llama.gguf"},
 				},
 			},
-			wantErr: "server_options key must not contain newline characters",
+			wantErr: "options key must not contain newline characters",
 		},
 		{
-			name: "router mode with newline in model server_options value",
+			name: "router mode with newline in model options value",
 			preset: Preset{
 				Mode: "router",
 				Models: []ModelEntry{
 					{
-						Name:          "llama",
-						Model:         "f:/llama.gguf",
-						ServerOptions: map[string]string{"key": "val\nue"},
+						Name:    "llama",
+						Model:   "f:/llama.gguf",
+						Options: Options{"key": "val\nue"},
 					},
 				},
 			},
-			wantErr: "server_options value must not contain newline characters",
+			wantErr: "options value must not contain newline characters",
 		},
 		{
-			name: "router mode with newline in model server_options key",
+			name: "router mode with newline in model options key",
 			preset: Preset{
 				Mode: "router",
 				Models: []ModelEntry{
 					{
-						Name:          "llama",
-						Model:         "f:/llama.gguf",
-						ServerOptions: map[string]string{"ke\ny": "value"},
+						Name:    "llama",
+						Model:   "f:/llama.gguf",
+						Options: Options{"ke\ny": "value"},
 					},
 				},
 			},
-			wantErr: "server_options key must not contain newline characters",
+			wantErr: "options key must not contain newline characters",
 		},
 		{
-			name: "router mode with carriage return in model server_options key",
+			name: "router mode with carriage return in model options key",
 			preset: Preset{
 				Mode: "router",
 				Models: []ModelEntry{
 					{
-						Name:          "llama",
-						Model:         "f:/llama.gguf",
-						ServerOptions: map[string]string{"ke\ry": "value"},
+						Name:    "llama",
+						Model:   "f:/llama.gguf",
+						Options: Options{"ke\ry": "value"},
 					},
 				},
 			},
-			wantErr: "server_options key must not contain newline characters",
+			wantErr: "options key must not contain newline characters",
 		},
 		{
 			name:    "single mode with newline in model",
@@ -714,9 +664,9 @@ func TestPreset_Validate(t *testing.T) {
 			wantErr: "model field must not contain newline characters",
 		},
 		{
-			name:    "single mode with newline in draft_model",
+			name:    "single mode with newline in draft-model",
 			preset:  Preset{Model: "f:/path/to/model.gguf", DraftModel: "f:/path\n/draft.gguf"},
-			wantErr: "draft_model field must not contain newline characters",
+			wantErr: "draft-model field must not contain newline characters",
 		},
 		{
 			name: "router mode with newline in model path",
@@ -729,111 +679,131 @@ func TestPreset_Validate(t *testing.T) {
 			wantErr: "model field must not contain newline characters",
 		},
 		{
-			name: "router mode with newline in draft_model path",
+			name: "router mode with newline in draft-model path",
 			preset: Preset{
 				Mode: "router",
 				Models: []ModelEntry{
 					{Name: "llama", Model: "f:/llama.gguf", DraftModel: "f:/draft\n.gguf"},
 				},
 			},
-			wantErr: "draft_model field must not contain newline characters",
+			wantErr: "draft-model field must not contain newline characters",
 		},
+		// Reserved key tests for top-level options
 		{
-			name: "single mode with models_max",
+			name: "single mode with reserved key port in options",
 			preset: Preset{
-				Model:     "f:/path/to/model.gguf",
-				ModelsMax: 3,
+				Model:   "f:/path/to/model.gguf",
+				Options: Options{"port": "8080"},
 			},
-			wantErr: "models_max is only valid in router mode",
+			wantErr: `options key "port" is reserved`,
 		},
 		{
-			name: "single mode with sleep_idle_seconds",
+			name: "single mode with reserved key host in options",
 			preset: Preset{
-				Model:            "f:/path/to/model.gguf",
-				SleepIdleSeconds: 300,
+				Model:   "f:/path/to/model.gguf",
+				Options: Options{"host": "127.0.0.1"},
 			},
-			wantErr: "sleep_idle_seconds is only valid in router mode",
+			wantErr: `options key "host" is reserved`,
 		},
 		{
-			name: "router mode with top-level context_size",
+			name: "single mode with reserved key model in options",
 			preset: Preset{
-				Mode:        "router",
-				ContextSize: 4096,
-				Models: []ModelEntry{
-					{Name: "llama", Model: "f:/llama.gguf"},
-				},
+				Model:   "f:/path/to/model.gguf",
+				Options: Options{"model": "/other.gguf"},
 			},
-			wantErr: "router mode defines context_size per model in the 'models' list, not as a top-level field",
+			wantErr: `options key "model" is reserved`,
 		},
 		{
-			name: "router mode with top-level threads",
+			name: "single mode with reserved key model-draft in options",
+			preset: Preset{
+				Model:   "f:/path/to/model.gguf",
+				Options: Options{"model-draft": "/draft.gguf"},
+			},
+			wantErr: `options key "model-draft" is reserved`,
+		},
+		{
+			name: "single mode with reserved key models-max in options",
+			preset: Preset{
+				Model:   "f:/path/to/model.gguf",
+				Options: Options{"models-max": "3"},
+			},
+			wantErr: `options key "models-max" is reserved`,
+		},
+		{
+			name: "single mode with reserved key sleep-idle-seconds in options",
+			preset: Preset{
+				Model:   "f:/path/to/model.gguf",
+				Options: Options{"sleep-idle-seconds": "300"},
+			},
+			wantErr: `options key "sleep-idle-seconds" is reserved`,
+		},
+		{
+			name: "router mode with reserved key in global options",
 			preset: Preset{
 				Mode:    "router",
-				Threads: 8,
+				Options: Options{"port": "8080"},
 				Models: []ModelEntry{
 					{Name: "llama", Model: "f:/llama.gguf"},
 				},
 			},
-			wantErr: "router mode defines threads per model in the 'models' list, not as a top-level field",
+			wantErr: `options key "port" is reserved`,
 		},
+		// Reserved key tests for model entry options
 		{
-			name: "model field and server_options model conflict",
+			name: "router mode with reserved key port in model options",
 			preset: Preset{
 				Mode: "router",
 				Models: []ModelEntry{
 					{
-						Name:          "llama",
-						Model:         "f:/llama.gguf",
-						ServerOptions: map[string]string{"model": "/other.gguf"},
+						Name:    "llama",
+						Model:   "f:/llama.gguf",
+						Options: Options{"port": "8080"},
 					},
 				},
 			},
-			wantErr: "'model' field and server_options 'model' cannot both be set",
+			wantErr: `options key "port" is reserved`,
 		},
 		{
-			name: "context_size and ctx-size server_option conflict",
+			name: "router mode with reserved key model in model options",
 			preset: Preset{
 				Mode: "router",
 				Models: []ModelEntry{
 					{
-						Name:          "llama",
-						Model:         "f:/llama.gguf",
-						ContextSize:   4096,
-						ServerOptions: map[string]string{"ctx-size": "2048"},
+						Name:    "llama",
+						Model:   "f:/llama.gguf",
+						Options: Options{"model": "/other.gguf"},
 					},
 				},
 			},
-			wantErr: "'context_size' and server_options 'ctx-size' cannot both be set",
+			wantErr: `options key "model" is reserved`,
 		},
 		{
-			name: "threads and threads server_option conflict",
+			name: "router mode with reserved key model-draft in model options",
 			preset: Preset{
 				Mode: "router",
 				Models: []ModelEntry{
 					{
-						Name:          "llama",
-						Model:         "f:/llama.gguf",
-						Threads:       8,
-						ServerOptions: map[string]string{"threads": "4"},
+						Name:    "llama",
+						Model:   "f:/llama.gguf",
+						Options: Options{"model-draft": "/draft.gguf"},
 					},
 				},
 			},
-			wantErr: "'threads' and server_options 'threads' cannot both be set",
+			wantErr: `options key "model-draft" is reserved`,
 		},
+		// model entry options allow models-max and sleep-idle-seconds (not reserved at model level)
 		{
-			name: "draft_model and model-draft server_option conflict",
+			name: "router mode model options allow non-reserved keys",
 			preset: Preset{
 				Mode: "router",
 				Models: []ModelEntry{
 					{
-						Name:          "llama",
-						Model:         "f:/llama.gguf",
-						DraftModel:    "f:/draft.gguf",
-						ServerOptions: map[string]string{"model-draft": "/other.gguf"},
+						Name:    "llama",
+						Model:   "f:/llama.gguf",
+						Options: Options{"ctx-size": "4096", "threads": "8"},
 					},
 				},
 			},
-			wantErr: "'draft_model' and server_options 'model-draft' cannot both be set",
 		},
 	}
 
@@ -852,6 +822,143 @@ func TestPreset_Validate(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("Validate() error = %q, want to contain %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestOptions_UnmarshalYAML(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    Options
+		wantErr string
+	}{
+		{
+			name:  "string values",
+			input: "flash-attn: on\ncache-type-k: q8_0",
+			want:  Options{"flash-attn": "on", "cache-type-k": "q8_0"},
+		},
+		{
+			name:  "integer value stored as string",
+			input: "ctx-size: 4096",
+			want:  Options{"ctx-size": "4096"},
+		},
+		{
+			name:  "float value stored as string",
+			input: "temp: 0.7",
+			want:  Options{"temp": "0.7"},
+		},
+		{
+			name:  "bool true normalized to lowercase",
+			input: "mlock: true",
+			want:  Options{"mlock": "true"},
+		},
+		{
+			name:  "bool True normalized to lowercase",
+			input: "mlock: True",
+			want:  Options{"mlock": "true"},
+		},
+		{
+			name:  "bool TRUE normalized to lowercase",
+			input: "mlock: TRUE",
+			want:  Options{"mlock": "true"},
+		},
+		{
+			name:  "bool false normalized to lowercase",
+			input: "mlock: false",
+			want:  Options{"mlock": "false"},
+		},
+		{
+			name:  "bool FALSE normalized to lowercase",
+			input: "mlock: FALSE",
+			want:  Options{"mlock": "false"},
+		},
+		{
+			name:  "on is treated as string not bool",
+			input: "flash-attn: on",
+			want:  Options{"flash-attn": "on"},
+		},
+		{
+			name:  "off is treated as string not bool",
+			input: "flash-attn: off",
+			want:  Options{"flash-attn": "off"},
+		},
+		{
+			name:  "yes is treated as string not bool",
+			input: "flag: yes",
+			want:  Options{"flag": "yes"},
+		},
+		{
+			name:  "no is treated as string not bool",
+			input: "flag: no",
+			want:  Options{"flag": "no"},
+		},
+		{
+			name:    "null value rejected",
+			input:   "key: null",
+			wantErr: `value must not be null`,
+		},
+		{
+			name:    "null value rejected with tilde",
+			input:   "key: ~",
+			wantErr: `value must not be null`,
+		},
+		{
+			name:    "list value rejected",
+			input:   "key:\n  - a\n  - b",
+			wantErr: "options key and value must be scalars",
+		},
+		{
+			name:    "map value rejected",
+			input:   "key:\n  nested: value",
+			wantErr: "options key and value must be scalars",
+		},
+		{
+			name:  "mixed types",
+			input: "ctx-size: 4096\ntemp: 0.7\nmlock: true\nflash-attn: on\ncache-type-k: q8_0",
+			want: Options{
+				"ctx-size":     "4096",
+				"temp":         "0.7",
+				"mlock":        "true",
+				"flash-attn":   "on",
+				"cache-type-k": "q8_0",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var opts Options
+			err := yaml.Unmarshal([]byte(tt.input), &opts)
+
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("UnmarshalYAML() expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("UnmarshalYAML() error = %q, want to contain %q", err.Error(), tt.wantErr)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("UnmarshalYAML() unexpected error: %v", err)
+			}
+
+			if len(opts) != len(tt.want) {
+				t.Fatalf("UnmarshalYAML() got %d keys, want %d", len(opts), len(tt.want))
+			}
+
+			for k, wantV := range tt.want {
+				gotV, ok := opts[k]
+				if !ok {
+					t.Errorf("UnmarshalYAML() missing key %q", k)
+					continue
+				}
+				if gotV != wantV {
+					t.Errorf("UnmarshalYAML() key %q = %q, want %q", k, gotV, wantV)
+				}
 			}
 		})
 	}

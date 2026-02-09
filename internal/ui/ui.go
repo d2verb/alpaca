@@ -193,14 +193,12 @@ func PrintConfirm(message string) {
 
 // PresetDetails contains preset information for display.
 type PresetDetails struct {
-	Name        string
-	Model       string
-	DraftModel  string
-	ContextSize int
-	Threads     int
-	Host        string
-	Port        int
-	ExtraArgs   []string
+	Name       string
+	Model      string
+	DraftModel string
+	Host       string
+	Port       int
+	Options    map[string]string
 }
 
 // ModelDetails contains model metadata for display.
@@ -223,15 +221,9 @@ func PrintPresetDetails(p PresetDetails) {
 	if p.DraftModel != "" {
 		PrintKeyValue("Draft Model", Link(p.DraftModel))
 	}
-	if p.ContextSize > 0 {
-		PrintKeyValue("Context Size", fmt.Sprintf("%d", p.ContextSize))
-	}
-	if p.Threads > 0 {
-		PrintKeyValue("Threads", fmt.Sprintf("%d", p.Threads))
-	}
 	PrintKeyValue("Endpoint", Link(fmt.Sprintf("http://%s:%d", p.Host, p.Port)))
-	if len(p.ExtraArgs) > 0 {
-		PrintKeyValue("Extra Args", strings.Join(p.ExtraArgs, " "))
+	if len(p.Options) > 0 {
+		PrintKeyValue("Options", formatOptions(p.Options))
 	}
 }
 
@@ -317,23 +309,21 @@ func PrintRouterStatus(state, preset, endpoint, logPath string, models []RouterM
 
 // RouterPresetDetails contains router preset information for display.
 type RouterPresetDetails struct {
-	Name             string
-	Host             string
-	Port             int
-	ModelsMax        int
-	SleepIdleSeconds int
-	ServerOptions    map[string]string
-	Models           []RouterModelDetail
+	Name        string
+	Host        string
+	Port        int
+	MaxModels   int
+	IdleTimeout int
+	Options     map[string]string
+	Models      []RouterModelDetail
 }
 
 // RouterModelDetail contains a single model's details in a router preset.
 type RouterModelDetail struct {
-	Name          string
-	Model         string
-	DraftModel    string
-	ContextSize   int
-	Threads       int
-	ServerOptions map[string]string
+	Name       string
+	Model      string
+	DraftModel string
+	Options    map[string]string
 }
 
 // PrintRouterPresetDetails prints router preset details in a formatted style.
@@ -343,14 +333,14 @@ func PrintRouterPresetDetails(p RouterPresetDetails) {
 
 	PrintKeyValue("Mode", "router")
 	PrintKeyValue("Endpoint", Link(fmt.Sprintf("http://%s:%d", p.Host, p.Port)))
-	if p.ModelsMax > 0 {
-		PrintKeyValue("Max Models", fmt.Sprintf("%d", p.ModelsMax))
+	if p.MaxModels > 0 {
+		PrintKeyValue("Max Models", fmt.Sprintf("%d", p.MaxModels))
 	}
-	if p.SleepIdleSeconds > 0 {
-		PrintKeyValue("Idle Timeout", fmt.Sprintf("%ds", p.SleepIdleSeconds))
+	if p.IdleTimeout > 0 {
+		PrintKeyValue("Idle Timeout", fmt.Sprintf("%ds", p.IdleTimeout))
 	}
-	if len(p.ServerOptions) > 0 {
-		PrintKeyValue("Server Options", formatServerOptions(p.ServerOptions))
+	if len(p.Options) > 0 {
+		PrintKeyValue("Options", formatOptions(p.Options))
 	}
 
 	if len(p.Models) > 0 {
@@ -363,14 +353,8 @@ func PrintRouterPresetDetails(p RouterPresetDetails) {
 			if m.DraftModel != "" {
 				PrintKeyValue("  Draft Model", Link(m.DraftModel))
 			}
-			if m.ContextSize > 0 {
-				PrintKeyValue("  Context Size", fmt.Sprintf("%d", m.ContextSize))
-			}
-			if m.Threads > 0 {
-				PrintKeyValue("  Threads", fmt.Sprintf("%d", m.Threads))
-			}
-			if len(m.ServerOptions) > 0 {
-				PrintKeyValue("  Server Options", formatServerOptions(m.ServerOptions))
+			if len(m.Options) > 0 {
+				PrintKeyValue("  Options", formatOptions(m.Options))
 			}
 			if i < len(p.Models)-1 {
 				fmt.Fprintln(Output)
@@ -379,8 +363,8 @@ func PrintRouterPresetDetails(p RouterPresetDetails) {
 	}
 }
 
-// formatServerOptions formats server options as sorted key=value pairs.
-func formatServerOptions(opts map[string]string) string {
+// formatOptions formats options as sorted key=value pairs.
+func formatOptions(opts map[string]string) string {
 	parts := make([]string, 0, len(opts))
 	for _, k := range slices.Sorted(maps.Keys(opts)) {
 		parts = append(parts, fmt.Sprintf("%s=%s", k, opts[k]))

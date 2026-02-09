@@ -373,13 +373,14 @@ func TestPrintPresetDetails(t *testing.T) {
 	defer func() { Output = nil }()
 
 	preset := PresetDetails{
-		Name:        "my-preset",
-		Model:       "h:org/model:Q4_K_M",
-		ContextSize: 4096,
-		Threads:     8,
-		Host:        "127.0.0.1",
-		Port:        8080,
-		ExtraArgs:   []string{"--flash-attn", "--verbose"},
+		Name:  "my-preset",
+		Model: "h:org/model:Q4_K_M",
+		Host:  "127.0.0.1",
+		Port:  8080,
+		Options: map[string]string{
+			"ctx-size":   "4096",
+			"flash-attn": "on",
+		},
 	}
 
 	// Act
@@ -396,26 +397,20 @@ func TestPrintPresetDetails(t *testing.T) {
 	if !strings.Contains(output, "h:org/model:Q4_K_M") {
 		t.Error("Output should contain model")
 	}
-	if !strings.Contains(output, "Context Size") {
-		t.Error("Output should contain 'Context Size' label")
+	if !strings.Contains(output, "Options") {
+		t.Error("Output should contain 'Options' label")
 	}
-	if !strings.Contains(output, "4096") {
-		t.Error("Output should contain context size value")
+	if !strings.Contains(output, "ctx-size=4096") {
+		t.Error("Output should contain ctx-size option")
 	}
-	if !strings.Contains(output, "Threads") {
-		t.Error("Output should contain 'Threads' label")
+	if !strings.Contains(output, "flash-attn=on") {
+		t.Error("Output should contain flash-attn option")
 	}
 	if !strings.Contains(output, "Endpoint") {
 		t.Error("Output should contain 'Endpoint' label")
 	}
 	if !strings.Contains(output, "127.0.0.1:8080") {
 		t.Error("Output should contain endpoint")
-	}
-	if !strings.Contains(output, "Extra Args") {
-		t.Error("Output should contain 'Extra Args' label")
-	}
-	if !strings.Contains(output, "--flash-attn") {
-		t.Error("Output should contain extra args")
 	}
 }
 
@@ -447,14 +442,8 @@ func TestPrintPresetDetails_Minimal(t *testing.T) {
 	if !strings.Contains(output, "Model") {
 		t.Error("Output should contain 'Model' label")
 	}
-	if strings.Contains(output, "Context Size") {
-		t.Error("Output should not contain 'Context Size' label when zero")
-	}
-	if strings.Contains(output, "Threads") {
-		t.Error("Output should not contain 'Threads' label when zero")
-	}
-	if strings.Contains(output, "Extra Args") {
-		t.Error("Output should not contain 'Extra Args' label when empty")
+	if strings.Contains(output, "Options") {
+		t.Error("Output should not contain 'Options' label when empty")
 	}
 }
 
@@ -682,35 +671,37 @@ func TestPrintRouterPresetDetails(t *testing.T) {
 	defer func() { Output = nil }()
 
 	details := RouterPresetDetails{
-		Name:             "my-workspace",
-		Host:             "127.0.0.1",
-		Port:             8080,
-		ModelsMax:        3,
-		SleepIdleSeconds: 300,
-		ServerOptions: map[string]string{
+		Name:        "my-workspace",
+		Host:        "127.0.0.1",
+		Port:        8080,
+		MaxModels:   3,
+		IdleTimeout: 300,
+		Options: map[string]string{
 			"flash-attn":   "on",
 			"cache-type-k": "q8_0",
 		},
 		Models: []RouterModelDetail{
 			{
-				Name:        "qwen3",
-				Model:       "h:Qwen/Qwen3-8B-GGUF",
-				DraftModel:  "h:Qwen/Qwen3-1B-GGUF",
-				ContextSize: 8192,
+				Name:       "qwen3",
+				Model:      "h:Qwen/Qwen3-8B-GGUF",
+				DraftModel: "h:Qwen/Qwen3-1B-GGUF",
+				Options:    map[string]string{"ctx-size": "8192"},
 			},
 			{
-				Name:        "nomic-embed",
-				Model:       "h:nomic-ai/nomic-embed-text-v2-moe-GGUF",
-				ContextSize: 2048,
-				ServerOptions: map[string]string{
+				Name:  "nomic-embed",
+				Model: "h:nomic-ai/nomic-embed-text-v2-moe-GGUF",
+				Options: map[string]string{
+					"ctx-size":   "2048",
 					"embeddings": "true",
 				},
 			},
 			{
-				Name:        "gemma3",
-				Model:       "f:/path/to/gemma3.gguf",
-				ContextSize: 4096,
-				Threads:     4,
+				Name:  "gemma3",
+				Model: "f:/path/to/gemma3.gguf",
+				Options: map[string]string{
+					"ctx-size": "4096",
+					"threads":  "4",
+				},
 			},
 		},
 	}
@@ -741,8 +732,8 @@ func TestPrintRouterPresetDetails(t *testing.T) {
 	if !strings.Contains(output, "300s") {
 		t.Error("Output should contain idle timeout value")
 	}
-	if !strings.Contains(output, "Server Options") {
-		t.Error("Output should contain 'Server Options' label")
+	if !strings.Contains(output, "Options") {
+		t.Error("Output should contain 'Options' label")
 	}
 	if !strings.Contains(output, "cache-type-k=q8_0") {
 		t.Error("Output should contain cache-type-k option")
@@ -765,14 +756,14 @@ func TestPrintRouterPresetDetails(t *testing.T) {
 	if !strings.Contains(output, "h:Qwen/Qwen3-1B-GGUF") {
 		t.Error("Output should contain draft model path")
 	}
-	if !strings.Contains(output, "8192") {
-		t.Error("Output should contain qwen3 context size")
+	if !strings.Contains(output, "ctx-size=8192") {
+		t.Error("Output should contain qwen3 ctx-size option")
 	}
 	if !strings.Contains(output, "nomic-embed") {
 		t.Error("Output should contain nomic-embed model name")
 	}
 	if !strings.Contains(output, "embeddings=true") {
-		t.Error("Output should contain per-model server option")
+		t.Error("Output should contain per-model embeddings option")
 	}
 	if !strings.Contains(output, "gemma3") {
 		t.Error("Output should contain gemma3 model name")
@@ -780,8 +771,8 @@ func TestPrintRouterPresetDetails(t *testing.T) {
 	if !strings.Contains(output, "f:/path/to/gemma3.gguf") {
 		t.Error("Output should contain gemma3 model path")
 	}
-	if !strings.Contains(output, "Threads") {
-		t.Error("Output should contain 'Threads' label for gemma3")
+	if !strings.Contains(output, "threads=4") {
+		t.Error("Output should contain gemma3 threads option")
 	}
 }
 
@@ -824,18 +815,15 @@ func TestPrintRouterPresetDetails_Minimal(t *testing.T) {
 	if strings.Contains(output, "Idle Timeout") {
 		t.Error("Output should not contain 'Idle Timeout' when zero")
 	}
-	if strings.Contains(output, "Server Options") {
-		t.Error("Output should not contain 'Server Options' when empty")
+	if strings.Contains(output, "Options") {
+		t.Error("Output should not contain 'Options' when empty")
 	}
 	if strings.Contains(output, "Draft Model") {
 		t.Error("Output should not contain 'Draft Model' when empty")
 	}
-	if strings.Contains(output, "Threads") {
-		t.Error("Output should not contain 'Threads' when zero")
-	}
 }
 
-func TestFormatServerOptions(t *testing.T) {
+func TestFormatOptions(t *testing.T) {
 	tests := []struct {
 		name string
 		opts map[string]string
@@ -863,9 +851,9 @@ func TestFormatServerOptions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := formatServerOptions(tt.opts)
+			got := formatOptions(tt.opts)
 			if got != tt.want {
-				t.Errorf("formatServerOptions() = %q, want %q", got, tt.want)
+				t.Errorf("formatOptions() = %q, want %q", got, tt.want)
 			}
 		})
 	}

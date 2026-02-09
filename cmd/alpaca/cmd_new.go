@@ -147,10 +147,6 @@ func (c *NewCmd) collectSingleInputs(name string) (*preset.Preset, error) {
 	if err != nil {
 		return nil, err
 	}
-	ctxStr, err := promptLine("Context", strconv.Itoa(preset.DefaultContextSize))
-	if err != nil {
-		return nil, err
-	}
 
 	p := &preset.Preset{
 		Name:  name,
@@ -163,9 +159,6 @@ func (c *NewCmd) collectSingleInputs(name string) (*preset.Preset, error) {
 	}
 	if port, err := strconv.Atoi(portStr); err == nil && port != preset.DefaultPort {
 		p.Port = port
-	}
-	if ctx, err := strconv.Atoi(ctxStr); err == nil && ctx != preset.DefaultContextSize {
-		p.ContextSize = ctx
 	}
 
 	return p, nil
@@ -224,17 +217,9 @@ func (c *NewCmd) collectRouterInputs(name string) (*preset.Preset, error) {
 			continue
 		}
 
-		ctxStr, err := promptLine("    Context", strconv.Itoa(preset.DefaultContextSize))
-		if err != nil {
-			return nil, err
-		}
-
 		entry := preset.ModelEntry{
 			Name:  modelName,
 			Model: modelRef,
-		}
-		if ctx, err := strconv.Atoi(ctxStr); err == nil && ctx != preset.DefaultContextSize {
-			entry.ContextSize = ctx
 		}
 
 		models = append(models, entry)

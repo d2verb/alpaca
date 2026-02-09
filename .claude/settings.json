@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(task build:*)",
+      "Bash(task test:*)",
+      "Bash(task lint:*)",
+      "Bash(task check:*)",
+      "Bash(task fmt:*)",
+      "Bash(task gui:*)",
+      "Bash(go build:*)",
+      "Bash(go test:*)",
+      "Bash(go run:*)",
+      "Bash(go mod tidy:*)",
+      "Bash(go mod init:*)",
+      "Bash(go vet:*)",
+      "Bash(go list:*)",
+      "Bash(go doc:*)",
+      "Bash(go get:*)",
+      "Bash(go install:*)",
+      "Bash(go tool cover:*)",
+      "Bash(gofmt:*)",
+      "Bash(golangci-lint:*)",
+      "Bash(swift:*)",
+      "Bash(xcodebuild:*)",
+      "Bash(swiftc:*)",
+      "Bash(open:*)",
+      "Bash(./build/alpaca:*)",
+      "Bash(./alpaca:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git revert:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "mcp__codex__codex",
+      "mcp__codex__codex-reply"
+    ]
+  }
+}
