@@ -80,7 +80,7 @@ options:
 
 The `options` field is a key-value map for passing arbitrary options to llama-server. Keys are llama-server long option names without the `--` prefix.
 
-```
+```text
 llama-server flag    → options key
 --ctx-size           → ctx-size
 --threads            → threads

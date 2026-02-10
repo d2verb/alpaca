@@ -44,3 +44,5 @@ docs/wip/**/*
 !docs/wip/.gitkeep
 
 .serena/
+
+.claude/settings.local.json
