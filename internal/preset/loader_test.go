@@ -10,16 +10,15 @@ import (
 func TestLoader_Load(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Create a valid preset file with random filename
+	// Create a valid preset file with random filename (v2 format)
 	validPreset := `name: valid-preset
 model: "f:/path/to/model.gguf"
-context_size: 4096
-threads: 8
 port: 9090
 host: "0.0.0.0"
-extra_args:
-  - "--verbose"
-  - "--mlock"
+options:
+  ctx-size: 4096
+  threads: 8
+  mlock: true
 `
 	if err := os.WriteFile(filepath.Join(tmpDir, "abc123.yaml"), []byte(validPreset), 0644); err != nil {
 		t.Fatal(err)
@@ -59,20 +58,20 @@ model: "f:~/.alpaca/models/test.gguf"
 		if p.Model != "f:/path/to/model.gguf" {
 			t.Errorf("Model = %q, want %q", p.Model, "f:/path/to/model.gguf")
 		}
-		if p.ContextSize != 4096 {
-			t.Errorf("ContextSize = %d, want %d", p.ContextSize, 4096)
+		if p.Options["ctx-size"] != "4096" {
+			t.Errorf("Options[ctx-size] = %q, want %q", p.Options["ctx-size"], "4096")
 		}
-		if p.Threads != 8 {
-			t.Errorf("Threads = %d, want %d", p.Threads, 8)
+		if p.Options["threads"] != "8" {
+			t.Errorf("Options[threads] = %q, want %q", p.Options["threads"], "8")
+		}
+		if p.Options["mlock"] != "true" {
+			t.Errorf("Options[mlock] = %q, want %q", p.Options["mlock"], "true")
 		}
 		if p.Port != 9090 {
 			t.Errorf("Port = %d, want %d", p.Port, 9090)
 		}
 		if p.Host != "0.0.0.0" {
 			t.Errorf("Host = %q, want %q", p.Host, "0.0.0.0")
-		}
-		if len(p.ExtraArgs) != 2 || p.ExtraArgs[0] != "--verbose" || p.ExtraArgs[1] != "--mlock" {
-			t.Errorf("ExtraArgs = %v, want [--verbose --mlock]", p.ExtraArgs)
 		}
 	})
 
@@ -358,7 +357,8 @@ func TestLoadFile(t *testing.T) {
 
 		preset := `name: local-preset
 model: f:/abs/path/model.gguf
-context_size: 4096
+options:
+  ctx-size: 4096
 `
 		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
 		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
@@ -376,8 +376,8 @@ context_size: 4096
 		if p.Model != "f:/abs/path/model.gguf" {
 			t.Errorf("Model = %q, want %q", p.Model, "f:/abs/path/model.gguf")
 		}
-		if p.ContextSize != 4096 {
-			t.Errorf("ContextSize = %d, want %d", p.ContextSize, 4096)
+		if p.Options["ctx-size"] != "4096" {
+			t.Errorf("Options[ctx-size] = %q, want %q", p.Options["ctx-size"], "4096")
 		}
 	})
 
@@ -546,7 +546,7 @@ model: h:org/repo:Q4_K_M
 
 		preset := `name: speculative-preset
 model: f:/path/to/model.gguf
-draft_model: f:/path/to/draft.gguf
+draft-model: f:/path/to/draft.gguf
 `
 		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
 		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
@@ -568,7 +568,7 @@ draft_model: f:/path/to/draft.gguf
 
 		preset := `name: relative-draft
 model: f:/path/to/model.gguf
-draft_model: f:./models/draft.gguf
+draft-model: f:./models/draft.gguf
 `
 		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
 		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
@@ -591,7 +591,7 @@ draft_model: f:./models/draft.gguf
 
 		preset := `name: tilde-draft
 model: f:/path/to/model.gguf
-draft_model: f:~/models/draft.gguf
+draft-model: f:~/models/draft.gguf
 `
 		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
 		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
@@ -615,7 +615,7 @@ draft_model: f:~/models/draft.gguf
 
 		preset := `name: hf-draft
 model: f:/path/to/model.gguf
-draft_model: h:org/draft-repo:Q4_K_M
+draft-model: h:org/draft-repo:Q4_K_M
 `
 		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
 		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
@@ -635,7 +635,7 @@ draft_model: h:org/draft-repo:Q4_K_M
 	t.Run("returns error for draft model without prefix", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
-		content := "name: test\nmodel: f:/path/model.gguf\ndraft_model: /path/draft.gguf"
+		content := "name: test\nmodel: f:/path/model.gguf\ndraft-model: /path/draft.gguf"
 		if err := os.WriteFile(presetPath, []byte(content), 0644); err != nil {
 			t.Fatal(err)
 		}
@@ -768,7 +768,7 @@ mode: router
 models:
   - name: qwen3
     model: f:/abs/path/model.gguf
-    draft_model: f:./drafts/draft.gguf
+    draft-model: f:./drafts/draft.gguf
 `
 		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
 		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
@@ -798,7 +798,7 @@ mode: router
 models:
   - name: qwen3
     model: h:Qwen/Qwen3-8B-GGUF:Q4_K_M
-    draft_model: h:Qwen/Qwen3-1B-GGUF:Q4_K_M
+    draft-model: h:Qwen/Qwen3-1B-GGUF:Q4_K_M
 `
 		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
 		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {

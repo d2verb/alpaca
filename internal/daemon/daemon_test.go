@@ -86,15 +86,12 @@ func TestResolveHFPresetSuccess(t *testing.T) {
 	if p.Model != "f:/path/to/model.gguf" {
 		t.Errorf("Model = %q, want %q", p.Model, "f:/path/to/model.gguf")
 	}
-	// Host, Port, ContextSize use preset defaults via GetXxx() methods
+	// Host, Port use preset defaults via GetXxx() methods
 	if p.GetHost() != preset.DefaultHost {
 		t.Errorf("GetHost() = %q, want %q", p.GetHost(), preset.DefaultHost)
 	}
 	if p.GetPort() != preset.DefaultPort {
 		t.Errorf("GetPort() = %d, want %d", p.GetPort(), preset.DefaultPort)
-	}
-	if p.GetContextSize() != preset.DefaultContextSize {
-		t.Errorf("GetContextSize() = %d, want %d", p.GetContextSize(), preset.DefaultContextSize)
 	}
 }
 
@@ -255,11 +252,10 @@ func mockHealthChecker(err error) healthChecker {
 func TestDaemonRun_PresetNameSuccess(t *testing.T) {
 	// Arrange
 	testPreset := &preset.Preset{
-		Name:        "test-preset",
-		Model:       "f:/path/to/model.gguf",
-		Host:        "127.0.0.1",
-		Port:        8080,
-		ContextSize: 4096,
+		Name:  "test-preset",
+		Model: "f:/path/to/model.gguf",
+		Host:  "127.0.0.1",
+		Port:  8080,
 	}
 
 	presets := &stubPresetLoader{
@@ -1125,7 +1121,7 @@ func TestDaemonRun_RouterModeSuccess(t *testing.T) {
 		Host: "127.0.0.1",
 		Port: 8080,
 		Models: []preset.ModelEntry{
-			{Name: "codellama", Model: "f:/models/codellama.gguf", ContextSize: 4096},
+			{Name: "codellama", Model: "f:/models/codellama.gguf", Options: preset.Options{"ctx-size": "4096"}},
 			{Name: "mistral", Model: "f:/models/mistral.gguf"},
 		},
 	}
@@ -1405,10 +1401,10 @@ func TestResolveModel_RouterModeInvalidDraftModel(t *testing.T) {
 
 	// Assert
 	if err == nil {
-		t.Fatal("expected error for invalid draft_model identifier, got nil")
+		t.Fatal("expected error for invalid draft-model identifier, got nil")
 	}
-	if !strings.Contains(err.Error(), "draft_model") {
-		t.Errorf("error should mention draft_model, got: %v", err)
+	if !strings.Contains(err.Error(), "draft-model") {
+		t.Errorf("error should mention draft-model, got: %v", err)
 	}
 }
 

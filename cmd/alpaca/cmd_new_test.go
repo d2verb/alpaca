@@ -31,10 +31,8 @@ func TestCollectRouterInputs(t *testing.T) {
 		"",                                   // Port [8080]
 		"qwen3",                              // Name
 		"h:Qwen/Qwen3-8B-GGUF:Q4_K_M",        // Model
-		"8192",                               // Context
 		"nomic-embed",                        // Name
 		"h:nomic-ai/nomic-embed-text:Q4_K_M", // Model
-		"",                                   // Context (default)
 		"",                                   // blank name to finish
 	}, "\n") + "\n"
 	setStdinInput(t, input)
@@ -63,15 +61,8 @@ func TestCollectRouterInputs(t *testing.T) {
 	if p.Models[0].Model != "h:Qwen/Qwen3-8B-GGUF:Q4_K_M" {
 		t.Errorf("Models[0].Model = %q, want %q", p.Models[0].Model, "h:Qwen/Qwen3-8B-GGUF:Q4_K_M")
 	}
-	if p.Models[0].ContextSize != 8192 {
-		t.Errorf("Models[0].ContextSize = %d, want 8192", p.Models[0].ContextSize)
-	}
 	if p.Models[1].Name != "nomic-embed" {
 		t.Errorf("Models[1].Name = %q, want %q", p.Models[1].Name, "nomic-embed")
-	}
-	// Default context size should not be stored
-	if p.Models[1].ContextSize != 0 {
-		t.Errorf("Models[1].ContextSize = %d, want 0 (default omitted)", p.Models[1].ContextSize)
 	}
 }
 
@@ -86,7 +77,6 @@ func TestCollectRouterInputs_CustomHostPort(t *testing.T) {
 		"9090",               // Port
 		"model1",             // Name
 		"h:org/model:Q4_K_M", // Model
-		"",                   // Context (default)
 		"",                   // blank name to finish
 	}, "\n") + "\n"
 	setStdinInput(t, input)
@@ -146,11 +136,9 @@ func TestCollectRouterInputs_DuplicateModelNameRecovers(t *testing.T) {
 		"",                    // Port (default)
 		"model1",              // Name 1
 		"h:org/model1:Q4_K_M", // Model 1
-		"",                    // Context (default)
 		"model1",              // Duplicate name → warning
 		"model2",              // Recovery with valid name
 		"h:org/model2:Q4_K_M", // Model 2
-		"",                    // Context (default)
 		"",                    // blank name to finish
 	}, "\n") + "\n"
 	setStdinInput(t, input)
@@ -184,7 +172,6 @@ func TestCollectRouterInputs_InvalidModelNameRecovers(t *testing.T) {
 		"invalid name!",      // Invalid name → warning
 		"valid-name",         // Recovery with valid name
 		"h:org/model:Q4_K_M", // Model
-		"",                   // Context (default)
 		"",                   // blank name to finish
 	}, "\n") + "\n"
 	setStdinInput(t, input)
@@ -222,7 +209,6 @@ func TestCollectRouterInputs_MissingModelRefRecovers(t *testing.T) {
 		"",                   // Empty model ref → warning
 		"model1",             // Re-enter name
 		"h:org/model:Q4_K_M", // Valid model
-		"",                   // Context (default)
 		"",                   // blank name to finish
 	}, "\n") + "\n"
 	setStdinInput(t, input)
@@ -257,7 +243,6 @@ func TestCollectRouterInputs_InvalidModelPrefixRecovers(t *testing.T) {
 		"org/model:Q4_K_M",   // Missing prefix → warning
 		"model1",             // Re-enter name
 		"h:org/model:Q4_K_M", // Valid model with prefix
-		"",                   // Context (default)
 		"",                   // blank name to finish
 	}, "\n") + "\n"
 	setStdinInput(t, input)
@@ -314,7 +299,6 @@ func TestCollectInputs_RouterModeBranch(t *testing.T) {
 		"",                   // Port (default)
 		"model1",             // Name
 		"h:org/model:Q4_K_M", // Model
-		"",                   // Context (default)
 		"",                   // blank name to finish
 	}, "\n") + "\n"
 	setStdinInput(t, input)
@@ -347,7 +331,6 @@ func TestCollectInputs_SingleModeBranch(t *testing.T) {
 		"h:org/model:Q4_K_M", // Model
 		"",                   // Host (default)
 		"",                   // Port (default)
-		"",                   // Context (default)
 	}, "\n") + "\n"
 	setStdinInput(t, input)
 

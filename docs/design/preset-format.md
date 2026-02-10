@@ -41,19 +41,20 @@ name: codellama-7b
 model: "f:~/.alpaca/models/codellama-7b-Q4_K_M.gguf"
 
 # Optional: draft model for speculative decoding (--model-draft)
-draft_model: "f:~/.alpaca/models/codellama-1b-Q4_K_M.gguf"
+draft-model: "f:~/.alpaca/models/codellama-1b-Q4_K_M.gguf"
 
-# Common options (mapped to llama-server arguments)
-context_size: 4096      # --ctx-size
-threads: 8              # --threads
-port: 8080              # --port
+# Alpaca-level options (optional)
+port: 8080              # default: 8080
+host: 127.0.0.1         # default: 127.0.0.1
 
-# Additional llama-server arguments
-# Use this for any option not explicitly defined above
-extra_args:
-  - "--flash-attn"
-  - "--cont-batching"
-  - "--mlock"
+# llama-server options (optional)
+# key = llama-server long option name without the -- prefix
+options:
+  ctx-size: 4096
+  threads: 8
+  flash-attn: on            # value option: → --flash-attn on
+  mlock: true               # boolean flag: → --mlock
+  no-mmap: true             # boolean flag: → --no-mmap
 ```
 
 ## Field Reference
@@ -67,44 +68,105 @@ extra_args:
 
 ### Optional Fields (Common)
 
-| Field | Type | Default | llama-server flag |
-|-------|------|---------|-------------------|
-| `draft_model` | string | (omit flag) | `--model-draft` |
-| `context_size` | int | 4096 | `--ctx-size` |
-| `threads` | int | 0 (omit flag, llama-server decides) | `--threads` |
-| `port` | int | 8080 | `--port` |
-| `host` | string | "127.0.0.1" | `--host` |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `mode` | string | `"single"` | `"single"` or `"router"` |
+| `draft-model` | string | - | Draft model identifier for speculative decoding (`--model-draft`). Uses `f:` or `h:` prefix. |
+| `port` | int | 8080 | llama-server listen port |
+| `host` | string | `"127.0.0.1"` | llama-server listen host |
+| `options` | Options | - | llama-server options (see [Options Map](#options-map)) |
 
-**Note on defaults:** Alpaca applies explicit defaults for `context_size`, `host`, and `port`. When these fields are omitted from the YAML, the defaults are still passed to llama-server. `threads` and `draft_model` omit the flag when not specified.
+### Options Map
 
-### Extra Arguments
+The `options` field is a key-value map for passing arbitrary options to llama-server. Keys are llama-server long option names without the `--` prefix.
 
-The `extra_args` field accepts a list of strings that are passed directly to llama-server. This allows using any llama-server option, including new options from future llama.cpp releases.
-
-Each element can contain space-separated flag and value pairs for convenience:
-
-```yaml
-# Recommended: space-separated format (more readable)
-extra_args:
-  - "-b 2048"
-  - "-ub 2048"
-  - "--temp 0.7"
-  - "--jinja"
-  - "--parallel 1"
-
-# Also supported: separate elements (legacy format)
-extra_args:
-  - "-b"
-  - "2048"
-  - "--jinja"
-
-# Mixed format works too
-extra_args:
-  - "-b 2048"
-  - "--jinja"
+```text
+llama-server flag    → options key
+--ctx-size           → ctx-size
+--threads            → threads
+--flash-attn         → flash-attn
+--cont-batching      → cont-batching
+--mlock              → mlock
+--temp               → temp
+--batch-size         → batch-size
 ```
 
-**Limitation:** Values containing spaces are not supported in the space-separated format. For such cases, use the separate elements format or consider alternative approaches (e.g., file-based templates for `--chat-template`).
+#### Value Types
+
+YAML values are written naturally as strings, numbers, or booleans. Internally all values are stored as strings (`map[string]string`) via a custom `UnmarshalYAML` implementation.
+
+go-yaml v3 follows YAML 1.2 where only `true`/`false` are `!!bool`. Values like `on`/`off`/`yes`/`no` are treated as plain strings (`!!str`), so no quoting is needed for value options like `flash-attn: on`.
+
+Boolean case variants (`True`/`TRUE`/`False`/`FALSE`) are normalized to lowercase `"true"`/`"false"` by `UnmarshalYAML`.
+
+```yaml
+options:
+  ctx-size: 4096        # YAML !!int   → Go "4096"
+  temp: 0.7             # YAML !!float → Go "0.7"
+  mlock: true           # YAML !!bool  → Go "true"
+  mlock: True           # YAML !!bool  → Go "true" (normalized)
+  mlock: FALSE          # YAML !!bool  → Go "false" (normalized)
+  flash-attn: on        # YAML !!str   → Go "on" (no quoting needed)
+  cache-type-k: q8_0    # YAML !!str   → Go "q8_0"
+```
+
+#### Single Mode Conversion Rules
+
+`options` map entries are converted to CLI arguments:
+
+| Value | Conversion | Use case | Example |
+|-------|-----------|----------|---------|
+| `"true"` | `--key` (flag only) | Boolean flags | `mlock: true` → `--mlock` |
+| `"false"` | (skipped) | Disable boolean flag | `mlock: false` → (nothing) |
+| Other | `--key value` | Value options | `ctx-size: 4096` → `--ctx-size 4096` |
+
+```yaml
+# Input
+options:
+  ctx-size: 4096
+  flash-attn: on
+  mlock: true
+  no-mmap: true
+  temp: 0.7
+
+# Generated CLI arguments
+# --ctx-size 4096 --flash-attn on --mlock --no-mmap --temp 0.7
+```
+
+> **User responsibility**: Alpaca does not manage llama-server flag types (thin wrapper principle). Use `true`/`false` for boolean flags and actual values for value options.
+
+#### Router Mode Conversion Rules
+
+`options` map entries are written directly as `key = value` pairs in config.ini. No special handling of `true`/`false`.
+
+```yaml
+# Input
+options:
+  flash-attn: on
+  mlock: true
+  cache-type-k: q8_0
+
+# config.ini output
+# [*]
+# cache-type-k = q8_0
+# flash-attn = on
+# mlock = true
+```
+
+In router mode, all values are written as-is to the INI file. llama-server's INI parser handles type conversion internally (e.g., `mlock = true` is interpreted as `--mlock`).
+
+#### Reserved Keys
+
+The following keys are prohibited in `options` (managed by top-level or dedicated fields):
+
+| Reserved Key | Reason |
+|-------------|--------|
+| `port` | Conflicts with top-level `port` |
+| `host` | Conflicts with top-level `host` |
+| `model` | Conflicts with top-level/ModelEntry `model` |
+| `model-draft` | Conflicts with top-level/ModelEntry `draft-model` |
+| `models-max` | Conflicts with top-level `max-models` (router mode) |
+| `sleep-idle-seconds` | Conflicts with top-level `idle-timeout` (router mode) |
 
 ## Router Mode
 
@@ -114,24 +176,29 @@ Presets can define multiple models to run simultaneously using llama-server's ro
 
 ```yaml
 name: my-workspace
-mode: router                   # "single" (default) or "router"
-port: 8080                     # Router's listening port
+mode: router
+port: 8080
 host: 127.0.0.1
-models_max: 3                  # Max simultaneously loaded models (optional)
-sleep_idle_seconds: 300        # Auto-unload idle models in seconds (optional)
-server_options:                # Global options applied to all models ([*] section)
-  flash-attn: "on"
+max-models: 3
+idle-timeout: 300
+
+# Global llama-server options ([*] section in config.ini)
+options:
+  flash-attn: on
   cache-type-k: q8_0
-models:                        # Required for router mode
+
+# Model definitions
+models:
   - name: qwen3
     model: "h:Qwen/Qwen3-8B-GGUF:Q4_K_M"
-    draft_model: "h:Qwen/Qwen3-1B-GGUF:Q4_K_M"
-    context_size: 8192
+    draft-model: "h:Qwen/Qwen3-1B-GGUF:Q4_K_M"
+    options:
+      ctx-size: 8192
   - name: nomic-embed
     model: "h:nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M"
-    context_size: 2048
-    server_options:
-      embeddings: "true"
+    options:
+      ctx-size: 2048
+      embeddings: true
 ```
 
 ### Router Mode Fields
@@ -139,9 +206,9 @@ models:                        # Required for router mode
 | Field | Type | Description |
 |-------|------|-------------|
 | `mode` | string | Must be `"router"` to enable router mode. |
-| `models_max` | int | Max simultaneously loaded models (`--models-max`). Omit to use llama-server default. |
-| `sleep_idle_seconds` | int | Auto-unload after N seconds idle (`--sleep-idle-seconds`). Omit to use llama-server default. |
-| `server_options` | map[string]string | Global llama-server options applied to all models (output as `[*]` section in config.ini). |
+| `max-models` | int | Max simultaneously loaded models (`--models-max`). Omit to use llama-server default. |
+| `idle-timeout` | int | Auto-unload after N seconds idle (`--sleep-idle-seconds`). Omit to use llama-server default. |
+| `options` | Options | Global llama-server options applied to all models (output as `[*]` section in config.ini). |
 | `models` | []ModelEntry | List of models to serve. At least one required. |
 
 ### ModelEntry Fields
@@ -150,32 +217,34 @@ models:                        # Required for router mode
 |-------|------|-------------|
 | `name` | string | Model identifier (section name in config.ini). Must match `[a-zA-Z0-9_-]+`. |
 | `model` | string | Model path with `h:` or `f:` prefix. |
-| `draft_model` | string | Draft model for speculative decoding (optional). |
-| `context_size` | int | Context window size (optional). |
-| `threads` | int | Thread count (optional). |
-| `server_options` | map[string]string | Per-model llama-server options (overrides global options). |
+| `draft-model` | string | Draft model for speculative decoding (optional). Uses `f:` or `h:` prefix. |
+| `options` | Options | Per-model llama-server options (overrides global options). |
 
-### server_options vs extra_args
+### Validation Rules
 
-| | `extra_args` | `server_options` |
-|--|-------------|---------|
-| Mode | Single mode only | Router mode only |
-| Format | CLI argument strings | INI key-value pairs |
-| Scope | Passed as CLI args to llama-server | Written to config.ini sections |
+#### Common
 
-### Validation Rules (Router Mode)
+- `name` is required. Must match `[a-zA-Z0-9_-]+`
+- `mode` must be `"single"` or `"router"`. Defaults to `"single"` when omitted
+- `options` keys and values must not contain newline characters
 
-- `models` must contain at least one entry
-- Top-level `model`, `extra_args`, `draft_model` are not allowed (use per-model fields instead)
-- Top-level `context_size`, `threads` are not allowed (define per model)
-- Model names must be unique and match `[a-zA-Z0-9_-]+`
-- Dedicated fields (`context_size`, `threads`, `draft_model`) cannot overlap with `server_options` keys (`ctx-size`, `threads`, `model-draft`)
+#### Single Mode
 
-### Backward Compatibility
+- `model` is required
+- `model` value must start with `f:` or `h:` prefix
+- `draft-model`, if specified, must start with `f:` or `h:` prefix
+- `models`, `max-models`, `idle-timeout` are not allowed
+- Reserved keys (`port`, `host`, `model`, `model-draft`, `models-max`, `sleep-idle-seconds`) are not allowed in `options`
 
-- `mode` defaults to `"single"` when omitted — existing presets work unchanged
-- Single mode presets cannot use `models` or `server_options`
-- Router mode presets cannot use `model`, `extra_args`, or top-level `draft_model`
+#### Router Mode
+
+- `models` is required with at least one entry
+- Top-level `model`, `draft-model` are not allowed
+- Each ModelEntry `name` is required and must be unique
+- Each ModelEntry `model` is required
+- Each ModelEntry `draft-model`, if specified, must start with `f:` or `h:` prefix
+- Reserved keys (`port`, `host`, `model`, `model-draft`, `models-max`, `sleep-idle-seconds`) are not allowed in top-level `options`
+- `port`, `host`, `model`, `model-draft` are not allowed in ModelEntry `options`
 
 ## Examples
 
@@ -185,21 +254,18 @@ models:                        # Required for router mode
 # Absolute path
 name: mistral-7b-q4
 model: "f:/Users/username/.alpaca/models/mistral-7b.Q4_K_M.gguf"
-context_size: 4096
 ```
 
 ```yaml
 # Home directory
 name: mistral-7b-q4
 model: "f:~/.alpaca/models/mistral-7b.Q4_K_M.gguf"
-context_size: 4096
 ```
 
 ```yaml
 # Relative to current working directory
 name: codellama
 model: "f:./models/codellama.gguf"
-context_size: 4096
 ```
 
 ### Preset with HuggingFace Model Reference
@@ -208,7 +274,6 @@ context_size: 4096
 # HuggingFace format (auto-resolved at runtime)
 name: gemma3-4b-q4
 model: "h:unsloth/gemma3-4b-it-GGUF:Q4_K_M"
-context_size: 4096
 ```
 
 **Note:** HuggingFace models must be downloaded first with `alpaca pull h:org/repo:quant`. The model field will be automatically resolved to `f:/path/to/downloaded/file.gguf` at runtime.
@@ -218,26 +283,27 @@ context_size: 4096
 ```yaml
 name: llama3-70b-speculative
 model: "f:~/.alpaca/models/llama3-70b.Q4_K_M.gguf"
-draft_model: "f:~/.alpaca/models/llama3-8b.Q4_K_M.gguf"
-context_size: 8192
-threads: 12
+draft-model: "f:~/.alpaca/models/llama3-8b.Q4_K_M.gguf"
+options:
+  ctx-size: 8192
+  threads: 12
 ```
 
-The `draft_model` field accepts the same format as `model` (`f:` for file paths, `h:` for HuggingFace). The draft model is passed to llama-server via the `--model-draft` flag for speculative decoding.
+The `draft-model` field accepts the same format as `model` (`f:` for file paths, `h:` for HuggingFace). The draft model is passed to llama-server via the `--model-draft` flag for speculative decoding.
 
 ### Full-Featured Preset
 
 ```yaml
 name: codellama-34b-instruct
 model: "f:~/.alpaca/models/codellama-34b-instruct.Q4_K_M.gguf"
-context_size: 8192
-threads: 12
 port: 8081
-extra_args:
-  - "--flash-attn"
-  - "--cont-batching"
-  - "--mlock"
-  - "--no-mmap"
+options:
+  ctx-size: 8192
+  threads: 12
+  flash-attn: on
+  cont-batching: true
+  mlock: true
+  no-mmap: true
 ```
 
 ### Preset with Custom Host
@@ -247,7 +313,32 @@ name: llama3-8b-network
 model: "f:~/.alpaca/models/llama3-8b.Q4_K_M.gguf"
 host: "0.0.0.0"  # Listen on all interfaces
 port: 8080
-context_size: 4096
+options:
+  ctx-size: 4096
+```
+
+### Router Mode
+
+```yaml
+name: my-workspace
+mode: router
+port: 8080
+max-models: 3
+idle-timeout: 300
+options:
+  flash-attn: on
+  cache-type-k: q8_0
+models:
+  - name: qwen3
+    model: "h:Qwen/Qwen3-8B-GGUF:Q4_K_M"
+    draft-model: "h:Qwen/Qwen3-1B-GGUF:Q4_K_M"
+    options:
+      ctx-size: 8192
+  - name: nomic-embed
+    model: "h:nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M"
+    options:
+      ctx-size: 2048
+      embeddings: true
 ```
 
 ## Model Field Resolution
@@ -311,7 +402,6 @@ Name [my-project]:
 Model: f:./models/my-model.gguf
 Host [127.0.0.1]:
 Port [8080]:
-Context [4096]:
 ✓ Created '.alpaca.yaml'
 💡 alpaca load
 ```
@@ -371,8 +461,36 @@ This makes local presets portable - they work correctly regardless of which dire
 - YAML is more standard and flexible
 - Easier to parse and validate
 - Better editor support (syntax highlighting, etc.)
-- `extra_args` provides full llama-server compatibility
+- `options` map provides full llama-server compatibility
+
+### Why `options` as `map[string]string`?
+
+- llama-server option names can be used directly as keys, no Alpaca-specific translation needed
+- New llama-server options work immediately without Alpaca changes (forward compatibility)
+- Same concept works in both single and router modes, reducing learning cost
+
+### Why `draft-model` is a dedicated field (not in `options`)?
+
+- `draft-model` values use `f:`/`h:` prefixes requiring Alpaca-level path resolution (home directory expansion, HuggingFace → file path conversion)
+- All other `options` keys are pass-through to llama-server with no processing
+- Putting `draft-model` in `options` would break the principle that `options` = pass-through
+- `model` and `draft-model` share the same nature (model identifiers) and belong at the same level
+
+### Why `port`/`host` are not in `options`?
+
+- `port`/`host` are Alpaca-level concerns (the daemon needs them to construct endpoints)
+- They are referenced internally by Alpaca, not just passed through to llama-server
+- Default value management belongs to Alpaca
+
+### Why `true`/`false` handling differs between single and router mode?
+
+llama-server has two flag types: **boolean flags** (no value, e.g., `--mlock`) and **value options** (value required, e.g., `--ctx-size 4096`).
+
+- **Single mode (CLI args)**: Boolean flags don't accept values on CLI. `--mlock true` would cause an error. So `mlock: true` → `--mlock` (flag only), `mlock: false` → (skipped).
+- **Router mode (config.ini)**: All flags use `key = value` format. llama-server's INI parser handles type conversion internally. Values are written as-is.
+
+This difference comes from llama-server's CLI vs INI behavior, not from Alpaca's design. Alpaca absorbs this difference so users can write the same `options` syntax in both modes.
 
 ### Extensibility
 
-The `extra_args` field ensures forward compatibility. When llama.cpp adds new options, users can immediately use them without waiting for Alpaca updates.
+The `options` map ensures forward compatibility. When llama.cpp adds new options, users can immediately use them without waiting for Alpaca updates.

@@ -222,7 +222,6 @@ $ alpaca load f:../shared/preset.yaml
 File paths are loaded with default settings:
 - `host`: 127.0.0.1
 - `port`: 8080
-- `context_size`: 4096
 
 **Error handling:**
 ```bash
@@ -245,7 +244,6 @@ When loading a model without a preset, the following defaults are used:
 ```yaml
 host: 127.0.0.1
 port: 8080
-context_size: 4096
 ```
 
 These defaults are defined in the preset package constants.
@@ -302,8 +300,7 @@ Show detailed information for a preset or model.
 $ alpaca show p:codellama-7b-q4
 📦 Preset: p:codellama-7b-q4
   Model          f:/Users/username/.alpaca/models/codellama-7b.Q4_K_M.gguf
-  Context Size   4096
-  Endpoint       127.0.0.1:8080
+  Endpoint       http://127.0.0.1:8080
 ```
 
 **Show model details:**
@@ -322,22 +319,21 @@ $ alpaca show h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 $ alpaca show p:my-workspace
 📦 Preset: p:my-workspace
   Mode             router
-  Endpoint         127.0.0.1:8080
+  Endpoint         http://127.0.0.1:8080
   Max Models       3
   Idle Timeout     300s
-  Server Options   flash-attn=on cache-type-k=q8_0
+  Options          cache-type-k=q8_0 flash-attn=on
 
   Models (2)
   ──────────
   qwen3
-    Model          h:Qwen/Qwen3-8B-GGUF
-    Draft Model    h:Qwen/Qwen3-1B-GGUF
-    Context Size   8192
+    Model          h:Qwen/Qwen3-8B-GGUF:Q4_K_M
+    Draft Model    h:Qwen/Qwen3-1B-GGUF:Q4_K_M
+    Options        ctx-size=8192
 
   nomic-embed
-    Model          h:nomic-ai/nomic-embed-text-v2-moe-GGUF
-    Context Size   2048
-    Server Options embeddings=true
+    Model          h:nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M
+    Options        ctx-size=2048 embeddings=true
 ```
 
 **Error cases:**
@@ -374,7 +370,6 @@ Name: my-model
 Model: h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 Host [127.0.0.1]:
 Port [8080]:
-Context [2048]: 8192
 ✓ Created 'my-model'
 💡 alpaca load p:my-model
 ```
@@ -391,7 +386,6 @@ Name [my-project]:
 Model: f:./models/model.gguf
 Host [127.0.0.1]:
 Port [8080]:
-Context [2048]: 4096
 ✓ Created '.alpaca.yaml'
 💡 alpaca load
 ```
@@ -415,12 +409,10 @@ Port [8080]:
   Model 1:
     Name: qwen3
     Model: h:Qwen/Qwen3-8B-GGUF:Q4_K_M
-    Context [4096]: 8192
 
   Model 2:
     Name: nomic-embed
     Model: h:nomic-ai/nomic-embed-text-v2-moe-GGUF:Q4_K_M
-    Context [4096]: 2048
 
   Model 3:
     Name:
@@ -436,12 +428,11 @@ The command will prompt for:
 - **Model**: Model identifier (must include `f:` or `h:` prefix) - **required** (single mode)
 - **Host**: Server host address (default: 127.0.0.1)
 - **Port**: Server port (default: 8080)
-- **Context**: Context window size (default: 4096) (single mode) or per-model (router mode)
 - **Models**: Interactive model addition loop (router mode) — enter blank name to finish
 
 Press Enter to accept default values (shown in brackets). Only non-default values are written to the YAML file.
 
-Additional settings (threads, extra_args, server_options, models_max, sleep_idle_seconds) can be added by editing the generated YAML file.
+Additional settings can be configured via `options` map (e.g., ctx-size, threads, flash-attn) by editing the generated YAML file.
 
 #### `alpaca edit [identifier]`
 

@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // namePattern validates preset names: alphanumeric, underscore, hyphen only.
@@ -21,9 +23,47 @@ const (
 	DefaultPort = 8080
 	// DefaultHost is the default host for llama-server.
 	DefaultHost = "127.0.0.1"
-	// DefaultContextSize is the default context size for llama-server.
-	DefaultContextSize = 4096
 )
+
+// reservedOptionsKeys are keys that cannot be used in the top-level options map.
+var reservedOptionsKeys = []string{
+	"port", "host", "model", "model-draft", "models-max", "sleep-idle-seconds",
+}
+
+// reservedModelEntryOptionsKeys are keys that cannot be used in ModelEntry options.
+var reservedModelEntryOptionsKeys = []string{
+	"port", "host", "model", "model-draft",
+}
+
+// Options is a map of llama-server options.
+// YAML scalars (string/int/float/bool) are accepted and stored as strings.
+// Non-scalar values (lists, maps) and null values are rejected.
+type Options map[string]string
+
+// UnmarshalYAML uses yaml.Node to normalize all scalar values to strings.
+// !!bool values are normalized to lowercase "true"/"false".
+func (o *Options) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind != yaml.MappingNode {
+		return fmt.Errorf("options must be a mapping")
+	}
+	*o = make(Options, len(value.Content)/2)
+	for i := 0; i < len(value.Content); i += 2 {
+		keyNode := value.Content[i]
+		valNode := value.Content[i+1]
+		if keyNode.Kind != yaml.ScalarNode || valNode.Kind != yaml.ScalarNode {
+			return fmt.Errorf("options key and value must be scalars")
+		}
+		if valNode.Tag == "!!null" {
+			return fmt.Errorf("options key %q: value must not be null", keyNode.Value)
+		}
+		val := valNode.Value
+		if valNode.Tag == "!!bool" {
+			val = strings.ToLower(val)
+		}
+		(*o)[keyNode.Value] = val
+	}
+	return nil
+}
 
 // ValidateName checks if a preset name is valid.
 // Valid names contain only alphanumeric characters, underscores, and hyphens.
@@ -57,29 +97,24 @@ func SanitizeName(name string) string {
 
 // ModelEntry represents a single model in router mode.
 type ModelEntry struct {
-	Name          string            `yaml:"name"`
-	Model         string            `yaml:"model"`
-	DraftModel    string            `yaml:"draft_model,omitempty"`
-	ContextSize   int               `yaml:"context_size,omitempty"`
-	Threads       int               `yaml:"threads,omitempty"`
-	ServerOptions map[string]string `yaml:"server_options,omitempty"`
+	Name       string  `yaml:"name"`
+	Model      string  `yaml:"model"`
+	DraftModel string  `yaml:"draft-model,omitempty"`
+	Options    Options `yaml:"options,omitempty"`
 }
 
 // Preset represents a model + argument combination.
 type Preset struct {
-	Name             string            `yaml:"name"`                         // Required, used as identifier
-	Model            string            `yaml:"model,omitempty"`              // single mode only
-	DraftModel       string            `yaml:"draft_model,omitempty"`        // single mode only
-	ContextSize      int               `yaml:"context_size,omitempty"`       // single mode only
-	Threads          int               `yaml:"threads,omitempty"`            // single mode only
-	Port             int               `yaml:"port,omitempty"`               // shared
-	Host             string            `yaml:"host,omitempty"`               // shared
-	ExtraArgs        []string          `yaml:"extra_args,omitempty"`         // single mode only
-	Mode             string            `yaml:"mode,omitempty"`               // "single" (default) or "router"
-	ModelsMax        int               `yaml:"models_max,omitempty"`         // router mode only
-	SleepIdleSeconds int               `yaml:"sleep_idle_seconds,omitempty"` // router mode only
-	Models           []ModelEntry      `yaml:"models,omitempty"`             // router mode only
-	ServerOptions    map[string]string `yaml:"server_options,omitempty"`     // router mode only, [*] section
+	Name        string       `yaml:"name"`
+	Model       string       `yaml:"model,omitempty"`
+	DraftModel  string       `yaml:"draft-model,omitempty"`
+	Mode        string       `yaml:"mode,omitempty"`
+	Port        int          `yaml:"port,omitempty"`
+	Host        string       `yaml:"host,omitempty"`
+	MaxModels   int          `yaml:"max-models,omitempty"`
+	IdleTimeout int          `yaml:"idle-timeout,omitempty"`
+	Options     Options      `yaml:"options,omitempty"`
+	Models      []ModelEntry `yaml:"models,omitempty"`
 }
 
 // GetPort returns the port, using default if not set.
@@ -98,14 +133,6 @@ func (p *Preset) GetHost() string {
 	return DefaultHost
 }
 
-// GetContextSize returns the context size, using default if not set.
-func (p *Preset) GetContextSize() int {
-	if p.ContextSize > 0 {
-		return p.ContextSize
-	}
-	return DefaultContextSize
-}
-
 // Endpoint returns the HTTP endpoint for this preset.
 func (p *Preset) Endpoint() string {
 	return fmt.Sprintf("http://%s:%d", p.GetHost(), p.GetPort())
@@ -118,33 +145,31 @@ func (p *Preset) IsRouter() bool {
 
 // BuildArgs builds the command-line arguments for llama-server in single mode.
 func (p *Preset) BuildArgs() []string {
-	// Extract actual file path from f: prefix if present
 	modelPath := strings.TrimPrefix(p.Model, "f:")
 
-	args := []string{
-		"-m", modelPath,
-	}
+	args := []string{"-m", modelPath}
 
 	if p.DraftModel != "" {
 		draftModelPath := strings.TrimPrefix(p.DraftModel, "f:")
 		args = append(args, "--model-draft", draftModelPath)
 	}
 
-	// Always include context size with default
-	args = append(args, "--ctx-size", strconv.Itoa(p.GetContextSize()))
-
-	if p.Threads > 0 {
-		args = append(args, "--threads", strconv.Itoa(p.Threads))
-	}
-
-	// Always include port and host with defaults
 	args = append(args, "--port", strconv.Itoa(p.GetPort()))
 	args = append(args, "--host", p.GetHost())
 
-	// Expand extra args (split each element by whitespace)
-	for _, arg := range p.ExtraArgs {
-		args = append(args, strings.Fields(arg)...)
+	// Convert options map to CLI args (sorted by key)
+	for _, k := range slices.Sorted(maps.Keys(p.Options)) {
+		v := p.Options[k]
+		switch v {
+		case "true":
+			args = append(args, "--"+k)
+		case "false":
+			// skip
+		default:
+			args = append(args, "--"+k, v)
+		}
 	}
+
 	return args
 }
 
@@ -156,12 +181,12 @@ func (p *Preset) BuildRouterArgs(configPath string) []string {
 		"--host", p.GetHost(),
 	}
 
-	if p.ModelsMax > 0 {
-		args = append(args, "--models-max", strconv.Itoa(p.ModelsMax))
+	if p.MaxModels > 0 {
+		args = append(args, "--models-max", strconv.Itoa(p.MaxModels))
 	}
 
-	if p.SleepIdleSeconds > 0 {
-		args = append(args, "--sleep-idle-seconds", strconv.Itoa(p.SleepIdleSeconds))
+	if p.IdleTimeout > 0 {
+		args = append(args, "--sleep-idle-seconds", strconv.Itoa(p.IdleTimeout))
 	}
 
 	return args
@@ -172,11 +197,11 @@ func (p *Preset) BuildRouterArgs(configPath string) []string {
 func (p *Preset) GenerateConfigINI() string {
 	var b strings.Builder
 
-	// [*] global section from top-level ServerOptions
-	if len(p.ServerOptions) > 0 {
+	// [*] global section from top-level Options
+	if len(p.Options) > 0 {
 		b.WriteString("[*]\n")
-		for _, k := range slices.Sorted(maps.Keys(p.ServerOptions)) {
-			fmt.Fprintf(&b, "%s = %s\n", k, p.ServerOptions[k])
+		for _, k := range slices.Sorted(maps.Keys(p.Options)) {
+			fmt.Fprintf(&b, "%s = %s\n", k, p.Options[k])
 		}
 		b.WriteString("\n")
 	}
@@ -193,17 +218,9 @@ func (p *Preset) GenerateConfigINI() string {
 			fmt.Fprintf(&b, "model-draft = %s\n", draftPath)
 		}
 
-		if m.ContextSize > 0 {
-			fmt.Fprintf(&b, "ctx-size = %d\n", m.ContextSize)
-		}
-
-		if m.Threads > 0 {
-			fmt.Fprintf(&b, "threads = %d\n", m.Threads)
-		}
-
-		if len(m.ServerOptions) > 0 {
-			for _, k := range slices.Sorted(maps.Keys(m.ServerOptions)) {
-				fmt.Fprintf(&b, "%s = %s\n", k, m.ServerOptions[k])
+		if len(m.Options) > 0 {
+			for _, k := range slices.Sorted(maps.Keys(m.Options)) {
+				fmt.Fprintf(&b, "%s = %s\n", k, m.Options[k])
 			}
 		}
 
@@ -234,14 +251,11 @@ func (p *Preset) validateSingle() error {
 	if len(p.Models) > 0 {
 		return fmt.Errorf("single mode uses 'model' field, not 'models' list")
 	}
-	if len(p.ServerOptions) > 0 {
-		return fmt.Errorf("single mode uses 'extra_args' instead of 'server_options'")
+	if p.MaxModels > 0 {
+		return fmt.Errorf("max-models is only valid in router mode")
 	}
-	if p.ModelsMax > 0 {
-		return fmt.Errorf("models_max is only valid in router mode")
-	}
-	if p.SleepIdleSeconds > 0 {
-		return fmt.Errorf("sleep_idle_seconds is only valid in router mode")
+	if p.IdleTimeout > 0 {
+		return fmt.Errorf("idle-timeout is only valid in router mode")
 	}
 	if p.Model == "" {
 		return fmt.Errorf("model field is required")
@@ -250,32 +264,23 @@ func (p *Preset) validateSingle() error {
 		return fmt.Errorf("model field must not contain newline characters")
 	}
 	if p.DraftModel != "" && strings.ContainsAny(p.DraftModel, "\n\r") {
-		return fmt.Errorf("draft_model field must not contain newline characters")
+		return fmt.Errorf("draft-model field must not contain newline characters")
 	}
-	return nil
+	return validateOptions(p.Options, reservedOptionsKeys)
 }
 
 func (p *Preset) validateRouter() error {
 	if p.Model != "" {
 		return fmt.Errorf("router mode defines models in the 'models' list, not as a top-level field")
 	}
-	if len(p.ExtraArgs) > 0 {
-		return fmt.Errorf("router mode uses 'server_options' instead of 'extra_args'")
-	}
 	if p.DraftModel != "" {
-		return fmt.Errorf("router mode defines draft_model per model in the 'models' list, not as a top-level field")
-	}
-	if p.ContextSize > 0 {
-		return fmt.Errorf("router mode defines context_size per model in the 'models' list, not as a top-level field")
-	}
-	if p.Threads > 0 {
-		return fmt.Errorf("router mode defines threads per model in the 'models' list, not as a top-level field")
+		return fmt.Errorf("router mode defines draft-model per model in the 'models' list, not as a top-level field")
 	}
 	if len(p.Models) == 0 {
 		return fmt.Errorf("at least one model is required for router mode")
 	}
 
-	if err := validateServerOptions(p.ServerOptions); err != nil {
+	if err := validateOptions(p.Options, reservedOptionsKeys); err != nil {
 		return err
 	}
 
@@ -293,7 +298,6 @@ func (p *Preset) validateRouter() error {
 			return fmt.Errorf("model field is required for model '%s'", m.Name)
 		}
 
-		// Validate model entry fields and check for duplicates with server_options
 		if err := validateModelEntry(m); err != nil {
 			return err
 		}
@@ -307,39 +311,23 @@ func validateModelEntry(m ModelEntry) error {
 		return fmt.Errorf("model field must not contain newline characters")
 	}
 	if m.DraftModel != "" && strings.ContainsAny(m.DraftModel, "\n\r") {
-		return fmt.Errorf("draft_model field must not contain newline characters")
+		return fmt.Errorf("draft-model field must not contain newline characters")
 	}
 
-	if m.ContextSize > 0 {
-		if _, ok := m.ServerOptions["ctx-size"]; ok {
-			return fmt.Errorf("'context_size' and server_options 'ctx-size' cannot both be set; use one or the other")
-		}
-	}
-	if m.Threads > 0 {
-		if _, ok := m.ServerOptions["threads"]; ok {
-			return fmt.Errorf("'threads' and server_options 'threads' cannot both be set; use one or the other")
-		}
-	}
-	if m.DraftModel != "" {
-		if _, ok := m.ServerOptions["model-draft"]; ok {
-			return fmt.Errorf("'draft_model' and server_options 'model-draft' cannot both be set; use one or the other")
-		}
-	}
-	if _, ok := m.ServerOptions["model"]; ok {
-		return fmt.Errorf("'model' field and server_options 'model' cannot both be set; use one or the other")
-	}
-
-	return validateServerOptions(m.ServerOptions)
+	return validateOptions(m.Options, reservedModelEntryOptionsKeys)
 }
 
-// validateServerOptions checks that server_options keys and values do not contain newline characters.
-func validateServerOptions(opts map[string]string) error {
+// validateOptions checks that options keys are not reserved and do not contain newline characters.
+func validateOptions(opts Options, reserved []string) error {
 	for k, v := range opts {
 		if strings.ContainsAny(k, "\n\r") {
-			return fmt.Errorf("server_options key must not contain newline characters")
+			return fmt.Errorf("options key must not contain newline characters")
 		}
 		if strings.ContainsAny(v, "\n\r") {
-			return fmt.Errorf("server_options value must not contain newline characters")
+			return fmt.Errorf("options value must not contain newline characters")
+		}
+		if slices.Contains(reserved, k) {
+			return fmt.Errorf("options key %q is reserved and cannot be used in options", k)
 		}
 	}
 	return nil

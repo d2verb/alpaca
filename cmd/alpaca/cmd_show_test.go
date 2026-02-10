@@ -57,26 +57,26 @@ func TestShowCmd_RouterPreset(t *testing.T) {
 	// Arrange: create a temp preset dir with a router preset
 	tmpDir := t.TempDir()
 	p := &preset.Preset{
-		Name:             "my-workspace",
-		Mode:             "router",
-		Port:             8080,
-		ModelsMax:        3,
-		SleepIdleSeconds: 300,
-		ServerOptions: map[string]string{
+		Name:        "my-workspace",
+		Mode:        "router",
+		Port:        8080,
+		MaxModels:   3,
+		IdleTimeout: 300,
+		Options: preset.Options{
 			"flash-attn": "on",
 		},
 		Models: []preset.ModelEntry{
 			{
-				Name:        "qwen3",
-				Model:       "h:Qwen/Qwen3-8B-GGUF",
-				DraftModel:  "h:Qwen/Qwen3-1B-GGUF",
-				ContextSize: 8192,
+				Name:       "qwen3",
+				Model:      "h:Qwen/Qwen3-8B-GGUF",
+				DraftModel: "h:Qwen/Qwen3-1B-GGUF",
+				Options:    preset.Options{"ctx-size": "8192"},
 			},
 			{
-				Name:        "nomic-embed",
-				Model:       "h:nomic-ai/nomic-embed-text-v2-moe-GGUF",
-				ContextSize: 2048,
-				ServerOptions: map[string]string{
+				Name:  "nomic-embed",
+				Model: "h:nomic-ai/nomic-embed-text-v2-moe-GGUF",
+				Options: preset.Options{
+					"ctx-size":   "2048",
 					"embeddings": "true",
 				},
 			},
@@ -136,7 +136,7 @@ func TestShowCmd_SinglePresetWithDraftModel(t *testing.T) {
 	color.NoColor = true
 	defer func() { color.NoColor = false }()
 
-	// Arrange: create a single mode preset with draft_model
+	// Arrange: create a single mode preset with draft-model
 	tmpDir := t.TempDir()
 	p := &preset.Preset{
 		Name:       "with-draft",

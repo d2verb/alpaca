@@ -160,7 +160,7 @@ func newDefaultPreset(name, model string) *preset.Preset {
 	return &preset.Preset{
 		Name:  name,
 		Model: model,
-		// Host, Port, ContextSize use preset package defaults via GetXxx() methods
+		// Host, Port use preset package defaults via GetXxx() methods
 	}
 }
 
@@ -174,7 +174,7 @@ func (d *Daemon) resolveHFPreset(ctx context.Context, repo, quant string) (*pres
 	return newDefaultPreset(fmt.Sprintf("h:%s:%s", repo, quant), "f:"+modelPath), nil
 }
 
-// resolveModel resolves the model and draft_model fields in a preset if they use HuggingFace format.
+// resolveModel resolves the model and draft-model fields in a preset if they use HuggingFace format.
 // Returns a new preset with the resolved model paths without mutating the original.
 // Returns the original preset as-is if no resolution is needed.
 // Returns error if HuggingFace model is not downloaded.
@@ -194,7 +194,7 @@ func (d *Daemon) resolveModel(ctx context.Context, p *preset.Preset) (*preset.Pr
 	if p.DraftModel != "" {
 		parsed, err := identifier.Parse(p.DraftModel)
 		if err != nil {
-			return nil, fmt.Errorf("invalid draft_model field in preset: %w", err)
+			return nil, fmt.Errorf("invalid draft-model field in preset: %w", err)
 		}
 		draftID = parsed
 		if parsed.Type == identifier.TypeHuggingFace {
@@ -208,6 +208,7 @@ func (d *Daemon) resolveModel(ctx context.Context, p *preset.Preset) (*preset.Pr
 
 	// Create copy to avoid mutating the original
 	resolved := *p
+	resolved.Options = maps.Clone(p.Options)
 
 	if id.Type == identifier.TypeHuggingFace {
 		modelPath, err := d.models.GetFilePath(ctx, id.Repo, id.Quant)
@@ -244,7 +245,7 @@ func (d *Daemon) resolveRouterModels(ctx context.Context, p *preset.Preset) (*pr
 		if m.DraftModel != "" {
 			did, err := identifier.Parse(m.DraftModel)
 			if err != nil {
-				return nil, fmt.Errorf("invalid draft_model field in models[%d]: %w", i, err)
+				return nil, fmt.Errorf("invalid draft-model field in models[%d]: %w", i, err)
 			}
 			if did.Type == identifier.TypeHuggingFace {
 				needsResolve = true
@@ -256,13 +257,13 @@ func (d *Daemon) resolveRouterModels(ctx context.Context, p *preset.Preset) (*pr
 		return p, nil
 	}
 
-	// Deep copy: copy the preset, Models slice, and ServerOptions maps
+	// Deep copy: copy the preset, Models slice, and Options maps
 	resolved := *p
-	resolved.ServerOptions = maps.Clone(p.ServerOptions)
+	resolved.Options = maps.Clone(p.Options)
 	resolved.Models = make([]preset.ModelEntry, len(p.Models))
 	copy(resolved.Models, p.Models)
 	for i, m := range resolved.Models {
-		resolved.Models[i].ServerOptions = maps.Clone(m.ServerOptions)
+		resolved.Models[i].Options = maps.Clone(m.Options)
 	}
 
 	for i, m := range resolved.Models {
