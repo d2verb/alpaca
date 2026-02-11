@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -612,11 +613,11 @@ func TestPull_RePull_MmprojFilenameChanged(t *testing.T) {
 
 	// First pull: mmproj filename A
 	mmprojOriginalA := "mmproj-v1.gguf"
-	pullCount := 0
+	var pullCount atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.Contains(r.URL.Path, "/manifests/"):
-			if pullCount == 0 {
+			if pullCount.Load() == 0 {
 				resp := newManifestResponseWithMmproj(
 					"model-Q4_K_M.gguf", int64(len(modelContent)), modelHash,
 					mmprojOriginalA, int64(len(mmprojContentA)), mmprojHashA,
@@ -671,7 +672,7 @@ func TestPull_RePull_MmprojFilenameChanged(t *testing.T) {
 	}
 
 	// Act - Second pull with different mmproj filename
-	pullCount = 1
+	pullCount.Store(1)
 	result2, err := puller.Pull(context.Background(), repo, "Q4_K_M")
 
 	// Assert
@@ -703,11 +704,11 @@ func TestPull_RePull_MmprojRemoved(t *testing.T) {
 	mmprojHash := computeSHA256(mmprojContent)
 	repo := "ggml-org/gemma-3-4b-it-GGUF"
 
-	pullCount := 0
+	var pullCount atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.Contains(r.URL.Path, "/manifests/"):
-			if pullCount == 0 {
+			if pullCount.Load() == 0 {
 				// First pull: with mmproj
 				resp := newManifestResponseWithMmproj(
 					"model-Q4_K_M.gguf", int64(len(modelContent)), modelHash,
@@ -756,7 +757,7 @@ func TestPull_RePull_MmprojRemoved(t *testing.T) {
 	}
 
 	// Act - Second pull (text-only, no mmproj)
-	pullCount = 1
+	pullCount.Store(1)
 	result2, err := puller.Pull(context.Background(), repo, "Q4_K_M")
 
 	// Assert
@@ -792,11 +793,11 @@ func TestPull_RePull_SharedMmproj_NotDeleted(t *testing.T) {
 	mmprojHash := computeSHA256(mmprojContent)
 	repo := "ggml-org/gemma-3-4b-it-GGUF"
 
-	pullCount := 0
+	var pullCount atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.Contains(r.URL.Path, "/manifests/Q4_K_M"):
-			if pullCount < 2 {
+			if pullCount.Load() < 2 {
 				resp := newManifestResponseWithMmproj(
 					"model-Q4_K_M.gguf", int64(len(modelContentQ4)), modelHashQ4,
 					"mmproj-model-f16.gguf", int64(len(mmprojContent)), mmprojHash,
@@ -840,7 +841,7 @@ func TestPull_RePull_SharedMmproj_NotDeleted(t *testing.T) {
 	puller := newTestPuller(tmpDir, srv.URL)
 
 	// First pull: Q4_K_M with mmproj
-	pullCount = 0
+	pullCount.Store(0)
 	result1, err := puller.Pull(context.Background(), repo, "Q4_K_M")
 	if err != nil {
 		t.Fatalf("first Pull(Q4_K_M) error = %v", err)
@@ -848,7 +849,7 @@ func TestPull_RePull_SharedMmproj_NotDeleted(t *testing.T) {
 	mmprojFilename := result1.MmprojFilename
 
 	// Second pull: Q8_0 with same mmproj
-	pullCount = 1
+	pullCount.Store(1)
 	_, err = puller.Pull(context.Background(), repo, "Q8_0")
 	if err != nil {
 		t.Fatalf("Pull(Q8_0) error = %v", err)
@@ -862,7 +863,7 @@ func TestPull_RePull_SharedMmproj_NotDeleted(t *testing.T) {
 	}
 
 	// Act - Re-pull Q4_K_M as text-only (mmproj removed)
-	pullCount = 2
+	pullCount.Store(2)
 	_, err = puller.Pull(context.Background(), repo, "Q4_K_M")
 
 	// Assert

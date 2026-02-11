@@ -357,6 +357,9 @@ func validateMmproj(mmproj string) error {
 		return fmt.Errorf("mmproj field must not contain newline characters")
 	}
 	if strings.HasPrefix(mmproj, "f:") {
+		if len(mmproj) <= 2 {
+			return fmt.Errorf("mmproj 'f:' prefix requires a path")
+		}
 		return nil
 	}
 	return fmt.Errorf("invalid mmproj value: got %q; expected 'none', 'f:/path', or omit", mmproj)

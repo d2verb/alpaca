@@ -773,6 +773,11 @@ func TestPreset_Validate(t *testing.T) {
 			preset: Preset{Model: "f:/path/to/model.gguf", Mmproj: "f:/path/to/mmproj.gguf"},
 		},
 		{
+			name:    "single mode with mmproj f: only (no path) is invalid",
+			preset:  Preset{Model: "f:/path/to/model.gguf", Mmproj: "f:"},
+			wantErr: "mmproj 'f:' prefix requires a path",
+		},
+		{
 			name:    "single mode with mmproj None is invalid",
 			preset:  Preset{Model: "f:/path/to/model.gguf", Mmproj: "None"},
 			wantErr: `invalid mmproj value: got "None"`,
