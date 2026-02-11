@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
@@ -113,7 +114,7 @@ func TestUpdate_EndToEnd(t *testing.T) {
 	updater.publicKey = pub
 
 	// Act
-	err = updater.Update(currentBinary)
+	err = updater.Update(context.Background(), currentBinary)
 
 	// Assert
 	if err != nil {
@@ -199,7 +200,7 @@ func TestUpdate_WithInvalidSignature(t *testing.T) {
 	updater.publicKey = pub
 
 	// Act
-	err = updater.Update(currentBinary)
+	err = updater.Update(context.Background(), currentBinary)
 
 	// Assert
 	if err == nil {
@@ -264,7 +265,7 @@ func TestUpdate_WithoutSignatureFile(t *testing.T) {
 	updater := newTestUpdater("v1.0.0", srv.URL)
 
 	// Act - should fail because signature file is missing (fail-closed)
-	err = updater.Update(currentBinary)
+	err = updater.Update(context.Background(), currentBinary)
 
 	// Assert
 	if err == nil {
@@ -339,7 +340,7 @@ func TestUpdate_ChecksumMismatch(t *testing.T) {
 	updater.publicKey = pub
 
 	// Act
-	err = updater.Update(currentBinary)
+	err = updater.Update(context.Background(), currentBinary)
 
 	// Assert
 	if err == nil {
@@ -377,7 +378,7 @@ func TestUpdate_AssetNotFound(t *testing.T) {
 	updater := newTestUpdater("v1.0.0", srv.URL)
 
 	// Act
-	err := updater.Update(currentBinary)
+	err := updater.Update(context.Background(), currentBinary)
 
 	// Assert
 	if err == nil {
@@ -411,7 +412,7 @@ func TestUpdate_ChecksumFileNotFound(t *testing.T) {
 	updater := newTestUpdater("v1.0.0", srv.URL)
 
 	// Act
-	err := updater.Update(currentBinary)
+	err := updater.Update(context.Background(), currentBinary)
 
 	// Assert
 	if err == nil {
@@ -436,7 +437,7 @@ func TestCheckUpdate_NewVersionAvailable(t *testing.T) {
 	updater := newTestUpdater("v1.0.0", srv.URL)
 
 	// Act
-	version, hasUpdate, err := updater.CheckUpdate()
+	version, hasUpdate, err := updater.CheckUpdate(context.Background())
 
 	// Assert
 	if err != nil {
@@ -464,7 +465,7 @@ func TestCheckUpdate_AlreadyUpToDate(t *testing.T) {
 	updater := newTestUpdater("v1.0.0", srv.URL)
 
 	// Act
-	_, hasUpdate, err := updater.CheckUpdate()
+	_, hasUpdate, err := updater.CheckUpdate(context.Background())
 
 	// Assert
 	if err != nil {
@@ -485,7 +486,7 @@ func TestCheckUpdate_RateLimitError(t *testing.T) {
 	updater := newTestUpdater("v1.0.0", srv.URL)
 
 	// Act
-	_, _, err := updater.CheckUpdate()
+	_, _, err := updater.CheckUpdate(context.Background())
 
 	// Assert
 	if err == nil {
@@ -506,7 +507,7 @@ func TestCheckUpdate_ServerError(t *testing.T) {
 	updater := newTestUpdater("v1.0.0", srv.URL)
 
 	// Act
-	_, _, err := updater.CheckUpdate()
+	_, _, err := updater.CheckUpdate(context.Background())
 
 	// Assert
 	if err == nil {

@@ -91,7 +91,7 @@ func IsProcessRunning(pid int) (bool, error) {
 	}
 
 	// "process already finished" is returned on macOS for non-existent processes
-	if err.Error() == "os: process already finished" {
+	if errors.Is(err, os.ErrProcessDone) {
 		return false, nil
 	}
 

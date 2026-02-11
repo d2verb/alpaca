@@ -57,6 +57,26 @@ func TestConcurrentIsRunningCallsNoRace(t *testing.T) {
 	wg.Wait()
 }
 
+func TestStartReturnsErrorWhenAlreadyRunning(t *testing.T) {
+	p := NewProcess("/bin/sleep")
+
+	// Start a real process
+	err := p.Start(context.Background(), []string{"60"})
+	if err != nil {
+		t.Fatalf("first Start() failed: %v", err)
+	}
+	defer p.Stop(context.Background())
+
+	// Second start should fail
+	err = p.Start(context.Background(), []string{"60"})
+	if err == nil {
+		t.Fatal("second Start() should return error, got nil")
+	}
+	if err.Error() != "process already running" {
+		t.Errorf("got error %q, want %q", err.Error(), "process already running")
+	}
+}
+
 func TestConcurrentSetLogWriterAndIsRunningNoRace(t *testing.T) {
 	p := NewProcess("llama-server")
 	var buf bytes.Buffer

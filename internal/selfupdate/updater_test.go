@@ -3,6 +3,7 @@ package selfupdate
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
@@ -223,7 +224,7 @@ func TestDownloadFile(t *testing.T) {
 	u := New("v1.0.0")
 
 	// Act
-	err := u.downloadFile(server.URL, destPath)
+	err := u.downloadFile(context.Background(), server.URL, destPath)
 
 	// Assert
 	if err != nil {
@@ -253,7 +254,7 @@ func TestDownloadFileServerError(t *testing.T) {
 	u := New("v1.0.0")
 
 	// Act
-	err := u.downloadFile(server.URL, destPath)
+	err := u.downloadFile(context.Background(), server.URL, destPath)
 
 	// Assert
 	if err == nil {

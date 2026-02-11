@@ -114,7 +114,6 @@ func pullModel(repo, quant, modelsDir string) error {
 	ui.PrintInfo("Fetching file list...")
 	info, err := puller.GetFileInfo(context.Background(), repo, quant)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
 
@@ -131,7 +130,6 @@ func pullModel(repo, quant, modelsDir string) error {
 	// Download
 	result, err := puller.Pull(context.Background(), repo, quant)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "\nError: %v\n", err)
 		return err
 	}
 

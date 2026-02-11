@@ -34,6 +34,32 @@ func (l *Loader) FindPath(name string) (string, error) {
 	return path, err
 }
 
+// iteratePresets reads all preset YAML files and calls fn for each successfully parsed preset.
+// fn receives the file path and parsed preset; return true to stop iteration early.
+// Returns accumulated parse errors for files that failed to parse.
+func (l *Loader) iteratePresets(fn func(path string, p *Preset) bool) []*ParseError {
+	entries, err := os.ReadDir(l.presetsDir)
+	if err != nil {
+		return nil
+	}
+	var parseErrors []*ParseError
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
+			continue
+		}
+		path := filepath.Join(l.presetsDir, entry.Name())
+		p, err := loadFromPath(path)
+		if err != nil {
+			parseErrors = append(parseErrors, &ParseError{File: entry.Name(), Err: err})
+			continue
+		}
+		if fn(path, p) {
+			return parseErrors
+		}
+	}
+	return parseErrors
+}
+
 // List returns all available preset names.
 // If some preset files fail to parse, they are skipped but a warning is included
 // in the error (the list is still returned).
@@ -45,24 +71,13 @@ func (l *Loader) List() ([]string, error) {
 		}
 		return nil, fmt.Errorf("read presets dir: %w", err)
 	}
+	_ = entries // directory exists; proceed with iteration
 
 	var names []string
-	var parseErrors []*ParseError
-
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
-			continue
-		}
-
-		path := filepath.Join(l.presetsDir, entry.Name())
-		p, err := loadFromPath(path)
-		if err != nil {
-			parseErrors = append(parseErrors, &ParseError{File: entry.Name(), Err: err})
-			continue
-		}
-
+	parseErrors := l.iteratePresets(func(_ string, p *Preset) bool {
 		names = append(names, p.Name)
-	}
+		return false
+	})
 
 	if len(parseErrors) > 0 {
 		return names, fmt.Errorf("%d preset file(s) had parse errors (first: %v)", len(parseErrors), parseErrors[0])
@@ -145,31 +160,27 @@ func (l *Loader) findByName(name string) (string, *Preset, error) {
 	entries, err := os.ReadDir(l.presetsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// No directory = preset cannot exist
 			return "", nil, &NotFoundError{Name: name}
 		}
 		return "", nil, fmt.Errorf("read presets dir: %w", err)
 	}
+	_ = entries // directory exists; proceed with iteration
 
-	var parseErrors []*ParseError
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
-			continue
-		}
-
-		path := filepath.Join(l.presetsDir, entry.Name())
-		p, err := loadFromPath(path)
-		if err != nil {
-			parseErrors = append(parseErrors, &ParseError{File: entry.Name(), Err: err})
-			continue
-		}
-
+	var foundPath string
+	var foundPreset *Preset
+	parseErrors := l.iteratePresets(func(path string, p *Preset) bool {
 		if p.Name == name {
-			return path, p, nil
+			foundPath = path
+			foundPreset = p
+			return true
 		}
+		return false
+	})
+
+	if foundPreset != nil {
+		return foundPath, foundPreset, nil
 	}
 
-	// Not found - include parse error hints if any
 	if len(parseErrors) > 0 {
 		return "", nil, fmt.Errorf("preset '%s' not found; %d file(s) had parse errors (first: %v)", name, len(parseErrors), parseErrors[0])
 	}

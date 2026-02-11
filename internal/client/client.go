@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/d2verb/alpaca/internal/protocol"
 )
+
+const socketTimeout = 30 * time.Second
 
 // Client communicates with the daemon via Unix socket.
 type Client struct {
@@ -22,11 +25,12 @@ func New(socketPath string) *Client {
 
 // Send sends a request to the daemon and returns the response.
 func (c *Client) Send(req *protocol.Request) (*protocol.Response, error) {
-	conn, err := net.Dial("unix", c.socketPath)
+	conn, err := net.DialTimeout("unix", c.socketPath, socketTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("connect to daemon: %w", err)
 	}
 	defer conn.Close()
+	conn.SetDeadline(time.Now().Add(socketTimeout))
 
 	// Send request
 	data, err := json.Marshal(req)
