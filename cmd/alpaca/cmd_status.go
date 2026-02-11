@@ -33,13 +33,15 @@ func (c *StatusCmd) Run() error {
 					models = append(models, ui.RouterModelInfo{
 						ID:     stringVal(m, "id"),
 						Status: stringVal(m, "status"),
+						Mmproj: stringVal(m, "mmproj"),
 					})
 				}
 			}
 		}
 		ui.PrintRouterStatus(state, preset, endpoint, paths.LlamaLog, models)
 	} else {
-		ui.PrintStatus(state, preset, endpoint, paths.LlamaLog)
+		mmproj := stringVal(resp.Data, "mmproj")
+		ui.PrintStatus(state, preset, endpoint, paths.LlamaLog, mmproj)
 	}
 
 	return nil

@@ -34,6 +34,7 @@ type presetLoader interface {
 type modelManager interface {
 	List(ctx context.Context) ([]metadata.ModelEntry, error)
 	GetFilePath(ctx context.Context, repo, quant string) (string, error)
+	GetDetails(ctx context.Context, repo, quant string) (*metadata.ModelEntry, error)
 }
 
 // llamaProcess manages llama-server process lifecycle.
@@ -164,6 +165,27 @@ func newDefaultPreset(name, model string) *preset.Preset {
 	}
 }
 
+// autoResolveMmproj resolves the mmproj file path from model metadata when the
+// mmproj field is empty. The modelName parameter is used for router-mode logging;
+// pass empty string for non-router cases.
+func (d *Daemon) autoResolveMmproj(ctx context.Context, mmproj *string, modelPath, repo, quant, modelName string) {
+	if *mmproj != "" {
+		return
+	}
+	entry, err := d.models.GetDetails(ctx, repo, quant)
+	if err != nil || entry.Mmproj == nil {
+		return
+	}
+	mmprojPath := filepath.Join(filepath.Dir(modelPath), entry.Mmproj.Filename)
+	*mmproj = "f:" + mmprojPath
+	attrs := []any{"path", mmprojPath}
+	if modelName != "" {
+		attrs = append(attrs, "model", modelName)
+	}
+	attrs = append(attrs, "source", "auto-resolved from metadata")
+	d.logger.Info("using mmproj", attrs...)
+}
+
 // resolveHFPreset creates a preset from HuggingFace format (h:repo:quant).
 // Returns error if model is not downloaded.
 func (d *Daemon) resolveHFPreset(ctx context.Context, repo, quant string) (*preset.Preset, error) {
@@ -171,7 +193,11 @@ func (d *Daemon) resolveHFPreset(ctx context.Context, repo, quant string) (*pres
 	if err != nil {
 		return nil, err
 	}
-	return newDefaultPreset(fmt.Sprintf("h:%s:%s", repo, quant), "f:"+modelPath), nil
+	p := newDefaultPreset(fmt.Sprintf("h:%s:%s", repo, quant), "f:"+modelPath)
+
+	d.autoResolveMmproj(ctx, &p.Mmproj, modelPath, repo, quant, "")
+
+	return p, nil
 }
 
 // resolveModel resolves the model and draft-model fields in a preset if they use HuggingFace format.
@@ -216,6 +242,8 @@ func (d *Daemon) resolveModel(ctx context.Context, p *preset.Preset) (*preset.Pr
 			return nil, fmt.Errorf("resolve model %s:%s: %w", id.Repo, id.Quant, err)
 		}
 		resolved.Model = "f:" + modelPath
+
+		d.autoResolveMmproj(ctx, &resolved.Mmproj, modelPath, id.Repo, id.Quant, "")
 	}
 
 	if draftID != nil && draftID.Type == identifier.TypeHuggingFace {
@@ -275,6 +303,8 @@ func (d *Daemon) resolveRouterModels(ctx context.Context, p *preset.Preset) (*pr
 				return nil, fmt.Errorf("resolve model %s:%s in models[%d]: %w", id.Repo, id.Quant, i, err)
 			}
 			resolved.Models[i].Model = "f:" + modelPath
+
+			d.autoResolveMmproj(ctx, &resolved.Models[i].Mmproj, modelPath, id.Repo, id.Quant, m.Name)
 		}
 
 		if m.DraftModel != "" {
@@ -345,7 +375,7 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 	// Resolve HuggingFace model reference if present
 	p, err = d.resolveModel(ctx, p)
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve model: %w", err)
 	}
 
 	d.state.Store(StateLoading)

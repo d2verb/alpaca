@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/d2verb/alpaca/internal/metadata"
 	"github.com/d2verb/alpaca/internal/preset"
 	"github.com/d2verb/alpaca/internal/ui"
 	"github.com/fatih/color"
@@ -210,5 +211,124 @@ func TestShowCmd_SinglePresetStillWorks(t *testing.T) {
 	}
 	if strings.Contains(output, "router") {
 		t.Error("Output should not contain 'router' for single mode preset")
+	}
+}
+
+func TestFormatMmprojDetail(t *testing.T) {
+	tests := []struct {
+		name   string
+		mmproj *metadata.MmprojEntry
+		want   string
+	}{
+		{
+			name:   "nil mmproj returns empty",
+			mmproj: nil,
+			want:   "",
+		},
+		{
+			name:   "mmproj with filename and size",
+			mmproj: &metadata.MmprojEntry{Filename: "org_model_mmproj-f16.gguf", Size: 892403712},
+			want:   "org_model_mmproj-f16.gguf (851.1 MB)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatMmprojDetail(tt.mmproj)
+			if got != tt.want {
+				t.Errorf("formatMmprojDetail() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestShowCmd_SinglePresetWithMmproj(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	// Arrange
+	tmpDir := t.TempDir()
+	p := &preset.Preset{
+		Name:   "with-mmproj",
+		Model:  "h:org/model:Q4_K_M",
+		Mmproj: "f:/path/to/mmproj.gguf",
+	}
+
+	presetPath := filepath.Join(tmpDir, "mmproj.yaml")
+	if err := preset.WriteFile(presetPath, p); err != nil {
+		t.Fatalf("write preset: %v", err)
+	}
+
+	var buf bytes.Buffer
+	ui.Output = &buf
+	defer func() { ui.Output = os.Stdout }()
+
+	// Act
+	cmd := &ShowCmd{}
+	err := cmd.showPreset("with-mmproj", tmpDir)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "Mmproj") {
+		t.Error("Output should contain 'Mmproj' label")
+	}
+	if !strings.Contains(output, "f:/path/to/mmproj.gguf") {
+		t.Error("Output should contain mmproj value")
+	}
+}
+
+func TestShowCmd_RouterPresetWithMmproj(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	// Arrange
+	tmpDir := t.TempDir()
+	p := &preset.Preset{
+		Name: "router-mmproj",
+		Mode: "router",
+		Port: 8080,
+		Models: []preset.ModelEntry{
+			{
+				Name:   "gemma3-vision",
+				Model:  "h:ggml-org/gemma-3-4b-it-GGUF",
+				Mmproj: "f:/path/to/mmproj.gguf",
+			},
+			{
+				Name:  "codellama",
+				Model: "h:TheBloke/CodeLlama-7B-GGUF",
+			},
+		},
+	}
+
+	presetPath := filepath.Join(tmpDir, "router-mmproj.yaml")
+	if err := preset.WriteFile(presetPath, p); err != nil {
+		t.Fatalf("write preset: %v", err)
+	}
+
+	var buf bytes.Buffer
+	ui.Output = &buf
+	defer func() { ui.Output = os.Stdout }()
+
+	// Act
+	cmd := &ShowCmd{}
+	err := cmd.showPreset("router-mmproj", tmpDir)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "Mmproj") {
+		t.Error("Output should contain 'Mmproj' label for model with mmproj")
+	}
+	if !strings.Contains(output, "f:/path/to/mmproj.gguf") {
+		t.Error("Output should contain mmproj value")
 	}
 }

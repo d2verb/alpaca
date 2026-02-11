@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/d2verb/alpaca/internal/config"
@@ -104,6 +105,9 @@ func (c *LoadCmd) ensureHFModel(paths *config.Paths, id *identifier.Identifier) 
 			if err := c.ensureDraftModel(paths, p.DraftModel); err != nil {
 				return err
 			}
+			if err := c.ensureMmprojFile(p.Mmproj); err != nil {
+				return err
+			}
 		}
 		// If preset loading fails, daemon will provide consistent error message
 
@@ -116,6 +120,9 @@ func (c *LoadCmd) ensureHFModel(paths *config.Paths, id *identifier.Identifier) 
 			}
 			repo, quant = extractHFModel(p.Model)
 			if err := c.ensureDraftModel(paths, p.DraftModel); err != nil {
+				return err
+			}
+			if err := c.ensureMmprojFile(p.Mmproj); err != nil {
 				return err
 			}
 		}
@@ -156,8 +163,30 @@ func (c *LoadCmd) ensureRouterModels(paths *config.Paths, p *preset.Preset) erro
 				return fmt.Errorf("download draft model for '%s': %w", m.Name, err)
 			}
 		}
+
+		if err := c.ensureMmprojFile(m.Mmproj); err != nil {
+			return fmt.Errorf("model '%s': %w", m.Name, err)
+		}
 	}
 
+	return nil
+}
+
+// ensureMmprojFile validates that an explicit mmproj file path exists.
+func (c *LoadCmd) ensureMmprojFile(mmproj string) error {
+	if !preset.IsMmprojActive(mmproj) {
+		return nil
+	}
+	if !strings.HasPrefix(mmproj, "f:") {
+		return nil
+	}
+	path := mmproj[2:]
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("mmproj file not found: %s", path)
+		}
+		return fmt.Errorf("check mmproj file: %w", err)
+	}
 	return nil
 }
 

@@ -51,6 +51,17 @@ $ alpaca status
   Logs           /Users/username/.alpaca/logs/llama.log
 ```
 
+With vision model (mmproj active):
+```bash
+$ alpaca status
+🚀 Status
+  State          ● Running
+  Preset         p:gemma3-vision
+  Mmproj         /Users/username/.alpaca/models/ggml-org_gemma-3-4b-it-GGUF_mmproj-model-f16.gguf
+  Endpoint       http://localhost:8080
+  Logs           /Users/username/.alpaca/logs/llama.log
+```
+
 When no model is loaded:
 ```bash
 $ alpaca status
@@ -73,7 +84,7 @@ $ alpaca status
   ──────────
   ● qwen3                    loaded
   ● nomic-embed              loaded
-  ○ gemma3                   unloaded
+  ○ gemma3                   unloaded    mmproj
 ```
 
 Model status badges: `●` loaded (green), `◐` loading (yellow), `○` unloaded (muted), `✗` failed (red).
@@ -269,14 +280,14 @@ $ alpaca ls
 ──────────
   p:codellama-7b-q4
   p:mistral-7b
-  p:deepseek-coder
+  p:gemma3-vision
 
 🤖 Models
 ─────────
   h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
     4.1 GB · Downloaded 2024-01-15
-  h:TheBloke/Mistral-7B-Instruct-v0.2-GGUF:Q5_K_M
-    4.8 GB · Downloaded 2024-01-14
+  h:ggml-org/gemma-3-4b-it-GGUF:Q4_K_M
+    2.5 GB + mmproj 851 MB · Downloaded 2024-01-16
 ```
 
 When no presets or models exist:
@@ -311,6 +322,18 @@ $ alpaca show h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
   Size           4.1 GB
   Downloaded     2026-01-28 10:30:00
   Path           /Users/username/.alpaca/models/codellama-7b.Q4_K_M.gguf
+  Status         ✓ Ready
+```
+
+**Show vision model details (with mmproj):**
+```bash
+$ alpaca show h:ggml-org/gemma-3-4b-it-GGUF:Q4_K_M
+🤖 Model: h:ggml-org/gemma-3-4b-it-GGUF:Q4_K_M
+  Filename       gemma-3-4b-it-Q4_K_M.gguf
+  Size           2.5 GB
+  Downloaded     2026-01-28 10:30:00
+  Path           /Users/username/.alpaca/models/gemma-3-4b-it-Q4_K_M.gguf
+  Mmproj         ggml-org_gemma-3-4b-it-GGUF_mmproj-model-f16.gguf (851 MB)
   Status         ✓ Ready
 ```
 
@@ -521,6 +544,16 @@ $ alpaca pull h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M
 ✓ Saved to: /Users/username/.alpaca/models/codellama-7b.Q4_K_M.gguf
 ```
 
+Vision model with mmproj:
+```bash
+$ alpaca pull h:ggml-org/gemma-3-4b-it-GGUF:Q4_K_M
+ℹ Fetching file list...
+ℹ Downloading gemma-3-4b-it-Q4_K_M.gguf (2.5 GB)...
+ℹ Also downloading mmproj: ggml-org_gemma-3-4b-it-GGUF_mmproj-model-f16.gguf (851 MB)
+[████████████████████████████████████████] 100.0% (2.5 GB / 2.5 GB)
+✓ Saved to: /Users/username/.alpaca/models/gemma-3-4b-it-Q4_K_M.gguf
+```
+
 **Format**: `h:<organization>/<repository>:<quantization>`
 
 **Examples**:
@@ -558,13 +591,27 @@ Delete model 'h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M'? (y/N): y
 ✓ Model 'h:unsloth/qwen3-coder-30b-a3b-instruct:Q4_K_M' removed.
 ```
 
+With mmproj (not shared):
+```bash
+$ alpaca rm h:ggml-org/gemma-3-4b-it-GGUF:Q4_K_M
+Delete model 'h:ggml-org/gemma-3-4b-it-GGUF:Q4_K_M' (and mmproj, 851 MB)? (y/N): y
+✓ Model 'h:ggml-org/gemma-3-4b-it-GGUF:Q4_K_M' removed.
+```
+
+With mmproj (shared with other quants):
+```bash
+$ alpaca rm h:ggml-org/gemma-3-4b-it-GGUF:Q4_K_M
+Delete model 'h:ggml-org/gemma-3-4b-it-GGUF:Q4_K_M' (mmproj retained by other quants)? (y/N): y
+✓ Model 'h:ggml-org/gemma-3-4b-it-GGUF:Q4_K_M' removed.
+```
+
 If model doesn't exist:
 ```bash
 $ alpaca rm h:nonexistent:Q4_K_M
 ✗ Model 'h:nonexistent:Q4_K_M' not found.
 ```
 
-This removes both the model file and its metadata entry.
+This removes the model file, its mmproj file (if not referenced by other quants), and its metadata entry.
 
 ## Daemon Behavior
 

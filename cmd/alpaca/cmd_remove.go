@@ -80,8 +80,22 @@ func (c *RemoveCmd) removeModel(id *identifier.Identifier, modelsDir string) err
 		return errModelNotFound(fmt.Sprintf("h:%s:%s", id.Repo, id.Quant))
 	}
 
+	// Build confirmation message with mmproj info
+	confirmMsg := fmt.Sprintf("Delete model 'h:%s:%s'?", id.Repo, id.Quant)
+	entry, err := modelMgr.GetDetails(ctx, id.Repo, id.Quant)
+	if err == nil && entry.Mmproj != nil {
+		refCount, refErr := modelMgr.MmprojReferenceCount(ctx, entry.Mmproj.Filename)
+		if refErr == nil {
+			if refCount <= 1 {
+				confirmMsg = fmt.Sprintf("Delete model 'h:%s:%s' (and mmproj, %s)?", id.Repo, id.Quant, formatSize(entry.Mmproj.Size))
+			} else {
+				confirmMsg = fmt.Sprintf("Delete model 'h:%s:%s' (mmproj retained by other quants)?", id.Repo, id.Quant)
+			}
+		}
+	}
+
 	// Confirmation prompt
-	if !promptConfirm(fmt.Sprintf("Delete model 'h:%s:%s'?", id.Repo, id.Quant)) {
+	if !promptConfirm(confirmMsg) {
 		ui.PrintInfo("Cancelled")
 		return nil
 	}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/d2verb/alpaca/internal/metadata"
 )
@@ -31,7 +32,7 @@ func (m *Manager) List(ctx context.Context) ([]metadata.ModelEntry, error) {
 	return m.metadata.List(), nil
 }
 
-// Remove deletes a model file and its metadata entry.
+// Remove deletes a model file, its mmproj file (if unreferenced), and its metadata entry.
 func (m *Manager) Remove(ctx context.Context, repo, quant string) error {
 	if err := m.metadata.Load(ctx); err != nil {
 		return fmt.Errorf("load metadata: %w", err)
@@ -40,12 +41,19 @@ func (m *Manager) Remove(ctx context.Context, repo, quant string) error {
 	// Get file path from metadata
 	filePath, err := m.metadata.GetFilePath(m.modelsDir, repo, quant)
 	if err != nil {
-		return err
+		return fmt.Errorf("get model file path: %w", err)
 	}
 
-	// Remove file
+	// Capture mmproj info before removing the metadata entry
+	entry := m.metadata.Find(repo, quant)
+	var mmprojFilename string
+	if entry != nil && entry.Mmproj != nil {
+		mmprojFilename = entry.Mmproj.Filename
+	}
+
+	// Remove model file
 	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("remove file: %w", err)
+		return fmt.Errorf("remove model file: %w", err)
 	}
 
 	// Remove metadata entry
@@ -54,6 +62,16 @@ func (m *Manager) Remove(ctx context.Context, repo, quant string) error {
 	}
 	if err := m.metadata.Save(ctx); err != nil {
 		return fmt.Errorf("save metadata: %w", err)
+	}
+
+	// Delete mmproj file if no other entries reference it
+	if mmprojFilename != "" {
+		if m.metadata.MmprojReferenceCount(mmprojFilename) == 0 {
+			mmprojPath := filepath.Join(m.modelsDir, mmprojFilename)
+			if err := os.Remove(mmprojPath); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("remove mmproj file: %w", err)
+			}
+		}
 	}
 
 	return nil
@@ -76,6 +94,14 @@ func (m *Manager) GetFilePath(ctx context.Context, repo, quant string) (string, 
 	}
 
 	return m.metadata.GetFilePath(m.modelsDir, repo, quant)
+}
+
+// MmprojReferenceCount returns the number of model entries referencing the given mmproj filename.
+func (m *Manager) MmprojReferenceCount(ctx context.Context, filename string) (int, error) {
+	if err := m.metadata.Load(ctx); err != nil {
+		return 0, fmt.Errorf("load metadata: %w", err)
+	}
+	return m.metadata.MmprojReferenceCount(filename), nil
 }
 
 // GetDetails returns detailed information about a model.

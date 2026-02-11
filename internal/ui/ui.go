@@ -70,13 +70,16 @@ func StatusBadge(state string) string {
 }
 
 // PrintStatus prints daemon status in a formatted style.
-func PrintStatus(state, preset, endpoint, logPath string) {
+func PrintStatus(state, preset, endpoint, logPath, mmproj string) {
 	fmt.Fprintf(Output, "🚀 %s\n", Heading("Status"))
 
 	PrintKeyValue("State", StatusBadge(state))
 	if preset != "" {
 		label, formatted := formatPresetOrModel(preset)
 		PrintKeyValue(label, formatted)
+	}
+	if mmproj != "" {
+		PrintKeyValue("Mmproj", mmproj)
 	}
 	if endpoint != "" {
 		PrintKeyValue("Endpoint", Link(endpoint))
@@ -196,6 +199,7 @@ type PresetDetails struct {
 	Name       string
 	Model      string
 	DraftModel string
+	Mmproj     string
 	Host       string
 	Port       int
 	Options    map[string]string
@@ -209,6 +213,7 @@ type ModelDetails struct {
 	Path         string
 	Size         string
 	DownloadedAt string
+	Mmproj       string // formatted mmproj info, empty if none
 }
 
 // PrintPresetDetails prints preset details in a formatted style.
@@ -220,6 +225,9 @@ func PrintPresetDetails(p PresetDetails) {
 	PrintKeyValue("Model", Link(p.Model))
 	if p.DraftModel != "" {
 		PrintKeyValue("Draft Model", Link(p.DraftModel))
+	}
+	if p.Mmproj != "" {
+		PrintKeyValue("Mmproj", p.Mmproj)
 	}
 	PrintKeyValue("Endpoint", Link(fmt.Sprintf("http://%s:%d", p.Host, p.Port)))
 	if len(p.Options) > 0 {
@@ -241,6 +249,9 @@ func PrintModelDetails(m ModelDetails) {
 	PrintKeyValue("Size", m.Size)
 	PrintKeyValue("Downloaded", m.DownloadedAt)
 	PrintKeyValue("Path", Link(m.Path))
+	if m.Mmproj != "" {
+		PrintKeyValue("Mmproj", m.Mmproj)
+	}
 	PrintKeyValue("Status", Success("✓ Ready"))
 }
 
@@ -266,6 +277,7 @@ func PrintKeyValue(key, value string) {
 type RouterModelInfo struct {
 	ID     string
 	Status string
+	Mmproj string // mmproj path, empty if none
 }
 
 // ModelStatusBadge returns a colored badge for a model status.
@@ -302,7 +314,11 @@ func PrintRouterStatus(state, preset, endpoint, logPath string, models []RouterM
 		fmt.Fprintf(Output, "  %s\n", Heading(fmt.Sprintf("Models (%d)", len(models))))
 		fmt.Fprintf(Output, "  %s\n", Muted("──────────"))
 		for _, m := range models {
-			fmt.Fprintf(Output, "  %-24s %s\n", m.ID, ModelStatusBadge(m.Status))
+			suffix := ""
+			if m.Mmproj != "" {
+				suffix = "    mmproj"
+			}
+			fmt.Fprintf(Output, "  %-24s %s%s\n", m.ID, ModelStatusBadge(m.Status), suffix)
 		}
 	}
 }
@@ -323,6 +339,7 @@ type RouterModelDetail struct {
 	Name       string
 	Model      string
 	DraftModel string
+	Mmproj     string
 	Options    map[string]string
 }
 
@@ -352,6 +369,9 @@ func PrintRouterPresetDetails(p RouterPresetDetails) {
 			PrintKeyValue("  Model", Link(m.Model))
 			if m.DraftModel != "" {
 				PrintKeyValue("  Draft Model", Link(m.DraftModel))
+			}
+			if m.Mmproj != "" {
+				PrintKeyValue("  Mmproj", m.Mmproj)
 			}
 			if len(m.Options) > 0 {
 				PrintKeyValue("  Options", formatOptions(m.Options))

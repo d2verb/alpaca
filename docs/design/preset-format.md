@@ -43,6 +43,10 @@ model: "f:~/.alpaca/models/codellama-7b-Q4_K_M.gguf"
 # Optional: draft model for speculative decoding (--model-draft)
 draft-model: "f:~/.alpaca/models/codellama-1b-Q4_K_M.gguf"
 
+# Optional: multimodal projector (--mmproj)
+# Omit → auto-resolve from metadata, "none" → disable, "f:path" → explicit
+mmproj: "f:~/.alpaca/models/mmproj-model-f16.gguf"
+
 # Alpaca-level options (optional)
 port: 8080              # default: 8080
 host: 127.0.0.1         # default: 127.0.0.1
@@ -72,6 +76,7 @@ options:
 |-------|------|---------|-------------|
 | `mode` | string | `"single"` | `"single"` or `"router"` |
 | `draft-model` | string | - | Draft model identifier for speculative decoding (`--model-draft`). Uses `f:` or `h:` prefix. |
+| `mmproj` | string | - | Multimodal projector (`--mmproj`). Omit to auto-resolve from metadata, `"none"` to disable, or `"f:/path"` to specify explicitly. |
 | `port` | int | 8080 | llama-server listen port |
 | `host` | string | `"127.0.0.1"` | llama-server listen host |
 | `options` | Options | - | llama-server options (see [Options Map](#options-map)) |
@@ -165,6 +170,7 @@ The following keys are prohibited in `options` (managed by top-level or dedicate
 | `host` | Conflicts with top-level `host` |
 | `model` | Conflicts with top-level/ModelEntry `model` |
 | `model-draft` | Conflicts with top-level/ModelEntry `draft-model` |
+| `mmproj` | Conflicts with top-level/ModelEntry `mmproj` |
 | `models-max` | Conflicts with top-level `max-models` (router mode) |
 | `sleep-idle-seconds` | Conflicts with top-level `idle-timeout` (router mode) |
 
@@ -218,6 +224,7 @@ models:
 | `name` | string | Model identifier (section name in config.ini). Must match `[a-zA-Z0-9_-]+`. |
 | `model` | string | Model path with `h:` or `f:` prefix. |
 | `draft-model` | string | Draft model for speculative decoding (optional). Uses `f:` or `h:` prefix. |
+| `mmproj` | string | Multimodal projector (optional). Omit to auto-resolve, `"none"` to disable, or `"f:/path"` for explicit. |
 | `options` | Options | Per-model llama-server options (overrides global options). |
 
 ### Validation Rules
@@ -233,18 +240,20 @@ models:
 - `model` is required
 - `model` value must start with `f:` or `h:` prefix
 - `draft-model`, if specified, must start with `f:` or `h:` prefix
+- `mmproj`, if specified, must be `"none"` or start with `f:` prefix. Must not contain newlines
 - `models`, `max-models`, `idle-timeout` are not allowed
-- Reserved keys (`port`, `host`, `model`, `model-draft`, `models-max`, `sleep-idle-seconds`) are not allowed in `options`
+- Reserved keys (`port`, `host`, `model`, `model-draft`, `mmproj`, `models-max`, `sleep-idle-seconds`) are not allowed in `options`
 
 #### Router Mode
 
 - `models` is required with at least one entry
-- Top-level `model`, `draft-model` are not allowed
+- Top-level `model`, `draft-model`, `mmproj` are not allowed
 - Each ModelEntry `name` is required and must be unique
 - Each ModelEntry `model` is required
 - Each ModelEntry `draft-model`, if specified, must start with `f:` or `h:` prefix
-- Reserved keys (`port`, `host`, `model`, `model-draft`, `models-max`, `sleep-idle-seconds`) are not allowed in top-level `options`
-- `port`, `host`, `model`, `model-draft` are not allowed in ModelEntry `options`
+- Each ModelEntry `mmproj`, if specified, must be `"none"` or start with `f:` prefix. Must not contain newlines
+- Reserved keys (`port`, `host`, `model`, `model-draft`, `mmproj`, `models-max`, `sleep-idle-seconds`) are not allowed in top-level `options`
+- `port`, `host`, `model`, `model-draft`, `mmproj` are not allowed in ModelEntry `options`
 
 ## Examples
 
@@ -277,6 +286,34 @@ model: "h:unsloth/gemma3-4b-it-GGUF:Q4_K_M"
 ```
 
 **Note:** HuggingFace models must be downloaded first with `alpaca pull h:org/repo:quant`. The model field will be automatically resolved to `f:/path/to/downloaded/file.gguf` at runtime.
+
+### Vision Preset (Auto mmproj)
+
+```yaml
+name: gemma3-vision
+model: "h:ggml-org/gemma-3-4b-it-GGUF:Q4_K_M"
+# mmproj omitted → auto-resolved from metadata (downloaded with model)
+options:
+  ctx-size: 8192
+  image-min-tokens: 256
+  image-max-tokens: 1024
+```
+
+### Vision Preset (Explicit mmproj)
+
+```yaml
+name: custom-vision
+model: "f:~/models/gemma-3-4b-it-Q4_K_M.gguf"
+mmproj: "f:~/models/mmproj-model-f16.gguf"
+```
+
+### Vision Preset (Disabled)
+
+```yaml
+name: gemma3-textonly
+model: "h:ggml-org/gemma-3-4b-it-GGUF:Q4_K_M"
+mmproj: none  # Use vision model in text-only mode
+```
 
 ### Preset with Draft Model (Speculative Decoding)
 
@@ -469,12 +506,13 @@ This makes local presets portable - they work correctly regardless of which dire
 - New llama-server options work immediately without Alpaca changes (forward compatibility)
 - Same concept works in both single and router modes, reducing learning cost
 
-### Why `draft-model` is a dedicated field (not in `options`)?
+### Why `draft-model` and `mmproj` are dedicated fields (not in `options`)?
 
 - `draft-model` values use `f:`/`h:` prefixes requiring Alpaca-level path resolution (home directory expansion, HuggingFace → file path conversion)
+- `mmproj` has special semantics: omit for auto-resolve from metadata, `"none"` to disable, or `f:` for explicit path
 - All other `options` keys are pass-through to llama-server with no processing
-- Putting `draft-model` in `options` would break the principle that `options` = pass-through
-- `model` and `draft-model` share the same nature (model identifiers) and belong at the same level
+- Putting these in `options` would break the principle that `options` = pass-through
+- `model`, `draft-model`, and `mmproj` share the same nature (model-related identifiers) and belong at the same level
 
 ### Why `port`/`host` are not in `options`?
 

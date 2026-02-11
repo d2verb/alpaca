@@ -35,10 +35,14 @@ func (c *ListCmd) Run() error {
 	// Convert to UI model format
 	models := make([]ui.ModelInfo, len(entries))
 	for i, entry := range entries {
+		sizeStr := formatSize(entry.Size)
+		if entry.Mmproj != nil {
+			sizeStr += " + mmproj " + formatSize(entry.Mmproj.Size)
+		}
 		models[i] = ui.ModelInfo{
 			Repo:         entry.Repo,
 			Quant:        entry.Quant,
-			SizeString:   formatSize(entry.Size),
+			SizeString:   sizeStr,
 			DownloadedAt: entry.DownloadedAt.Format("2006-01-02"),
 		}
 	}

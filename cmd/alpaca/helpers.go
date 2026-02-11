@@ -112,13 +112,16 @@ func pullModel(repo, quant, modelsDir string) error {
 
 	// Get file info first
 	ui.PrintInfo("Fetching file list...")
-	filename, size, err := puller.GetFileInfo(context.Background(), repo, quant)
+	info, err := puller.GetFileInfo(context.Background(), repo, quant)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
 
-	ui.PrintInfo(fmt.Sprintf("Downloading %s (%s)...", filename, formatSize(size)))
+	ui.PrintInfo(fmt.Sprintf("Downloading %s (%s)...", info.Filename, formatSize(info.Size)))
+	if info.MmprojFilename != "" {
+		ui.PrintInfo(fmt.Sprintf("Also downloading mmproj: %s (%s)", info.MmprojFilename, formatSize(info.MmprojSize)))
+	}
 
 	// Set up progress reporting
 	puller.SetProgressFunc(func(downloaded, total int64) {
@@ -138,6 +141,13 @@ func pullModel(repo, quant, modelsDir string) error {
 	}
 	fmt.Println() // New line after progress bar
 	ui.PrintSuccess(fmt.Sprintf("Saved to: %s", result.Path))
+
+	// Report mmproj result with non-zero exit code
+	if result.MmprojFailed {
+		ui.PrintWarning(fmt.Sprintf("mmproj download failed - vision unavailable. Run 'alpaca pull h:%s:%s' to retry.", repo, quant))
+		return errDownloadFailed()
+	}
+
 	return nil
 }
 

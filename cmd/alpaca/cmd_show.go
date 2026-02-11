@@ -56,6 +56,7 @@ func (c *ShowCmd) showPreset(name, presetsDir string) error {
 			Name:       p.Name,
 			Model:      p.Model,
 			DraftModel: p.DraftModel,
+			Mmproj:     p.Mmproj,
 			Host:       p.GetHost(),
 			Port:       p.GetPort(),
 			Options:    p.Options,
@@ -79,6 +80,7 @@ func (c *ShowCmd) showRouterPreset(p *preset.Preset) {
 			Name:       m.Name,
 			Model:      m.Model,
 			DraftModel: m.DraftModel,
+			Mmproj:     m.Mmproj,
 			Options:    m.Options,
 		})
 	}
@@ -116,7 +118,17 @@ func (c *ShowCmd) showModel(id *identifier.Identifier, modelsDir string) error {
 		Path:         filePath,
 		Size:         formatSize(entry.Size),
 		DownloadedAt: entry.DownloadedAt.Format("2006-01-02 15:04:05"),
+		Mmproj:       formatMmprojDetail(entry.Mmproj),
 	})
 
 	return nil
+}
+
+// formatMmprojDetail formats mmproj metadata for display.
+// Returns empty string if mmproj is nil.
+func formatMmprojDetail(mmproj *metadata.MmprojEntry) string {
+	if mmproj == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s (%s)", mmproj.Filename, formatSize(mmproj.Size))
 }

@@ -95,7 +95,7 @@ func TestPrintStatus(t *testing.T) {
 			defer func() { Output = nil }()
 
 			// Act
-			PrintStatus("running", tt.preset, "http://localhost:8080", "/path/to/llama.log")
+			PrintStatus("running", tt.preset, "http://localhost:8080", "/path/to/llama.log", "")
 
 			// Assert
 			output := buf.String()
@@ -138,7 +138,7 @@ func TestPrintStatus_NoPreset(t *testing.T) {
 	defer func() { Output = nil }()
 
 	// Act
-	PrintStatus("idle", "", "", "/path/to/llama.log")
+	PrintStatus("idle", "", "", "/path/to/llama.log", "")
 
 	// Assert
 	output := buf.String()
@@ -915,5 +915,163 @@ func TestPrintModelDetails(t *testing.T) {
 	}
 	if !strings.Contains(output, "✓ Ready") {
 		t.Error("Output should contain '✓ Ready' status")
+	}
+	if strings.Contains(output, "Mmproj") {
+		t.Error("Output should not contain 'Mmproj' when empty")
+	}
+}
+
+func TestPrintModelDetails_WithMmproj(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	// Arrange
+	var buf bytes.Buffer
+	Output = &buf
+	defer func() { Output = nil }()
+
+	model := ModelDetails{
+		Repo:         "org/vision-model",
+		Quant:        "Q4_K_M",
+		Filename:     "model.Q4_K_M.gguf",
+		Path:         "/path/to/model.gguf",
+		Size:         "2.5 GB",
+		DownloadedAt: "2024-01-15 10:30:00",
+		Mmproj:       "org_vision-model_mmproj-model-f16.gguf (851.0 MB)",
+	}
+
+	// Act
+	PrintModelDetails(model)
+
+	// Assert
+	output := buf.String()
+	if !strings.Contains(output, "Mmproj") {
+		t.Error("Output should contain 'Mmproj' label")
+	}
+	if !strings.Contains(output, "org_vision-model_mmproj-model-f16.gguf (851.0 MB)") {
+		t.Error("Output should contain mmproj info")
+	}
+}
+
+func TestPrintStatus_WithMmproj(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	// Arrange
+	var buf bytes.Buffer
+	Output = &buf
+	defer func() { Output = nil }()
+
+	// Act
+	PrintStatus("running", "p:vision", "http://localhost:8080", "/path/to/llama.log", "/models/mmproj.gguf")
+
+	// Assert
+	output := buf.String()
+	if !strings.Contains(output, "Mmproj") {
+		t.Error("Output should contain 'Mmproj' label")
+	}
+	if !strings.Contains(output, "/models/mmproj.gguf") {
+		t.Error("Output should contain mmproj path")
+	}
+}
+
+func TestPrintPresetDetails_WithMmproj(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	// Arrange
+	var buf bytes.Buffer
+	Output = &buf
+	defer func() { Output = nil }()
+
+	preset := PresetDetails{
+		Name:   "vision-preset",
+		Model:  "h:org/model:Q4_K_M",
+		Mmproj: "f:/path/to/mmproj.gguf",
+		Host:   "127.0.0.1",
+		Port:   8080,
+	}
+
+	// Act
+	PrintPresetDetails(preset)
+
+	// Assert
+	output := buf.String()
+	if !strings.Contains(output, "Mmproj") {
+		t.Error("Output should contain 'Mmproj' label")
+	}
+	if !strings.Contains(output, "f:/path/to/mmproj.gguf") {
+		t.Error("Output should contain mmproj value")
+	}
+}
+
+func TestPrintRouterPresetDetails_WithMmproj(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	// Arrange
+	var buf bytes.Buffer
+	Output = &buf
+	defer func() { Output = nil }()
+
+	details := RouterPresetDetails{
+		Name: "vision-workspace",
+		Host: "127.0.0.1",
+		Port: 8080,
+		Models: []RouterModelDetail{
+			{
+				Name:   "gemma3-vision",
+				Model:  "h:ggml-org/gemma-3-4b-it-GGUF:Q4_K_M",
+				Mmproj: "f:/path/to/mmproj.gguf",
+			},
+			{
+				Name:  "codellama",
+				Model: "h:TheBloke/CodeLlama-7B-GGUF:Q4_K_M",
+			},
+		},
+	}
+
+	// Act
+	PrintRouterPresetDetails(details)
+
+	// Assert
+	output := buf.String()
+	if !strings.Contains(output, "Mmproj") {
+		t.Error("Output should contain 'Mmproj' label for model with mmproj")
+	}
+	if !strings.Contains(output, "f:/path/to/mmproj.gguf") {
+		t.Error("Output should contain mmproj value")
+	}
+}
+
+func TestPrintRouterStatus_WithMmproj(t *testing.T) {
+	// Disable color for testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+
+	// Arrange
+	var buf bytes.Buffer
+	Output = &buf
+	defer func() { Output = nil }()
+
+	models := []RouterModelInfo{
+		{ID: "gemma3-vision", Status: "loaded", Mmproj: "/path/to/mmproj.gguf"},
+		{ID: "codellama", Status: "loaded"},
+	}
+
+	// Act
+	PrintRouterStatus("running", "p:ws", "http://127.0.0.1:8080", "/log", models)
+
+	// Assert
+	output := buf.String()
+	if !strings.Contains(output, "gemma3-vision") {
+		t.Error("Output should contain gemma3-vision model")
+	}
+	if !strings.Contains(output, "mmproj") {
+		t.Error("Output should contain mmproj annotation for vision model")
 	}
 }
