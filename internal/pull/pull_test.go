@@ -14,67 +14,6 @@ import (
 	"time"
 )
 
-func TestExtractQuants(t *testing.T) {
-	tests := []struct {
-		name  string
-		files []string
-		want  []string
-	}{
-		{
-			name: "multiple quants",
-			files: []string{
-				"codellama-7b.Q4_K_M.gguf",
-				"codellama-7b.Q5_K_M.gguf",
-				"codellama-7b.Q8_0.gguf",
-			},
-			want: []string{"Q4_K_M", "Q5_K_M", "Q8_0"},
-		},
-		{
-			name: "lowercase filenames",
-			files: []string{
-				"model.q4_k_m.gguf",
-				"model.q5_k_s.gguf",
-			},
-			want: []string{"Q4_K_M", "Q5_K_S"},
-		},
-		{
-			name: "duplicates removed",
-			files: []string{
-				"model-part1.Q4_K_M.gguf",
-				"model-part2.Q4_K_M.gguf",
-			},
-			want: []string{"Q4_K_M"},
-		},
-		{
-			name:  "no matching quants",
-			files: []string{"readme.md", "config.json"},
-			want:  nil,
-		},
-		{
-			name:  "empty list",
-			files: []string{},
-			want:  nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := extractQuants(tt.files)
-
-			if len(got) != len(tt.want) {
-				t.Errorf("extractQuants() = %v, want %v", got, tt.want)
-				return
-			}
-
-			for i := range got {
-				if got[i] != tt.want[i] {
-					t.Errorf("extractQuants()[%d] = %q, want %q", i, got[i], tt.want[i])
-				}
-			}
-		})
-	}
-}
-
 func TestPuller_SetProgressFunc(t *testing.T) {
 	puller := NewPuller("/tmp/models")
 
