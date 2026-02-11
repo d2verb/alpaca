@@ -79,7 +79,7 @@ func (c *UpgradeCmd) handleScriptInstall(currentBinary string, r *receipt.Receip
 	}
 
 	fmt.Fprintln(ui.Output)
-	fmt.Fprintf(ui.Output, "  Current: %s\n", version)
+	fmt.Fprintf(ui.Output, "  Current: v%s\n", version)
 	fmt.Fprintf(ui.Output, "  Latest:  %s\n", latest)
 	fmt.Fprintln(ui.Output)
 
