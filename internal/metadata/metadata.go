@@ -11,13 +11,20 @@ import (
 	"time"
 )
 
+// MmprojEntry represents metadata for a multimodal projector file.
+type MmprojEntry struct {
+	Filename string `json:"filename"`
+	Size     int64  `json:"size"`
+}
+
 // ModelEntry represents metadata for a downloaded model.
 type ModelEntry struct {
-	Repo         string    `json:"repo"`
-	Quant        string    `json:"quant"`
-	Filename     string    `json:"filename"`
-	Size         int64     `json:"size"`
-	DownloadedAt time.Time `json:"downloaded_at"`
+	Repo         string       `json:"repo"`
+	Quant        string       `json:"quant"`
+	Filename     string       `json:"filename"`
+	Size         int64        `json:"size"`
+	Mmproj       *MmprojEntry `json:"mmproj,omitempty"`
+	DownloadedAt time.Time    `json:"downloaded_at"`
 }
 
 // Metadata holds all model entries.
@@ -100,8 +107,25 @@ func (m *Manager) Save(ctx context.Context) error {
 		return fmt.Errorf("marshal metadata: %w", err)
 	}
 
-	if err := os.WriteFile(m.filePath, data, 0644); err != nil {
-		return fmt.Errorf("write metadata file: %w", err)
+	// Atomic write: temp file + rename to prevent corruption on crash
+	tmp, err := os.CreateTemp(dir, ".metadata-*.tmp")
+	if err != nil {
+		return fmt.Errorf("create temp file: %w", err)
+	}
+	tmpPath := tmp.Name()
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return fmt.Errorf("write metadata: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("close temp file: %w", err)
+	}
+	if err := os.Rename(tmpPath, m.filePath); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("rename metadata file: %w", err)
 	}
 
 	return nil
@@ -137,6 +161,7 @@ func (m *Manager) Remove(repo, quant string) error {
 }
 
 // Find looks up a model entry.
+// Returns a copy of the entry; mutations do not affect the underlying data.
 // Returns nil if not found.
 func (m *Manager) Find(repo, quant string) *ModelEntry {
 	m.mu.Lock()
@@ -158,6 +183,22 @@ func (m *Manager) List() []ModelEntry {
 
 	// Return a copy to prevent external mutation
 	return slices.Clone(m.data.Models)
+}
+
+// MmprojReferenceCount returns the number of model entries that reference
+// the given mmproj filename. This is used for reference counting when
+// deleting or cleaning up mmproj files.
+func (m *Manager) MmprojReferenceCount(filename string) int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	count := 0
+	for _, e := range m.data.Models {
+		if e.Mmproj != nil && e.Mmproj.Filename == filename {
+			count++
+		}
+	}
+	return count
 }
 
 // GetFilePath resolves repo:quant to the actual file path.

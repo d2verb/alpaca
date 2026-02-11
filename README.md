@@ -12,6 +12,7 @@
 - **Preset system**: Save model + argument combinations as reusable presets
 - **Router mode**: Run multiple models simultaneously (chat + embedding, A/B testing)
 - **Easy model switching**: Switch models without manually restarting servers
+- **Vision/Audio support**: Automatically detects and configures multimodal models
 - **Full llama-server options**: Pass any llama-server argument via the `options` map
 - **HuggingFace integration**: Download models directly with `alpaca pull`
 

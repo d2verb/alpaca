@@ -259,6 +259,43 @@ func TestPreset_BuildArgs(t *testing.T) {
 				"--threads", "4",
 			},
 		},
+		{
+			name: "with mmproj",
+			preset: Preset{
+				Model:  "/path/to/model.gguf",
+				Mmproj: "f:/path/to/mmproj.gguf",
+			},
+			want: []string{
+				"-m", "/path/to/model.gguf",
+				"--mmproj", "/path/to/mmproj.gguf",
+				"--port", "8080",
+				"--host", "127.0.0.1",
+			},
+		},
+		{
+			name: "with mmproj empty does not add flag",
+			preset: Preset{
+				Model:  "/path/to/model.gguf",
+				Mmproj: "",
+			},
+			want: []string{
+				"-m", "/path/to/model.gguf",
+				"--port", "8080",
+				"--host", "127.0.0.1",
+			},
+		},
+		{
+			name: "with mmproj none does not add flag",
+			preset: Preset{
+				Model:  "/path/to/model.gguf",
+				Mmproj: "none",
+			},
+			want: []string{
+				"-m", "/path/to/model.gguf",
+				"--port", "8080",
+				"--host", "127.0.0.1",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -441,6 +478,40 @@ func TestPreset_GenerateConfigINI(t *testing.T) {
 				},
 			},
 			want: "[*]\nctx-size = 4096\nmlock = true\nthreads = 8\n\n[m1]\nmodel = /path/m1.gguf\n",
+		},
+		{
+			name: "model with mmproj",
+			preset: Preset{
+				Mode: "router",
+				Models: []ModelEntry{
+					{
+						Name:   "vision",
+						Model:  "f:/path/to/model.gguf",
+						Mmproj: "f:/path/to/mmproj.gguf",
+					},
+				},
+			},
+			want: "[vision]\nmodel = /path/to/model.gguf\nmmproj = /path/to/mmproj.gguf\n",
+		},
+		{
+			name: "model without mmproj omits line",
+			preset: Preset{
+				Mode: "router",
+				Models: []ModelEntry{
+					{Name: "text-only", Model: "f:/path/to/model.gguf"},
+				},
+			},
+			want: "[text-only]\nmodel = /path/to/model.gguf\n",
+		},
+		{
+			name: "model with mmproj none omits line",
+			preset: Preset{
+				Mode: "router",
+				Models: []ModelEntry{
+					{Name: "no-vision", Model: "f:/path/to/model.gguf", Mmproj: "none"},
+				},
+			},
+			want: "[no-vision]\nmodel = /path/to/model.gguf\n",
 		},
 	}
 
@@ -688,7 +759,111 @@ func TestPreset_Validate(t *testing.T) {
 			},
 			wantErr: "draft-model field must not contain newline characters",
 		},
+		// mmproj validation tests
+		{
+			name:   "single mode with empty mmproj is valid",
+			preset: Preset{Model: "f:/path/to/model.gguf", Mmproj: ""},
+		},
+		{
+			name:   "single mode with mmproj none is valid",
+			preset: Preset{Model: "f:/path/to/model.gguf", Mmproj: "none"},
+		},
+		{
+			name:   "single mode with mmproj f: path is valid",
+			preset: Preset{Model: "f:/path/to/model.gguf", Mmproj: "f:/path/to/mmproj.gguf"},
+		},
+		{
+			name:    "single mode with mmproj f: only (no path) is invalid",
+			preset:  Preset{Model: "f:/path/to/model.gguf", Mmproj: "f:"},
+			wantErr: "mmproj 'f:' prefix requires a path",
+		},
+		{
+			name:    "single mode with mmproj None is invalid",
+			preset:  Preset{Model: "f:/path/to/model.gguf", Mmproj: "None"},
+			wantErr: `invalid mmproj value: got "None"`,
+		},
+		{
+			name:    "single mode with mmproj NONE is invalid",
+			preset:  Preset{Model: "f:/path/to/model.gguf", Mmproj: "NONE"},
+			wantErr: `invalid mmproj value: got "NONE"`,
+		},
+		{
+			name:    "single mode with mmproj h: prefix is invalid",
+			preset:  Preset{Model: "f:/path/to/model.gguf", Mmproj: "h:org/repo"},
+			wantErr: `invalid mmproj value: got "h:org/repo"`,
+		},
+		{
+			name:    "single mode with mmproj random string is invalid",
+			preset:  Preset{Model: "f:/path/to/model.gguf", Mmproj: "random-string"},
+			wantErr: `invalid mmproj value: got "random-string"`,
+		},
+		{
+			name:    "single mode with mmproj containing newline is invalid",
+			preset:  Preset{Model: "f:/path/to/model.gguf", Mmproj: "f:/path\n/mmproj.gguf"},
+			wantErr: "mmproj field must not contain newline characters",
+		},
+		{
+			name: "router mode with top-level mmproj is invalid",
+			preset: Preset{
+				Mode:   "router",
+				Mmproj: "none",
+				Models: []ModelEntry{
+					{Name: "llama", Model: "f:/llama.gguf"},
+				},
+			},
+			wantErr: "router mode defines mmproj per model in the 'models' list, not as a top-level field",
+		},
+		{
+			name: "router mode with per-model mmproj is valid",
+			preset: Preset{
+				Mode: "router",
+				Models: []ModelEntry{
+					{Name: "llama", Model: "f:/llama.gguf", Mmproj: "f:/path/to/mmproj.gguf"},
+				},
+			},
+		},
+		{
+			name: "router mode with per-model mmproj none is valid",
+			preset: Preset{
+				Mode: "router",
+				Models: []ModelEntry{
+					{Name: "llama", Model: "f:/llama.gguf", Mmproj: "none"},
+				},
+			},
+		},
+		{
+			name: "router mode with per-model invalid mmproj",
+			preset: Preset{
+				Mode: "router",
+				Models: []ModelEntry{
+					{Name: "llama", Model: "f:/llama.gguf", Mmproj: "random-string"},
+				},
+			},
+			wantErr: `invalid mmproj value: got "random-string"`,
+		},
 		// Reserved key tests for top-level options
+		{
+			name: "single mode with reserved key mmproj in options",
+			preset: Preset{
+				Model:   "f:/path/to/model.gguf",
+				Options: Options{"mmproj": "/path/to/mmproj.gguf"},
+			},
+			wantErr: `options key "mmproj" is reserved`,
+		},
+		{
+			name: "router mode with reserved key mmproj in model options",
+			preset: Preset{
+				Mode: "router",
+				Models: []ModelEntry{
+					{
+						Name:    "llama",
+						Model:   "f:/llama.gguf",
+						Options: Options{"mmproj": "/path/to/mmproj.gguf"},
+					},
+				},
+			},
+			wantErr: `options key "mmproj" is reserved`,
+		},
 		{
 			name: "single mode with reserved key port in options",
 			preset: Preset{

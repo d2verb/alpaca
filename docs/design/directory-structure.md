@@ -17,6 +17,7 @@ All Alpaca data is stored under `~/.alpaca/`:
 │   ├── .metadata.json   # Model download metadata
 │   ├── codellama-7b-Q4_K_M.gguf
 │   ├── mistral-7b-instruct-v0.2.Q4_K_M.gguf
+│   ├── ggml-org_gemma-3-4b-it-GGUF_mmproj-model-f16.gguf  # mmproj (repo-prefixed)
 │   └── ...
 └── logs/                # Log files (created automatically)
     ├── daemon.log       # Daemon process logs
@@ -58,7 +59,8 @@ Default location for downloaded models.
 
 - `alpaca pull` downloads models here
 - Presets can reference models here or anywhere else on the filesystem
-- `.metadata.json`: Tracks downloaded models (repo, quant, filename, size, download date)
+- `.metadata.json`: Tracks downloaded models (repo, quant, filename, size, mmproj info, download date)
+- mmproj files are stored with a repo-prefixed filename (e.g., `ggml-org_gemma-3-4b-it-GGUF_mmproj-model-f16.gguf`) to avoid collisions between repositories
 
 ### logs/
 

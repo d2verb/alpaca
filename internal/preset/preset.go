@@ -27,12 +27,12 @@ const (
 
 // reservedOptionsKeys are keys that cannot be used in the top-level options map.
 var reservedOptionsKeys = []string{
-	"port", "host", "model", "model-draft", "models-max", "sleep-idle-seconds",
+	"port", "host", "model", "model-draft", "mmproj", "models-max", "sleep-idle-seconds",
 }
 
 // reservedModelEntryOptionsKeys are keys that cannot be used in ModelEntry options.
 var reservedModelEntryOptionsKeys = []string{
-	"port", "host", "model", "model-draft",
+	"port", "host", "model", "model-draft", "mmproj",
 }
 
 // Options is a map of llama-server options.
@@ -100,6 +100,7 @@ type ModelEntry struct {
 	Name       string  `yaml:"name"`
 	Model      string  `yaml:"model"`
 	DraftModel string  `yaml:"draft-model,omitempty"`
+	Mmproj     string  `yaml:"mmproj,omitempty" json:"mmproj,omitempty"`
 	Options    Options `yaml:"options,omitempty"`
 }
 
@@ -108,6 +109,7 @@ type Preset struct {
 	Name        string       `yaml:"name"`
 	Model       string       `yaml:"model,omitempty"`
 	DraftModel  string       `yaml:"draft-model,omitempty"`
+	Mmproj      string       `yaml:"mmproj,omitempty" json:"mmproj,omitempty"`
 	Mode        string       `yaml:"mode,omitempty"`
 	Port        int          `yaml:"port,omitempty"`
 	Host        string       `yaml:"host,omitempty"`
@@ -143,6 +145,12 @@ func (p *Preset) IsRouter() bool {
 	return p.Mode == "router"
 }
 
+// IsMmprojActive reports whether the mmproj value represents an active mmproj
+// configuration (i.e. not empty and not "none").
+func IsMmprojActive(mmproj string) bool {
+	return mmproj != "" && mmproj != "none"
+}
+
 // BuildArgs builds the command-line arguments for llama-server in single mode.
 func (p *Preset) BuildArgs() []string {
 	modelPath := strings.TrimPrefix(p.Model, "f:")
@@ -152,6 +160,11 @@ func (p *Preset) BuildArgs() []string {
 	if p.DraftModel != "" {
 		draftModelPath := strings.TrimPrefix(p.DraftModel, "f:")
 		args = append(args, "--model-draft", draftModelPath)
+	}
+
+	if IsMmprojActive(p.Mmproj) {
+		mmprojPath := strings.TrimPrefix(p.Mmproj, "f:")
+		args = append(args, "--mmproj", mmprojPath)
 	}
 
 	args = append(args, "--port", strconv.Itoa(p.GetPort()))
@@ -218,6 +231,11 @@ func (p *Preset) GenerateConfigINI() string {
 			fmt.Fprintf(&b, "model-draft = %s\n", draftPath)
 		}
 
+		if IsMmprojActive(m.Mmproj) {
+			mmprojPath := strings.TrimPrefix(m.Mmproj, "f:")
+			fmt.Fprintf(&b, "mmproj = %s\n", mmprojPath)
+		}
+
 		if len(m.Options) > 0 {
 			for _, k := range slices.Sorted(maps.Keys(m.Options)) {
 				fmt.Fprintf(&b, "%s = %s\n", k, m.Options[k])
@@ -266,6 +284,9 @@ func (p *Preset) validateSingle() error {
 	if p.DraftModel != "" && strings.ContainsAny(p.DraftModel, "\n\r") {
 		return fmt.Errorf("draft-model field must not contain newline characters")
 	}
+	if err := validateMmproj(p.Mmproj); err != nil {
+		return err
+	}
 	return validateOptions(p.Options, reservedOptionsKeys)
 }
 
@@ -275,6 +296,9 @@ func (p *Preset) validateRouter() error {
 	}
 	if p.DraftModel != "" {
 		return fmt.Errorf("router mode defines draft-model per model in the 'models' list, not as a top-level field")
+	}
+	if p.Mmproj != "" {
+		return fmt.Errorf("router mode defines mmproj per model in the 'models' list, not as a top-level field")
 	}
 	if len(p.Models) == 0 {
 		return fmt.Errorf("at least one model is required for router mode")
@@ -313,8 +337,32 @@ func validateModelEntry(m ModelEntry) error {
 	if m.DraftModel != "" && strings.ContainsAny(m.DraftModel, "\n\r") {
 		return fmt.Errorf("draft-model field must not contain newline characters")
 	}
+	if err := validateMmproj(m.Mmproj); err != nil {
+		return err
+	}
 
 	return validateOptions(m.Options, reservedModelEntryOptionsKeys)
+}
+
+// validateMmproj validates the mmproj field value.
+// Valid values: empty (omitted), "none" (lowercase only), or "f:" prefixed path.
+func validateMmproj(mmproj string) error {
+	if mmproj == "" {
+		return nil
+	}
+	if mmproj == "none" {
+		return nil
+	}
+	if strings.ContainsAny(mmproj, "\n\r") {
+		return fmt.Errorf("mmproj field must not contain newline characters")
+	}
+	if strings.HasPrefix(mmproj, "f:") {
+		if len(mmproj) <= 2 {
+			return fmt.Errorf("mmproj 'f:' prefix requires a path")
+		}
+		return nil
+	}
+	return fmt.Errorf("invalid mmproj value: got %q; expected 'none', 'f:/path', or omit", mmproj)
 }
 
 // validateOptions checks that options keys are not reserved and do not contain newline characters.
@@ -327,7 +375,7 @@ func validateOptions(opts Options, reserved []string) error {
 			return fmt.Errorf("options value must not contain newline characters")
 		}
 		if slices.Contains(reserved, k) {
-			return fmt.Errorf("options key %q is reserved and cannot be used in options", k)
+			return fmt.Errorf("options key %q is reserved and cannot be used in options; use the top-level %q field instead", k, k)
 		}
 	}
 	return nil

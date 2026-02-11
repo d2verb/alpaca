@@ -255,6 +255,12 @@ func resolveSingleModelPaths(preset *Preset, baseDir string) error {
 		preset.DraftModel = resolvedDraft
 	}
 
+	resolvedMmproj, err := resolveMmprojPath(preset.Mmproj, baseDir)
+	if err != nil {
+		return fmt.Errorf("resolve mmproj path: %w", err)
+	}
+	preset.Mmproj = resolvedMmproj
+
 	return nil
 }
 
@@ -276,6 +282,12 @@ func resolveRouterModelPaths(preset *Preset, baseDir string) error {
 			}
 			m.DraftModel = resolvedDraft
 		}
+
+		resolvedMmproj, err := resolveMmprojPath(m.Mmproj, baseDir)
+		if err != nil {
+			return fmt.Errorf("resolve mmproj path for '%s': %w", m.Name, err)
+		}
+		m.Mmproj = resolvedMmproj
 	}
 
 	return nil
@@ -291,6 +303,29 @@ func WriteFile(path string, p *Preset) error {
 		return fmt.Errorf("write file: %w", err)
 	}
 	return nil
+}
+
+// resolveMmprojPath resolves the mmproj path in a preset.
+// - Empty string → return empty (auto-resolve happens in daemon)
+// - "none" → return "none" as-is
+// - "f:" prefix → expand path using pathutil.ResolvePath
+// - Other values should have been caught by validation, but return error as safety net
+func resolveMmprojPath(mmproj, baseDir string) (string, error) {
+	if mmproj == "" {
+		return "", nil
+	}
+	if mmproj == "none" {
+		return "none", nil
+	}
+	if strings.HasPrefix(mmproj, "f:") {
+		path := mmproj[2:]
+		resolved, err := pathutil.ResolvePath(path, baseDir)
+		if err != nil {
+			return "", err
+		}
+		return "f:" + resolved, nil
+	}
+	return "", fmt.Errorf("invalid mmproj value: %q", mmproj)
 }
 
 // resolveModelPath resolves the model path in a preset.

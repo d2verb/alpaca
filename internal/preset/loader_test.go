@@ -646,6 +646,96 @@ draft-model: h:org/draft-repo:Q4_K_M
 		}
 	})
 
+	t.Run("resolves mmproj with empty value to empty", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: no-mmproj
+model: f:/path/to/model.gguf
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		if p.Mmproj != "" {
+			t.Errorf("Mmproj = %q, want empty string", p.Mmproj)
+		}
+	})
+
+	t.Run("resolves mmproj none to none", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: mmproj-none
+model: f:/path/to/model.gguf
+mmproj: none
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		if p.Mmproj != "none" {
+			t.Errorf("Mmproj = %q, want %q", p.Mmproj, "none")
+		}
+	})
+
+	t.Run("expands tilde in mmproj path", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: mmproj-tilde
+model: f:/path/to/model.gguf
+mmproj: "f:~/models/mmproj.gguf"
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		home, _ := os.UserHomeDir()
+		expected := "f:" + filepath.Join(home, "models/mmproj.gguf")
+		if p.Mmproj != expected {
+			t.Errorf("Mmproj = %q, want %q", p.Mmproj, expected)
+		}
+	})
+
+	t.Run("resolves relative mmproj path from preset directory", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: mmproj-relative
+model: f:/path/to/model.gguf
+mmproj: f:./models/mmproj.gguf
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		expected := "f:" + filepath.Join(tmpDir, "models/mmproj.gguf")
+		if p.Mmproj != expected {
+			t.Errorf("Mmproj = %q, want %q", p.Mmproj, expected)
+		}
+	})
+
 	t.Run("omits draft model when not specified", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
@@ -787,6 +877,39 @@ models:
 		expectedDraft := "f:" + filepath.Join(tmpDir, "drafts/draft.gguf")
 		if p.Models[0].DraftModel != expectedDraft {
 			t.Errorf("Models[0].DraftModel = %q, want %q", p.Models[0].DraftModel, expectedDraft)
+		}
+	})
+
+	t.Run("resolves mmproj paths in router mode", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		preset := `name: router-mmproj
+mode: router
+models:
+  - name: vision
+    model: f:/path/to/model.gguf
+    mmproj: "f:~/models/mmproj.gguf"
+  - name: text-only
+    model: f:/path/to/text.gguf
+`
+		presetPath := filepath.Join(tmpDir, ".alpaca.yaml")
+		if err := os.WriteFile(presetPath, []byte(preset), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		p, err := LoadFile(presetPath)
+		if err != nil {
+			t.Fatalf("LoadFile() error = %v", err)
+		}
+
+		home, _ := os.UserHomeDir()
+		expectedMmproj := "f:" + filepath.Join(home, "models/mmproj.gguf")
+		if p.Models[0].Mmproj != expectedMmproj {
+			t.Errorf("Models[0].Mmproj = %q, want %q", p.Models[0].Mmproj, expectedMmproj)
+		}
+
+		if p.Models[1].Mmproj != "" {
+			t.Errorf("Models[1].Mmproj = %q, want empty string", p.Models[1].Mmproj)
 		}
 	})
 

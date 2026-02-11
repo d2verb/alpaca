@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/d2verb/alpaca/internal/llama"
 	"github.com/d2verb/alpaca/internal/logging"
@@ -142,18 +143,37 @@ func (s *Server) handleStatus(ctx context.Context) *protocol.Response {
 	data := map[string]any{
 		"state": string(state),
 	}
-	if preset := s.daemon.CurrentPreset(); preset != nil {
-		data["preset"] = preset.Name
-		data["endpoint"] = preset.Endpoint()
-		if preset.IsRouter() {
+	if p := s.daemon.CurrentPreset(); p != nil {
+		data["preset"] = p.Name
+		data["endpoint"] = p.Endpoint()
+
+		// Add mmproj path for single mode
+		if preset.IsMmprojActive(p.Mmproj) {
+			data["mmproj"] = strings.TrimPrefix(p.Mmproj, "f:")
+		}
+
+		if p.IsRouter() {
 			data["mode"] = "router"
+
+			// Build mmproj map from preset models
+			mmprojMap := map[string]string{}
+			for _, m := range p.Models {
+				if preset.IsMmprojActive(m.Mmproj) {
+					mmprojMap[m.Name] = strings.TrimPrefix(m.Mmproj, "f:")
+				}
+			}
+
 			if statuses := s.daemon.FetchModelStatuses(ctx); statuses != nil {
 				models := []map[string]any{}
 				for _, m := range statuses {
-					models = append(models, map[string]any{
+					modelData := map[string]any{
 						"id":     m.ID,
 						"status": m.Status.Value,
-					})
+					}
+					if mmprojPath, ok := mmprojMap[m.ID]; ok {
+						modelData["mmproj"] = mmprojPath
+					}
+					models = append(models, modelData)
 				}
 				data["models"] = models
 			}
@@ -244,6 +264,7 @@ func (s *Server) handleListModels(ctx context.Context) *protocol.Response {
 func (s *Server) writeResponse(conn net.Conn, resp *protocol.Response) {
 	data, err := json.Marshal(resp)
 	if err != nil {
+		s.logger.Error("marshal response failed", "error", err)
 		return
 	}
 	data = append(data, '\n')

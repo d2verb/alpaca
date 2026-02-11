@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -362,5 +363,208 @@ func TestGetFilePathFileNotFound(t *testing.T) {
 	// Assert
 	if err == nil {
 		t.Fatal("expected error for missing file")
+	}
+}
+
+func TestMmprojEntryJSONRoundTrip(t *testing.T) {
+	// Arrange
+	entry := MmprojEntry{
+		Filename: "ggml-org_gemma-3-4b-it-GGUF_mmproj-model-f16.gguf",
+		Size:     851251104,
+	}
+
+	// Act
+	data, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var loaded MmprojEntry
+	if err := json.Unmarshal(data, &loaded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// Assert
+	if loaded.Filename != entry.Filename {
+		t.Errorf("filename = %s, want %s", loaded.Filename, entry.Filename)
+	}
+	if loaded.Size != entry.Size {
+		t.Errorf("size = %d, want %d", loaded.Size, entry.Size)
+	}
+}
+
+func TestModelEntryWithMmprojJSON(t *testing.T) {
+	// Arrange
+	entry := ModelEntry{
+		Repo:     "ggml-org/gemma-3-4b-it-GGUF",
+		Quant:    "Q4_K_M",
+		Filename: "gemma-3-4b-it-Q4_K_M.gguf",
+		Size:     2489757856,
+		Mmproj: &MmprojEntry{
+			Filename: "ggml-org_gemma-3-4b-it-GGUF_mmproj-model-f16.gguf",
+			Size:     851251104,
+		},
+		DownloadedAt: time.Date(2025, 2, 11, 10, 30, 0, 0, time.UTC),
+	}
+
+	// Act
+	data, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var loaded ModelEntry
+	if err := json.Unmarshal(data, &loaded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// Assert
+	if loaded.Mmproj == nil {
+		t.Fatal("expected mmproj to be non-nil")
+	}
+	if loaded.Mmproj.Filename != entry.Mmproj.Filename {
+		t.Errorf("mmproj filename = %s, want %s", loaded.Mmproj.Filename, entry.Mmproj.Filename)
+	}
+	if loaded.Mmproj.Size != entry.Mmproj.Size {
+		t.Errorf("mmproj size = %d, want %d", loaded.Mmproj.Size, entry.Mmproj.Size)
+	}
+}
+
+func TestModelEntryWithoutMmprojOmitsField(t *testing.T) {
+	// Arrange
+	entry := ModelEntry{
+		Repo:         "unsloth/Qwen3-8B-GGUF",
+		Quant:        "Q4_K_M",
+		Filename:     "Qwen3-8B-Q4_K_M.gguf",
+		Size:         5030000000,
+		DownloadedAt: time.Date(2025, 2, 11, 10, 30, 0, 0, time.UTC),
+	}
+
+	// Act
+	data, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	// Assert - verify "mmproj" key is not present in JSON
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("unmarshal raw: %v", err)
+	}
+	if _, exists := raw["mmproj"]; exists {
+		t.Error("expected mmproj field to be omitted from JSON when nil")
+	}
+
+	// Also verify round-trip keeps it nil
+	var loaded ModelEntry
+	if err := json.Unmarshal(data, &loaded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if loaded.Mmproj != nil {
+		t.Error("expected mmproj to be nil after round-trip")
+	}
+}
+
+func TestSaveAndLoadWithMmproj(t *testing.T) {
+	// Arrange
+	tmpDir := t.TempDir()
+	mgr := NewManager(tmpDir)
+	ctx := context.Background()
+	entry := ModelEntry{
+		Repo:     "ggml-org/gemma-3-4b-it-GGUF",
+		Quant:    "Q4_K_M",
+		Filename: "gemma-3-4b-it-Q4_K_M.gguf",
+		Size:     2489757856,
+		Mmproj: &MmprojEntry{
+			Filename: "ggml-org_gemma-3-4b-it-GGUF_mmproj-model-f16.gguf",
+			Size:     851251104,
+		},
+		DownloadedAt: time.Now().UTC().Truncate(time.Second),
+	}
+	if err := mgr.Add(entry); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+
+	// Act
+	if err := mgr.Save(ctx); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	mgr2 := NewManager(tmpDir)
+	if err := mgr2.Load(ctx); err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	// Assert
+	loaded := mgr2.data.Models[0]
+	if loaded.Mmproj == nil {
+		t.Fatal("expected mmproj to be non-nil after save/load")
+	}
+	if loaded.Mmproj.Filename != entry.Mmproj.Filename {
+		t.Errorf("mmproj filename = %s, want %s", loaded.Mmproj.Filename, entry.Mmproj.Filename)
+	}
+	if loaded.Mmproj.Size != entry.Mmproj.Size {
+		t.Errorf("mmproj size = %d, want %d", loaded.Mmproj.Size, entry.Mmproj.Size)
+	}
+}
+
+func TestMmprojReferenceCount(t *testing.T) {
+	tests := []struct {
+		name     string
+		entries  []ModelEntry
+		filename string
+		want     int
+	}{
+		{
+			name:     "no entries",
+			entries:  nil,
+			filename: "mmproj.gguf",
+			want:     0,
+		},
+		{
+			name: "no entries reference the filename",
+			entries: []ModelEntry{
+				{Repo: "repo1", Quant: "Q4_K_M", Filename: "model1.gguf"},
+				{Repo: "repo2", Quant: "Q8_0", Filename: "model2.gguf", Mmproj: &MmprojEntry{Filename: "other-mmproj.gguf", Size: 100}},
+			},
+			filename: "mmproj.gguf",
+			want:     0,
+		},
+		{
+			name: "one entry references the filename",
+			entries: []ModelEntry{
+				{Repo: "repo1", Quant: "Q4_K_M", Filename: "model1.gguf", Mmproj: &MmprojEntry{Filename: "mmproj.gguf", Size: 100}},
+				{Repo: "repo2", Quant: "Q8_0", Filename: "model2.gguf"},
+			},
+			filename: "mmproj.gguf",
+			want:     1,
+		},
+		{
+			name: "multiple entries share the same mmproj",
+			entries: []ModelEntry{
+				{Repo: "repo1", Quant: "Q4_K_M", Filename: "model-q4.gguf", Mmproj: &MmprojEntry{Filename: "repo1_mmproj-f16.gguf", Size: 800}},
+				{Repo: "repo1", Quant: "Q8_0", Filename: "model-q8.gguf", Mmproj: &MmprojEntry{Filename: "repo1_mmproj-f16.gguf", Size: 800}},
+				{Repo: "repo2", Quant: "Q4_K_M", Filename: "other.gguf", Mmproj: &MmprojEntry{Filename: "repo2_mmproj-f16.gguf", Size: 500}},
+			},
+			filename: "repo1_mmproj-f16.gguf",
+			want:     2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
+			mgr := NewManager(t.TempDir())
+			for _, e := range tt.entries {
+				if err := mgr.Add(e); err != nil {
+					t.Fatalf("add entry: %v", err)
+				}
+			}
+
+			// Act
+			got := mgr.MmprojReferenceCount(tt.filename)
+
+			// Assert
+			if got != tt.want {
+				t.Errorf("MmprojReferenceCount(%q) = %d, want %d", tt.filename, got, tt.want)
+			}
+		})
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -47,16 +48,32 @@ func (p *Puller) SetProgressFunc(fn ProgressFunc) {
 
 // PullResult contains information about the downloaded file.
 type PullResult struct {
-	Path     string
-	Filename string
-	Size     int64
+	Path           string
+	Filename       string
+	Size           int64
+	MmprojFilename string // empty if no mmproj or download failed
+	MmprojSize     int64  // 0 if no mmproj
+	MmprojFailed   bool   // true if mmproj download was attempted but failed
 }
 
-// ggufFileInfo holds a GGUF filename and its optional LFS SHA256 hash.
+// FileInfo contains information about model and mmproj files from the manifest.
+type FileInfo struct {
+	Filename       string
+	Size           int64
+	MmprojFilename string // storage filename with repo prefix; empty if no mmproj
+	MmprojSize     int64
+}
+
+// ggufFileInfo holds a GGUF filename and its optional LFS SHA256 hash,
+// along with optional mmproj information.
 type ggufFileInfo struct {
-	Filename string
-	SHA256   string // empty if not available from API
-	Size     int64  // file size in bytes; 0 if not available from API
+	Filename               string
+	SHA256                 string // empty if not available from API
+	Size                   int64  // file size in bytes; 0 if not available from API
+	MmprojFilename         string // storage filename with repo prefix; empty if no mmproj
+	MmprojSHA256           string // SHA256 from LFS; empty if not available
+	MmprojSize             int64  // mmproj file size; 0 if no mmproj
+	MmprojOriginalFilename string // original filename from API (before prefix)
 }
 
 // Pull downloads a model from HuggingFace.
@@ -95,12 +112,28 @@ func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, err
 
 	destPath := filepath.Join(p.modelsDir, fileInfo.Filename)
 
+	// Re-pull cleanup: remove outdated mmproj if filename changed or mmproj was removed
+	p.cleanupOldMmproj(repo, quant, fileInfo.MmprojFilename)
+
+	// Download mmproj if manifest includes one
+	var mmprojEntry *metadata.MmprojEntry
+	mmprojFailed := false
+	if fileInfo.MmprojFilename != "" {
+		mmprojEntry, err = p.downloadMmproj(ctx, repo, fileInfo)
+		if err != nil {
+			slog.Warn("mmproj download failed", "error", err)
+			mmprojFailed = true
+			// Continue without mmproj - save metadata without it
+		}
+	}
+
 	// Save metadata entry
 	entry := metadata.ModelEntry{
 		Repo:         repo,
 		Quant:        quant,
 		Filename:     fileInfo.Filename,
 		Size:         size,
+		Mmproj:       mmprojEntry,
 		DownloadedAt: time.Now().UTC(),
 	}
 	if err := p.metadata.Add(entry); err != nil {
@@ -110,25 +143,38 @@ func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, err
 		return nil, fmt.Errorf("save metadata: %w", err)
 	}
 
-	return &PullResult{
-		Path:     destPath,
-		Filename: fileInfo.Filename,
-		Size:     size,
-	}, nil
+	result := &PullResult{
+		Path:         destPath,
+		Filename:     fileInfo.Filename,
+		Size:         size,
+		MmprojFailed: mmprojFailed,
+	}
+	if mmprojEntry != nil {
+		result.MmprojFilename = mmprojEntry.Filename
+		result.MmprojSize = mmprojEntry.Size
+	}
+
+	return result, nil
 }
 
-// GetFileInfo fetches info about the model file without downloading.
-func (p *Puller) GetFileInfo(ctx context.Context, repo, quant string) (filename string, size int64, err error) {
+// GetFileInfo fetches info about the model and optional mmproj files without downloading.
+func (p *Puller) GetFileInfo(ctx context.Context, repo, quant string) (*FileInfo, error) {
 	fileInfo, err := p.fetchManifest(ctx, repo, quant)
 	if err != nil {
-		return "", 0, err
+		return nil, err
 	}
-	return fileInfo.Filename, fileInfo.Size, nil
+	return &FileInfo{
+		Filename:       fileInfo.Filename,
+		Size:           fileInfo.Size,
+		MmprojFilename: fileInfo.MmprojFilename,
+		MmprojSize:     fileInfo.MmprojSize,
+	}, nil
 }
 
 // manifestResponse represents the HuggingFace v2 manifest API response.
 type manifestResponse struct {
-	GGUFFile *manifestFile `json:"ggufFile"`
+	GGUFFile   *manifestFile `json:"ggufFile"`
+	MmprojFile *manifestFile `json:"mmprojFile"`
 }
 
 // manifestFile represents a file entry in the manifest response.
@@ -184,6 +230,17 @@ func (p *Puller) fetchManifest(ctx context.Context, repo, quant string) (ggufFil
 	if manifest.GGUFFile.LFS != nil {
 		fi.SHA256 = manifest.GGUFFile.LFS.SHA256
 	}
+
+	// Populate mmproj fields if present in manifest
+	if manifest.MmprojFile != nil && manifest.MmprojFile.Filename != "" {
+		fi.MmprojOriginalFilename = manifest.MmprojFile.Filename
+		fi.MmprojFilename = mmprojStorageFilename(repo, manifest.MmprojFile.Filename)
+		fi.MmprojSize = manifest.MmprojFile.Size
+		if manifest.MmprojFile.LFS != nil {
+			fi.MmprojSHA256 = manifest.MmprojFile.LFS.SHA256
+		}
+	}
+
 	return fi, nil
 }
 
