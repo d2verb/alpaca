@@ -168,8 +168,8 @@ func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, err
 			// Continue without mmproj - save metadata without it
 		} else {
 			// Ensure progress shows 100% and notify saved
-			if p.onProgress != nil && fileInfo.MmprojSize > 0 {
-				p.onProgress(fileInfo.MmprojSize, fileInfo.MmprojSize)
+			if p.onProgress != nil && mmprojEntry.Size > 0 {
+				p.onProgress(mmprojEntry.Size, mmprojEntry.Size)
 			}
 			if p.onFileSaved != nil {
 				p.onFileSaved(filepath.Join(p.modelsDir, fileInfo.MmprojFilename))

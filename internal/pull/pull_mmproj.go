@@ -52,7 +52,7 @@ func (p *Puller) downloadMmproj(ctx context.Context, repo string, fileInfo ggufF
 	}
 
 	// Download mmproj file using the original filename for the URL path
-	_, err := p.downloadFile(ctx, repo, fileInfo.MmprojOriginalFilename)
+	size, err := p.downloadFile(ctx, repo, fileInfo.MmprojOriginalFilename)
 	if err != nil {
 		return nil, fmt.Errorf("download mmproj: %w", err)
 	}
@@ -84,7 +84,7 @@ func (p *Puller) downloadMmproj(ctx context.Context, repo string, fileInfo ggufF
 
 	return &metadata.MmprojEntry{
 		Filename: fileInfo.MmprojFilename,
-		Size:     fileInfo.MmprojSize,
+		Size:     size,
 	}, nil
 }
 
