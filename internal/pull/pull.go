@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/d2verb/alpaca/internal/metadata"
@@ -57,6 +56,7 @@ type PullResult struct {
 type ggufFileInfo struct {
 	Filename string
 	SHA256   string // empty if not available from API
+	Size     int64  // file size in bytes; 0 if not available from API
 }
 
 // Pull downloads a model from HuggingFace.
@@ -66,8 +66,8 @@ func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, err
 		return nil, fmt.Errorf("load metadata: %w", err)
 	}
 
-	// Find matching file
-	fileInfo, err := p.findMatchingFile(ctx, repo, quant)
+	// Fetch manifest from HuggingFace v2 API
+	fileInfo, err := p.fetchManifest(ctx, repo, quant)
 	if err != nil {
 		return nil, err
 	}
@@ -119,119 +119,72 @@ func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, err
 
 // GetFileInfo fetches info about the model file without downloading.
 func (p *Puller) GetFileInfo(ctx context.Context, repo, quant string) (filename string, size int64, err error) {
-	fileInfo, err := p.findMatchingFile(ctx, repo, quant)
+	fileInfo, err := p.fetchManifest(ctx, repo, quant)
 	if err != nil {
 		return "", 0, err
 	}
-	filename = fileInfo.Filename
-
-	// Get file size via HEAD request
-	url := fmt.Sprintf("%s/%s/resolve/main/%s", p.baseURL, repo, filename)
-	req, err := http.NewRequestWithContext(ctx, "HEAD", url, nil)
-	if err != nil {
-		return "", 0, fmt.Errorf("create request: %w", err)
-	}
-
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return "", 0, fmt.Errorf("fetch file info: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", 0, fmt.Errorf("file not found: status %d", resp.StatusCode)
-	}
-
-	return filename, resp.ContentLength, nil
+	return fileInfo.Filename, fileInfo.Size, nil
 }
 
-func (p *Puller) findMatchingFile(ctx context.Context, repo, quant string) (ggufFileInfo, error) {
-	files, err := p.listGGUFFiles(ctx, repo)
-	if err != nil {
-		return ggufFileInfo{}, err
-	}
-
-	// Find GGUF file matching quant
-	quantUpper := strings.ToUpper(quant)
-	for _, fi := range files {
-		if strings.Contains(strings.ToUpper(fi.Filename), quantUpper) {
-			return fi, nil
-		}
-	}
-
-	// Build available quants for error message
-	filenames := make([]string, len(files))
-	for i, fi := range files {
-		filenames[i] = fi.Filename
-	}
-	available := extractQuants(filenames)
-	if len(available) > 0 {
-		return ggufFileInfo{}, fmt.Errorf("no matching file found for quant '%s'\nAvailable: %s", quant, strings.Join(available, ", "))
-	}
-	return ggufFileInfo{}, fmt.Errorf("no GGUF files found in repository '%s'", repo)
+// manifestResponse represents the HuggingFace v2 manifest API response.
+type manifestResponse struct {
+	GGUFFile *manifestFile `json:"ggufFile"`
 }
 
-func (p *Puller) listGGUFFiles(ctx context.Context, repo string) ([]ggufFileInfo, error) {
-	url := fmt.Sprintf("%s/api/models/%s", p.baseURL, repo)
+// manifestFile represents a file entry in the manifest response.
+type manifestFile struct {
+	Filename string       `json:"rfilename"` // "rfilename" is the field name used by HuggingFace v2 manifest API
+	Size     int64        `json:"size"`
+	LFS      *manifestLFS `json:"lfs"`
+}
+
+// manifestLFS represents the LFS metadata in the manifest response.
+type manifestLFS struct {
+	SHA256 string `json:"sha256"`
+}
+
+func (p *Puller) fetchManifest(ctx context.Context, repo, quant string) (ggufFileInfo, error) {
+	url := fmt.Sprintf("%s/v2/%s/manifests/%s", p.baseURL, repo, quant)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
+		return ggufFileInfo{}, fmt.Errorf("create request: %w", err)
 	}
+	req.Header.Set("User-Agent", "llama-cpp") // Required by HuggingFace v2 manifest API to return GGUF file info
+	req.Header.Set("Accept", "application/json")
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("fetch repo info: %w", err)
+		return ggufFileInfo{}, fmt.Errorf("fetch manifest: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized {
-		return nil, fmt.Errorf("repository not found: %s", repo)
+		return ggufFileInfo{}, fmt.Errorf("repository not found: %s", repo)
+	}
+	if resp.StatusCode == http.StatusBadRequest {
+		return ggufFileInfo{}, fmt.Errorf("invalid quantization '%s' for repository '%s'", quant, repo)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch repo info: status %d", resp.StatusCode)
+		return ggufFileInfo{}, fmt.Errorf("failed to fetch manifest: status %d", resp.StatusCode)
 	}
 
-	var repoInfo struct {
-		Siblings []struct {
-			Filename string `json:"rfilename"`
-			LFS      *struct {
-				SHA256 string `json:"sha256"`
-			} `json:"lfs"`
-		} `json:"siblings"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&repoInfo); err != nil {
-		return nil, fmt.Errorf("parse repo info: %w", err)
+	var manifest manifestResponse
+	if err := json.NewDecoder(resp.Body).Decode(&manifest); err != nil {
+		return ggufFileInfo{}, fmt.Errorf("parse manifest: %w", err)
 	}
 
-	var files []ggufFileInfo
-	for _, sibling := range repoInfo.Siblings {
-		if strings.HasSuffix(strings.ToLower(sibling.Filename), ".gguf") {
-			fi := ggufFileInfo{Filename: sibling.Filename}
-			if sibling.LFS != nil {
-				fi.SHA256 = sibling.LFS.SHA256
-			}
-			files = append(files, fi)
-		}
+	if manifest.GGUFFile == nil || manifest.GGUFFile.Filename == "" {
+		return ggufFileInfo{}, fmt.Errorf("no GGUF file found in manifest for '%s'", quant)
 	}
-	return files, nil
-}
 
-// extractQuants extracts quantization types from GGUF filenames.
-func extractQuants(files []string) []string {
-	quantPatterns := []string{"Q2_K", "Q3_K_S", "Q3_K_M", "Q3_K_L", "Q4_0", "Q4_K_S", "Q4_K_M", "Q5_0", "Q5_K_S", "Q5_K_M", "Q6_K", "Q8_0"}
-	var found []string
-	seen := make(map[string]bool)
-
-	for _, file := range files {
-		fileUpper := strings.ToUpper(file)
-		for _, q := range quantPatterns {
-			if strings.Contains(fileUpper, q) && !seen[q] {
-				found = append(found, q)
-				seen[q] = true
-			}
-		}
+	fi := ggufFileInfo{
+		Filename: manifest.GGUFFile.Filename,
+		Size:     manifest.GGUFFile.Size,
 	}
-	return found
+	if manifest.GGUFFile.LFS != nil {
+		fi.SHA256 = manifest.GGUFFile.LFS.SHA256
+	}
+	return fi, nil
 }
 
 func (p *Puller) downloadFile(ctx context.Context, repo, filename string) (int64, error) {
