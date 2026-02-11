@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 
@@ -92,7 +93,7 @@ func TestPrintStatus(t *testing.T) {
 			// Arrange
 			var buf bytes.Buffer
 			Output = &buf
-			defer func() { Output = nil }()
+			defer func() { Output = os.Stdout }()
 
 			// Act
 			PrintStatus("running", tt.preset, "http://localhost:8080", "/path/to/llama.log", "")
@@ -135,7 +136,7 @@ func TestPrintStatus_NoPreset(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	// Act
 	PrintStatus("idle", "", "", "/path/to/llama.log", "")
@@ -167,7 +168,7 @@ func TestPrintModelList(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	models := []ModelInfo{
 		{Repo: "org/model1", Quant: "Q4_K_M", SizeString: "2.5 GB", DownloadedAt: "2024-01-15"},
@@ -204,7 +205,7 @@ func TestPrintModelList_Empty(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	// Act
 	PrintModelList([]ModelInfo{})
@@ -227,7 +228,7 @@ func TestPrintPresetList(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	presets := []string{"preset1", "preset2"}
 
@@ -255,7 +256,7 @@ func TestPrintPresetList_Empty(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	// Act
 	PrintPresetList([]string{})
@@ -278,7 +279,7 @@ func TestPrintSuccess(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	// Act
 	PrintSuccess("Operation completed")
@@ -301,7 +302,7 @@ func TestPrintError(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	// Act
 	PrintError("Something went wrong")
@@ -324,7 +325,7 @@ func TestPrintWarning(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	// Act
 	PrintWarning("Be careful")
@@ -347,7 +348,7 @@ func TestPrintInfo(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	// Act
 	PrintInfo("Information")
@@ -370,7 +371,7 @@ func TestPrintPresetDetails(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	preset := PresetDetails{
 		Name:  "my-preset",
@@ -422,7 +423,7 @@ func TestPrintPresetDetails_Minimal(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	preset := PresetDetails{
 		Name:  "minimal",
@@ -583,7 +584,7 @@ func TestPrintRouterStatus(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	models := []RouterModelInfo{
 		{ID: "qwen3", Status: "loaded"},
@@ -645,7 +646,7 @@ func TestPrintRouterStatus_NoModels(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	// Act
 	PrintRouterStatus("running", "p:test", "http://127.0.0.1:8080", "/log", nil)
@@ -668,7 +669,7 @@ func TestPrintRouterPresetDetails(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	details := RouterPresetDetails{
 		Name:        "my-workspace",
@@ -784,7 +785,7 @@ func TestPrintRouterPresetDetails_Minimal(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	details := RouterPresetDetails{
 		Name: "minimal",
@@ -867,7 +868,7 @@ func TestPrintModelDetails(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	model := ModelDetails{
 		Repo:         "org/model",
@@ -929,7 +930,7 @@ func TestPrintModelDetails_WithMmproj(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	model := ModelDetails{
 		Repo:         "org/vision-model",
@@ -962,7 +963,7 @@ func TestPrintStatus_WithMmproj(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	// Act
 	PrintStatus("running", "p:vision", "http://localhost:8080", "/path/to/llama.log", "/models/mmproj.gguf")
@@ -985,7 +986,7 @@ func TestPrintPresetDetails_WithMmproj(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	preset := PresetDetails{
 		Name:   "vision-preset",
@@ -1016,7 +1017,7 @@ func TestPrintRouterPresetDetails_WithMmproj(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	details := RouterPresetDetails{
 		Name: "vision-workspace",
@@ -1056,7 +1057,7 @@ func TestPrintRouterStatus_WithMmproj(t *testing.T) {
 	// Arrange
 	var buf bytes.Buffer
 	Output = &buf
-	defer func() { Output = nil }()
+	defer func() { Output = os.Stdout }()
 
 	models := []RouterModelInfo{
 		{ID: "gemma3-vision", Status: "loaded", Mmproj: "/path/to/mmproj.gguf"},

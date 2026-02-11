@@ -2,6 +2,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -23,7 +24,7 @@ type Paths struct {
 func GetPaths() (*Paths, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get user home dir: %w", err)
 	}
 
 	alpacaHome := filepath.Join(home, ".alpaca")
@@ -46,7 +47,7 @@ func (p *Paths) EnsureDirectories() error {
 	dirs := []string{p.Home, p.Presets, p.Models, p.Logs}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			return err
+			return fmt.Errorf("create directory %s: %w", dir, err)
 		}
 	}
 	return nil

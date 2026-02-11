@@ -37,35 +37,26 @@ var (
 	Label   = func(s string) string { return s } // Normal color for readability
 )
 
-// Legacy color functions - kept for backward compatibility.
-// Prefer semantic colors (Primary, Secondary, etc.) for new code.
-var (
-	Green  = color.New(color.FgGreen).SprintFunc()
-	Red    = color.New(color.FgRed).SprintFunc()
-	Yellow = color.New(color.FgYellow).SprintFunc()
-	Blue   = color.New(color.FgBlue).SprintFunc()
-)
-
 // Output is the destination for UI output.
 // Defaults to os.Stdout but can be overridden for testing.
 var Output io.Writer = os.Stdout
 
-// FormatEndpoint formats endpoint with blue color.
+// FormatEndpoint formats endpoint as a link.
 func FormatEndpoint(endpoint string) string {
-	return Blue(endpoint)
+	return Link(endpoint)
 }
 
 // StatusBadge returns a colored status indicator with label.
 func StatusBadge(state string) string {
 	switch state {
 	case "running":
-		return Green("● Running")
+		return Success("● Running")
 	case "loading":
-		return Yellow("◐ Loading")
+		return Warning("◐ Loading")
 	case "idle":
-		return Yellow("○ Idle")
+		return Warning("○ Idle")
 	default:
-		return Red("○ Not Running")
+		return Error("○ Not Running")
 	}
 }
 
@@ -171,17 +162,17 @@ func PrintPresetList(presets []string) {
 
 // PrintSuccess prints a success message with green checkmark.
 func PrintSuccess(message string) {
-	fmt.Fprintf(Output, "%s %s\n", Green("✓"), message)
+	fmt.Fprintf(Output, "%s %s\n", Success("✓"), message)
 }
 
 // PrintError prints an error message with red X.
 func PrintError(message string) {
-	fmt.Fprintf(Output, "%s %s\n", Red("✗"), message)
+	fmt.Fprintf(Output, "%s %s\n", Error("✗"), message)
 }
 
 // PrintWarning prints a warning message with yellow exclamation.
 func PrintWarning(message string) {
-	fmt.Fprintf(Output, "%s %s\n", Yellow("⚠"), message)
+	fmt.Fprintf(Output, "%s %s\n", Warning("⚠"), message)
 }
 
 // PrintInfo prints an info message with info icon.
@@ -284,13 +275,13 @@ type RouterModelInfo struct {
 func ModelStatusBadge(status string) string {
 	switch status {
 	case "loaded":
-		return Green("●") + " loaded"
+		return Success("●") + " loaded"
 	case "loading":
-		return Yellow("◐") + " loading"
+		return Warning("◐") + " loading"
 	case "unloaded":
 		return Muted("○") + " unloaded"
 	default:
-		return Red("✗") + " " + status
+		return Error("✗") + " " + status
 	}
 }
 

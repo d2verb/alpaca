@@ -43,6 +43,10 @@ func (p *Process) Start(ctx context.Context, args []string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	if p.cmd != nil && p.cmd.Process != nil {
+		return fmt.Errorf("process already running")
+	}
+
 	p.cmd = exec.CommandContext(ctx, p.path, args...)
 
 	if p.logWriter != nil {
@@ -63,37 +67,34 @@ func (p *Process) Start(ctx context.Context, args []string) error {
 // Stop stops the llama-server process gracefully.
 func (p *Process) Stop(ctx context.Context) error {
 	p.mu.Lock()
-	defer p.mu.Unlock()
+	cmd := p.cmd
+	p.mu.Unlock()
 
-	if p.cmd == nil || p.cmd.Process == nil {
+	if cmd == nil || cmd.Process == nil {
 		return nil
 	}
 
-	// Send SIGTERM for graceful shutdown
-	if err := p.cmd.Process.Signal(syscall.SIGTERM); err != nil {
+	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
 		return fmt.Errorf("send SIGTERM: %w", err)
 	}
 
-	// Wait for process to exit with timeout
 	done := make(chan error, 1)
 	go func() {
-		_, err := p.cmd.Process.Wait()
-		done <- err
+		done <- cmd.Wait()
 	}()
 
 	select {
 	case <-done:
-		// Process exited gracefully
 		return nil
 	case <-time.After(GracefulShutdownTimeout):
-		// Timeout, force kill
-		if err := p.cmd.Process.Kill(); err != nil {
+		if err := cmd.Process.Kill(); err != nil {
 			return fmt.Errorf("kill llama-server: %w", err)
 		}
+		<-done
 		return nil
 	case <-ctx.Done():
-		// Context cancelled, force kill
-		p.cmd.Process.Kill()
+		cmd.Process.Kill()
+		<-done
 		return ctx.Err()
 	}
 }

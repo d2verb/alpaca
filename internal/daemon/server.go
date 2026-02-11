@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/d2verb/alpaca/internal/llama"
 	"github.com/d2verb/alpaca/internal/logging"
@@ -82,6 +83,7 @@ func (s *Server) acceptLoop(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			default:
+				time.Sleep(100 * time.Millisecond)
 				continue
 			}
 		}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -72,7 +73,7 @@ func (c *UpgradeCmd) handleScriptInstall(currentBinary string, r *receipt.Receip
 	updater := selfupdate.New(version)
 
 	// Check for new version
-	latest, hasUpdate, err := updater.CheckUpdate()
+	latest, hasUpdate, err := updater.CheckUpdate(context.Background())
 	if err != nil {
 		return fmt.Errorf("check for updates: %w", err)
 	}
@@ -95,7 +96,7 @@ func (c *UpgradeCmd) handleScriptInstall(currentBinary string, r *receipt.Receip
 	// Perform the upgrade
 	ui.PrintInfo("Downloading...")
 
-	if err := updater.Update(currentBinary); err != nil {
+	if err := updater.Update(context.Background(), currentBinary); err != nil {
 		return fmt.Errorf("upgrade failed: %w", err)
 	}
 

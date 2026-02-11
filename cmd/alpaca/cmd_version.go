@@ -1,10 +1,14 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/d2verb/alpaca/internal/ui"
+)
 
 type VersionCmd struct{}
 
 func (c *VersionCmd) Run() error {
-	fmt.Printf("alpaca version %s (%s)\n", version, commit)
+	fmt.Fprintf(ui.Output, "alpaca version %s (%s)\n", version, commit)
 	return nil
 }

@@ -3,6 +3,7 @@ package selfupdate
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
@@ -24,6 +25,7 @@ const (
 	repoName             = "alpaca"
 	apiTimeout           = 30 * time.Second
 	defaultGitHubBaseURL = "https://api.github.com"
+	maxBinarySize        = 500 << 20 // 500MB
 
 	// releasePublicKey is the hex-encoded Ed25519 public key used to verify release signatures.
 	releasePublicKey = "394cf6c1b1ca12afda257e5338c7e6aa10d811c3054b5c16e341d0e97f3246e5"
@@ -69,8 +71,8 @@ func New(currentVersion string) *Updater {
 
 // CheckUpdate checks if a newer version is available.
 // Returns the latest version, whether an update is available, and any error.
-func (u *Updater) CheckUpdate() (string, bool, error) {
-	release, err := u.getLatestRelease()
+func (u *Updater) CheckUpdate(ctx context.Context) (string, bool, error) {
+	release, err := u.getLatestRelease(ctx)
 	if err != nil {
 		return "", false, err
 	}
@@ -100,8 +102,8 @@ func ensureVPrefix(version string) string {
 }
 
 // Update downloads and installs the latest version.
-func (u *Updater) Update(currentBinaryPath string) error {
-	release, err := u.getLatestRelease()
+func (u *Updater) Update(ctx context.Context, currentBinaryPath string) error {
+	release, err := u.getLatestRelease(ctx)
 	if err != nil {
 		return fmt.Errorf("get latest release: %w", err)
 	}
@@ -120,13 +122,13 @@ func (u *Updater) Update(currentBinaryPath string) error {
 	}
 
 	// Download checksums (raw bytes for signature verification)
-	checksumsRaw, err := u.downloadChecksumsRaw(release)
+	checksumsRaw, err := u.downloadChecksumsRaw(ctx, release)
 	if err != nil {
 		return fmt.Errorf("download checksums: %w", err)
 	}
 
 	// Download and verify signature (fail-closed: reject if signature is missing or invalid)
-	sig, err := u.downloadSignature(release)
+	sig, err := u.downloadSignature(ctx, release)
 	if err != nil {
 		return fmt.Errorf("download signature: %w", err)
 	}
@@ -149,7 +151,7 @@ func (u *Updater) Update(currentBinaryPath string) error {
 
 	// Download the archive
 	archivePath := filepath.Join(tmpDir, assetName)
-	if err := u.downloadFile(downloadURL, archivePath); err != nil {
+	if err := u.downloadFile(ctx, downloadURL, archivePath); err != nil {
 		return fmt.Errorf("download archive: %w", err)
 	}
 
@@ -172,10 +174,10 @@ func (u *Updater) Update(currentBinaryPath string) error {
 	return nil
 }
 
-func (u *Updater) getLatestRelease() (*Release, error) {
+func (u *Updater) getLatestRelease(ctx context.Context) (*Release, error) {
 	url := fmt.Sprintf("%s/repos/%s/%s/releases/latest", u.baseURL, repoOwner, repoName)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +209,7 @@ func (u *Updater) getAssetName(tagName string) string {
 	return fmt.Sprintf("alpaca_%s_%s_%s.tar.gz", version, runtime.GOOS, runtime.GOARCH)
 }
 
-func (u *Updater) downloadChecksumsRaw(release *Release) ([]byte, error) {
+func (u *Updater) downloadChecksumsRaw(ctx context.Context, release *Release) ([]byte, error) {
 	var checksumURL string
 	for _, asset := range release.Assets {
 		if asset.Name == "checksums.txt" {
@@ -219,7 +221,11 @@ func (u *Updater) downloadChecksumsRaw(release *Release) ([]byte, error) {
 		return nil, fmt.Errorf("checksums.txt not found in release")
 	}
 
-	resp, err := u.client.Get(checksumURL)
+	req, err := http.NewRequestWithContext(ctx, "GET", checksumURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := u.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +250,7 @@ func parseChecksums(data []byte) map[string]string {
 	return checksums
 }
 
-func (u *Updater) downloadSignature(release *Release) ([]byte, error) {
+func (u *Updater) downloadSignature(ctx context.Context, release *Release) ([]byte, error) {
 	var sigURL string
 	for _, asset := range release.Assets {
 		if asset.Name == "checksums.txt.sig" {
@@ -256,7 +262,11 @@ func (u *Updater) downloadSignature(release *Release) ([]byte, error) {
 		return nil, fmt.Errorf("checksums.txt.sig not found in release")
 	}
 
-	resp, err := u.client.Get(sigURL)
+	req, err := http.NewRequestWithContext(ctx, "GET", sigURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := u.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -277,8 +287,12 @@ func (u *Updater) verifySignature(data, signature []byte) error {
 	return nil
 }
 
-func (u *Updater) downloadFile(url, destPath string) error {
-	resp, err := u.client.Get(url)
+func (u *Updater) downloadFile(ctx context.Context, url, destPath string) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := u.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -294,7 +308,7 @@ func (u *Updater) downloadFile(url, destPath string) error {
 	}
 	defer f.Close()
 
-	_, err = io.Copy(f, resp.Body)
+	_, err = io.Copy(f, io.LimitReader(resp.Body, maxBinarySize))
 	return err
 }
 

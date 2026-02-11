@@ -16,7 +16,6 @@
 		B100000700000000000000AA /* Model.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000700000000000000AA /* Model.swift */; };
 		B100000800000000000000AA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C100000800000000000000AA /* Assets.xcassets */; };
 		B100000900000000000000AA /* AlpacaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100000900000000000000AA /* AlpacaTests.swift */; };
-		C53B4B7B2F2B913500C6F20E /* DaemonClientLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C53B4B792F2B913500C6F20E /* DaemonClientLogicTests.swift */; };
 		C53B4B7C2F2B913500C6F20E /* DaemonResponseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C53B4B7A2F2B913500C6F20E /* DaemonResponseTests.swift */; };
 		C53B4B7E2F2B913500C6F20E /* MenuBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C53B4B7D2F2B913500C6F20E /* MenuBuilderTests.swift */; };
 		C53B4B802F2B913500C6F20E /* StatusFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C53B4B7F2F2B913500C6F20E /* StatusFormatterTests.swift */; };
@@ -49,7 +48,6 @@
 		C100000800000000000000AA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C100000810000000000000AA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C100000900000000000000AA /* AlpacaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlpacaTests.swift; sourceTree = "<group>"; };
-		C53B4B792F2B913500C6F20E /* DaemonClientLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonClientLogicTests.swift; sourceTree = "<group>"; };
 		C53B4B7A2F2B913500C6F20E /* DaemonResponseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonResponseTests.swift; sourceTree = "<group>"; };
 		C53B4B7D2F2B913500C6F20E /* MenuBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBuilderTests.swift; sourceTree = "<group>"; };
 		C53B4B7F2F2B913500C6F20E /* StatusFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusFormatterTests.swift; sourceTree = "<group>"; };
@@ -126,7 +124,6 @@
 			isa = PBXGroup;
 			children = (
 				C100000900000000000000AA /* AlpacaTests.swift */,
-				C53B4B792F2B913500C6F20E /* DaemonClientLogicTests.swift */,
 				C53B4B7A2F2B913500C6F20E /* DaemonResponseTests.swift */,
 				C53B4B7D2F2B913500C6F20E /* MenuBuilderTests.swift */,
 				C53B4B7F2F2B913500C6F20E /* StatusFormatterTests.swift */,
@@ -283,7 +280,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C53B4B7B2F2B913500C6F20E /* DaemonClientLogicTests.swift in Sources */,
 				C53B4B7C2F2B913500C6F20E /* DaemonResponseTests.swift in Sources */,
 				C53B4B7E2F2B913500C6F20E /* MenuBuilderTests.swift in Sources */,
 				C53B4B802F2B913500C6F20E /* StatusFormatterTests.swift in Sources */,

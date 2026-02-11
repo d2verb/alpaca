@@ -56,7 +56,8 @@ func (c *LoadCmd) Run() error {
 
 	// Ensure HuggingFace model is downloaded (with progress bar)
 	// This handles direct HF identifiers and presets that reference HF models
-	if err := c.ensureHFModel(paths, id); err != nil {
+	isRouter, err := c.ensureHFModel(paths, id)
+	if err != nil {
 		return err
 	}
 
@@ -76,7 +77,7 @@ func (c *LoadCmd) Run() error {
 
 	endpoint, _ := resp.Data["endpoint"].(string)
 	readyMsg := "Model ready"
-	if isRouterPreset(id, paths) {
+	if isRouter {
 		readyMsg = "Router ready"
 	}
 	ui.PrintSuccess(fmt.Sprintf("%s at %s", readyMsg, ui.FormatEndpoint(endpoint)))
@@ -85,63 +86,73 @@ func (c *LoadCmd) Run() error {
 
 // ensureHFModel ensures HuggingFace models are downloaded before loading.
 // Handles direct HF identifiers and presets that reference HF models.
-func (c *LoadCmd) ensureHFModel(paths *config.Paths, id *identifier.Identifier) error {
+func (c *LoadCmd) ensureHFModel(paths *config.Paths, id *identifier.Identifier) (bool, error) {
 	var repo, quant string
 
 	switch id.Type {
 	case identifier.TypeHuggingFace:
-		// Direct HF identifier: h:org/repo:quant
 		repo, quant = id.Repo, id.Quant
 
-	case identifier.TypePresetName:
-		// Preset name: p:name - load from presets directory
-		loader := preset.NewLoader(paths.Presets)
-		p, err := loader.Load(id.PresetName)
-		if err == nil {
-			if p.IsRouter() {
-				return c.ensureRouterModels(paths, p)
-			}
-			repo, quant = extractHFModel(p.Model)
-			if err := c.ensureDraftModel(paths, p.DraftModel); err != nil {
-				return err
-			}
-			if err := c.ensureMmprojFile(p.Mmproj); err != nil {
-				return err
-			}
+	case identifier.TypePresetName, identifier.TypePresetFilePath:
+		p, err := c.loadPreset(paths, id)
+		if err != nil {
+			return false, err
 		}
-		// If preset loading fails, daemon will provide consistent error message
-
-	case identifier.TypePresetFilePath:
-		// Preset file: f:*.yaml - load from file path
-		p, err := preset.LoadFile(id.FilePath)
-		if err == nil {
-			if p.IsRouter() {
-				return c.ensureRouterModels(paths, p)
-			}
-			repo, quant = extractHFModel(p.Model)
-			if err := c.ensureDraftModel(paths, p.DraftModel); err != nil {
-				return err
-			}
-			if err := c.ensureMmprojFile(p.Mmproj); err != nil {
-				return err
-			}
+		if p == nil {
+			return false, nil
 		}
-		// If preset loading fails, daemon will provide consistent error message
+		if p.IsRouter() {
+			return true, c.ensureRouterModels(paths, p)
+		}
+		repo, quant = extractHFModel(p.Model)
+		if err := c.ensureDraftModel(paths, p.DraftModel); err != nil {
+			return false, err
+		}
+		if err := c.ensureMmprojFile(p.Mmproj); err != nil {
+			return false, err
+		}
 
 	default:
-		// Model file path or other types don't need pulling
-		return nil
+		return false, nil
 	}
 
-	// No HF model to pull
 	if repo == "" {
-		return nil
+		return false, nil
 	}
 
 	if err := pullIfNeeded(context.Background(), paths.Models, repo, quant); err != nil {
-		return fmt.Errorf("download model: %w", err)
+		return false, fmt.Errorf("download model: %w", err)
 	}
-	return nil
+	return false, nil
+}
+
+// loadPreset loads a preset from name or file path.
+// Returns (nil, nil) if not found (to let daemon handle the error).
+// Returns (nil, err) for parse/validation errors (should be shown to user).
+func (c *LoadCmd) loadPreset(paths *config.Paths, id *identifier.Identifier) (*preset.Preset, error) {
+	switch id.Type {
+	case identifier.TypePresetName:
+		loader := preset.NewLoader(paths.Presets)
+		p, err := loader.Load(id.PresetName)
+		if err != nil {
+			if preset.IsNotFound(err) {
+				return nil, nil
+			}
+			return nil, err
+		}
+		return p, nil
+	case identifier.TypePresetFilePath:
+		p, err := preset.LoadFile(id.FilePath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil, nil
+			}
+			return nil, err
+		}
+		return p, nil
+	default:
+		return nil, nil
+	}
 }
 
 // ensureRouterModels downloads all HF models in a router preset.
@@ -268,27 +279,6 @@ func toAbsFileID(path string) (string, error) {
 		return "", fmt.Errorf("make absolute path: %w", err)
 	}
 	return "f:" + absPath, nil
-}
-
-// isRouterPreset checks if the identifier refers to a router mode preset.
-func isRouterPreset(id *identifier.Identifier, paths *config.Paths) bool {
-	switch id.Type {
-	case identifier.TypePresetName:
-		loader := preset.NewLoader(paths.Presets)
-		p, err := loader.Load(id.PresetName)
-		if err != nil {
-			return false
-		}
-		return p.IsRouter()
-	case identifier.TypePresetFilePath:
-		p, err := preset.LoadFile(id.FilePath)
-		if err != nil {
-			return false
-		}
-		return p.IsRouter()
-	default:
-		return false
-	}
 }
 
 // handleLoadError converts daemon error codes into user-friendly errors.

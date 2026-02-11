@@ -147,3 +147,58 @@ func TestClient_Status(t *testing.T) {
 		}
 	})
 }
+
+func TestClient_Load(t *testing.T) {
+	t.Run("sends load command with identifier", func(t *testing.T) {
+		socketPath := testServer(t, func(req *protocol.Request) *protocol.Response {
+			if req.Command != protocol.CmdLoad {
+				t.Errorf("command = %q, want %q", req.Command, protocol.CmdLoad)
+			}
+			id, ok := req.Args["identifier"].(string)
+			if !ok {
+				t.Fatal("identifier arg missing or not a string")
+			}
+			if id != "p:my-preset" {
+				t.Errorf("identifier = %q, want %q", id, "p:my-preset")
+			}
+			return protocol.NewOKResponse(map[string]any{"endpoint": "http://localhost:8080"})
+		})
+
+		client := New(socketPath)
+		resp, err := client.Load("p:my-preset")
+
+		if err != nil {
+			t.Fatalf("Load() error = %v", err)
+		}
+		if resp.Status != protocol.StatusOK {
+			t.Errorf("Status = %q, want %q", resp.Status, protocol.StatusOK)
+		}
+		if resp.Data["endpoint"] != "http://localhost:8080" {
+			t.Errorf("endpoint = %v, want %q", resp.Data["endpoint"], "http://localhost:8080")
+		}
+	})
+}
+
+func TestClient_Unload(t *testing.T) {
+	t.Run("sends unload command", func(t *testing.T) {
+		socketPath := testServer(t, func(req *protocol.Request) *protocol.Response {
+			if req.Command != protocol.CmdUnload {
+				t.Errorf("command = %q, want %q", req.Command, protocol.CmdUnload)
+			}
+			if req.Args != nil {
+				t.Errorf("args = %v, want nil", req.Args)
+			}
+			return protocol.NewOKResponse(nil)
+		})
+
+		client := New(socketPath)
+		resp, err := client.Unload()
+
+		if err != nil {
+			t.Fatalf("Unload() error = %v", err)
+		}
+		if resp.Status != protocol.StatusOK {
+			t.Errorf("Status = %q, want %q", resp.Status, protocol.StatusOK)
+		}
+	})
+}
