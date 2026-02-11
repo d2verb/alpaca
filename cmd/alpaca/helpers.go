@@ -117,9 +117,15 @@ func pullModel(repo, quant, modelsDir string) error {
 		return err
 	}
 
-	ui.PrintInfo(fmt.Sprintf("Downloading %s (%s)...", info.Filename, formatSize(info.Size)))
-	if info.MmprojFilename != "" {
-		ui.PrintInfo(fmt.Sprintf("Also downloading mmproj: %s (%s)", info.MmprojFilename, formatSize(info.MmprojSize)))
+	// Show download plan when multiple files
+	if info.MmprojOriginalFilename != "" {
+		ui.PrintInfo("Download plan (2 files):")
+		nameWidth := len(info.Filename)
+		if w := len(info.MmprojOriginalFilename); w > nameWidth {
+			nameWidth = w
+		}
+		fmt.Fprintf(ui.Output, "  Model:  %-*s  (%s)\n", nameWidth, info.Filename, formatSize(info.Size))
+		fmt.Fprintf(ui.Output, "  Mmproj: %-*s  (%s)\n", nameWidth, info.MmprojOriginalFilename, formatSize(info.MmprojSize))
 	}
 
 	// Set up progress reporting
@@ -127,21 +133,29 @@ func pullModel(repo, quant, modelsDir string) error {
 		printProgress(downloaded, total)
 	})
 
+	// Set up file lifecycle callbacks
+	puller.SetFileStartFunc(func(filename string, size int64, index, total int) {
+		if total > 1 {
+			ui.PrintInfo(fmt.Sprintf("[%d/%d] Downloading %s (%s)...", index, total, filename, formatSize(size)))
+		} else {
+			ui.PrintInfo(fmt.Sprintf("Downloading %s (%s)...", filename, formatSize(size)))
+		}
+	})
+	puller.SetFileSavedFunc(func(savedPath string) {
+		fmt.Fprintln(ui.Output) // End progress bar line
+		ui.PrintSuccess(fmt.Sprintf("Saved to: %s", savedPath))
+	})
+
 	// Download
 	result, err := puller.Pull(context.Background(), repo, quant)
 	if err != nil {
+		fmt.Fprintln(ui.Output) // End progress bar line
 		return err
 	}
 
-	// Ensure progress bar shows 100% completion
-	if result.Size > 0 {
-		printProgress(result.Size, result.Size)
-	}
-	fmt.Println() // New line after progress bar
-	ui.PrintSuccess(fmt.Sprintf("Saved to: %s", result.Path))
-
-	// Report mmproj result with non-zero exit code
+	// Report mmproj failure
 	if result.MmprojFailed {
+		fmt.Fprintln(ui.Output) // End progress bar line
 		ui.PrintWarning(fmt.Sprintf("mmproj download failed - vision unavailable. Run 'alpaca pull h:%s:%s' to retry.", repo, quant))
 		return errDownloadFailed()
 	}

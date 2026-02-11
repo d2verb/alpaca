@@ -22,13 +22,21 @@ const defaultHuggingFaceBaseURL = "https://huggingface.co"
 // ProgressFunc is called during download with current and total bytes.
 type ProgressFunc func(downloaded, total int64)
 
+// FileStartFunc is called before each file download begins.
+type FileStartFunc func(filename string, size int64, index, total int)
+
+// FileSavedFunc is called after each file is successfully downloaded and verified.
+type FileSavedFunc func(savedPath string)
+
 // Puller handles model downloads from HuggingFace.
 type Puller struct {
-	modelsDir  string
-	client     *http.Client
-	onProgress ProgressFunc
-	metadata   *metadata.Manager
-	baseURL    string
+	modelsDir   string
+	client      *http.Client
+	onProgress  ProgressFunc
+	onFileStart FileStartFunc
+	onFileSaved FileSavedFunc
+	metadata    *metadata.Manager
+	baseURL     string
 }
 
 // NewPuller creates a new model puller.
@@ -46,6 +54,16 @@ func (p *Puller) SetProgressFunc(fn ProgressFunc) {
 	p.onProgress = fn
 }
 
+// SetFileStartFunc sets the callback called before each file download.
+func (p *Puller) SetFileStartFunc(fn FileStartFunc) {
+	p.onFileStart = fn
+}
+
+// SetFileSavedFunc sets the callback called after each file is saved.
+func (p *Puller) SetFileSavedFunc(fn FileSavedFunc) {
+	p.onFileSaved = fn
+}
+
 // PullResult contains information about the downloaded file.
 type PullResult struct {
 	Path           string
@@ -58,10 +76,11 @@ type PullResult struct {
 
 // FileInfo contains information about model and mmproj files from the manifest.
 type FileInfo struct {
-	Filename       string
-	Size           int64
-	MmprojFilename string // storage filename with repo prefix; empty if no mmproj
-	MmprojSize     int64
+	Filename               string
+	Size                   int64
+	MmprojFilename         string // storage filename with repo prefix; empty if no mmproj
+	MmprojOriginalFilename string // original filename before repo prefix; empty if no mmproj
+	MmprojSize             int64
 }
 
 // ggufFileInfo holds a GGUF filename and its optional LFS SHA256 hash,
@@ -94,6 +113,16 @@ func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, err
 		return nil, fmt.Errorf("invalid filename from API: %s", fileInfo.Filename)
 	}
 
+	totalFiles := 1
+	if fileInfo.MmprojFilename != "" {
+		totalFiles = 2
+	}
+
+	// Notify: starting main model download
+	if p.onFileStart != nil {
+		p.onFileStart(fileInfo.Filename, fileInfo.Size, 1, totalFiles)
+	}
+
 	// Download file with OS-level path confinement
 	size, err := p.downloadFile(ctx, repo, fileInfo.Filename)
 	if err != nil {
@@ -112,6 +141,14 @@ func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, err
 
 	destPath := filepath.Join(p.modelsDir, fileInfo.Filename)
 
+	// Ensure progress shows 100% and notify saved
+	if p.onProgress != nil && size > 0 {
+		p.onProgress(size, size)
+	}
+	if p.onFileSaved != nil {
+		p.onFileSaved(destPath)
+	}
+
 	// Re-pull cleanup: remove outdated mmproj if filename changed or mmproj was removed
 	p.cleanupOldMmproj(repo, quant, fileInfo.MmprojFilename)
 
@@ -119,11 +156,24 @@ func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, err
 	var mmprojEntry *metadata.MmprojEntry
 	mmprojFailed := false
 	if fileInfo.MmprojFilename != "" {
+		// Notify: starting mmproj download
+		if p.onFileStart != nil {
+			p.onFileStart(fileInfo.MmprojOriginalFilename, fileInfo.MmprojSize, 2, totalFiles)
+		}
+
 		mmprojEntry, err = p.downloadMmproj(ctx, repo, fileInfo)
 		if err != nil {
 			slog.Warn("mmproj download failed", "error", err)
 			mmprojFailed = true
 			// Continue without mmproj - save metadata without it
+		} else {
+			// Ensure progress shows 100% and notify saved
+			if p.onProgress != nil && fileInfo.MmprojSize > 0 {
+				p.onProgress(fileInfo.MmprojSize, fileInfo.MmprojSize)
+			}
+			if p.onFileSaved != nil {
+				p.onFileSaved(filepath.Join(p.modelsDir, fileInfo.MmprojFilename))
+			}
 		}
 	}
 
@@ -164,10 +214,11 @@ func (p *Puller) GetFileInfo(ctx context.Context, repo, quant string) (*FileInfo
 		return nil, err
 	}
 	return &FileInfo{
-		Filename:       fileInfo.Filename,
-		Size:           fileInfo.Size,
-		MmprojFilename: fileInfo.MmprojFilename,
-		MmprojSize:     fileInfo.MmprojSize,
+		Filename:               fileInfo.Filename,
+		Size:                   fileInfo.Size,
+		MmprojFilename:         fileInfo.MmprojFilename,
+		MmprojOriginalFilename: fileInfo.MmprojOriginalFilename,
+		MmprojSize:             fileInfo.MmprojSize,
 	}, nil
 }
 
