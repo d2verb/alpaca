@@ -23,6 +23,8 @@ type Process struct {
 	path      string
 	cmd       *exec.Cmd
 	logWriter io.Writer
+	done      chan struct{} // closed when process exits
+	exitErr   error         // set before done is closed
 }
 
 // NewProcess creates a new process manager.
@@ -61,6 +63,15 @@ func (p *Process) Start(ctx context.Context, args []string) error {
 		return &ProcessError{Op: ProcessOpStart, Err: err}
 	}
 
+	p.done = make(chan struct{})
+	go func() {
+		err := p.cmd.Wait()
+		p.mu.Lock()
+		p.exitErr = err
+		p.mu.Unlock()
+		close(p.done)
+	}()
+
 	return nil
 }
 
@@ -68,46 +79,69 @@ func (p *Process) Start(ctx context.Context, args []string) error {
 func (p *Process) Stop(ctx context.Context) error {
 	p.mu.Lock()
 	cmd := p.cmd
+	done := p.done
 	p.mu.Unlock()
 
 	if cmd == nil || cmd.Process == nil {
 		return nil
 	}
 
-	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
-		return fmt.Errorf("send SIGTERM: %w", err)
+	select {
+	case <-done:
+		return nil // already exited
+	default:
 	}
 
-	done := make(chan error, 1)
-	go func() {
-		done <- cmd.Wait()
-	}()
+	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		select {
+		case <-done:
+			return nil
+		default:
+			return fmt.Errorf("send SIGTERM: %w", err)
+		}
+	}
 
 	select {
 	case <-done:
 		return nil
 	case <-time.After(GracefulShutdownTimeout):
-		if err := cmd.Process.Kill(); err != nil {
-			return fmt.Errorf("kill llama-server: %w", err)
-		}
+		cmd.Process.Kill() // ignore error: process may have exited between timeout and kill
 		<-done
 		return nil
 	case <-ctx.Done():
-		cmd.Process.Kill()
+		cmd.Process.Kill() // ignore error: best-effort cleanup
 		<-done
 		return ctx.Err()
 	}
+}
+
+// Done returns a channel that is closed when the process exits.
+// Returns nil if the process has not been started.
+func (p *Process) Done() <-chan struct{} {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.done
+}
+
+// ExitErr returns the error from the process exit.
+// Only valid after Done() is closed.
+func (p *Process) ExitErr() error {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.exitErr
 }
 
 // IsRunning returns true if the process is running.
 func (p *Process) IsRunning() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-
-	if p.cmd == nil || p.cmd.Process == nil {
+	if p.done == nil {
 		return false
 	}
-	// Check if process is still running
-	err := p.cmd.Process.Signal(syscall.Signal(0))
-	return err == nil
+	select {
+	case <-p.done:
+		return false
+	default:
+		return true
+	}
 }

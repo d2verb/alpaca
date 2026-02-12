@@ -79,6 +79,8 @@ type mockProcess struct {
 	stopCalled   bool
 	logWriter    io.Writer
 	receivedArgs []string
+	doneCh       chan struct{}
+	exitError    error
 }
 
 func (m *mockProcess) Start(ctx context.Context, args []string) error {
@@ -97,6 +99,16 @@ func (m *mockProcess) Stop(ctx context.Context) error {
 
 func (m *mockProcess) SetLogWriter(w io.Writer) {
 	m.logWriter = w
+}
+
+// Done returns doneCh. When doneCh is nil (default), the returned nil channel
+// blocks forever in select, simulating a process that never exits.
+func (m *mockProcess) Done() <-chan struct{} {
+	return m.doneCh
+}
+
+func (m *mockProcess) ExitErr() error {
+	return m.exitError
 }
 
 // mockHealthChecker returns a health checker function that can be configured to succeed or fail.
