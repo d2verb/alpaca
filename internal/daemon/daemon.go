@@ -42,6 +42,8 @@ type llamaProcess interface {
 	Start(ctx context.Context, args []string) error
 	Stop(ctx context.Context) error
 	SetLogWriter(w io.Writer)
+	Done() <-chan struct{}
+	ExitErr() error
 }
 
 // healthChecker waits for llama-server to become ready.
@@ -77,6 +79,13 @@ type Daemon struct {
 	logger         *slog.Logger
 	llamaLogWriter io.Writer
 
+	// startupMu protects cancelStartup.
+	// Separate from mu so Kill() can cancel startup without acquiring mu.
+	startupMu     sync.Mutex
+	cancelStartup context.CancelFunc
+
+	startupTimeout time.Duration
+
 	// Test hooks (optional, defaults to real implementations)
 	newProcess   func(path string) llamaProcess
 	waitForReady healthChecker
@@ -86,6 +95,9 @@ type Daemon struct {
 // llamaServerCommand is the command to run llama-server.
 // It relies on PATH resolution to find the binary.
 const llamaServerCommand = "llama-server"
+
+// defaultStartupTimeout is the maximum time to wait for llama-server to become ready.
+const defaultStartupTimeout = 60 * time.Second
 
 // New creates a new daemon instance.
 func New(presets presetLoader, models modelManager, configPath string, daemonLogWriter io.Writer, llamaLogWriter io.Writer) *Daemon {
@@ -107,8 +119,9 @@ func New(presets presetLoader, models modelManager, configPath string, daemonLog
 		newProcess: func(path string) llamaProcess {
 			return llama.NewProcess(path)
 		},
-		waitForReady: llama.WaitForReady,
-		httpClient:   &http.Client{},
+		waitForReady:   llama.WaitForReady,
+		httpClient:     &http.Client{},
+		startupTimeout: defaultStartupTimeout,
 	}
 	d.state.Store(StateIdle)
 	return d
@@ -326,6 +339,13 @@ func (d *Daemon) resolveRouterModels(ctx context.Context, p *preset.Preset) (*pr
 // Returns error if HuggingFace model is not downloaded (use CLI to pull first).
 func (d *Daemon) Run(ctx context.Context, input string) error {
 	d.logger.Info("run requested", "input", input)
+
+	d.startupMu.Lock()
+	if d.cancelStartup != nil {
+		d.cancelStartup()
+	}
+	d.startupMu.Unlock()
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -411,17 +431,57 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 	}
 	d.process = proc
 
+	// Build cancellable context with timeout for startup
+	startupCtx, startupCancel := context.WithCancel(ctx)
+	defer startupCancel()
+
+	timeoutCtx, timeoutCancel := context.WithTimeout(startupCtx, d.startupTimeout)
+	defer timeoutCancel()
+
+	// Monitor process death → cancel health check
+	go func() {
+		select {
+		case <-proc.Done():
+			startupCancel()
+		case <-timeoutCtx.Done():
+		}
+	}()
+
+	// Allow Kill() to cancel startup
+	d.startupMu.Lock()
+	d.cancelStartup = startupCancel
+	d.startupMu.Unlock()
+
 	// Wait for llama-server to become ready
-	if err := d.waitForReady(ctx, p.Endpoint()); err != nil {
+	if err := d.waitForReady(timeoutCtx, p.Endpoint()); err != nil {
+		d.startupMu.Lock()
+		d.cancelStartup = nil
+		d.startupMu.Unlock()
+
+		// Determine cause and build user-friendly error message
+		select {
+		case <-proc.Done():
+			err = fmt.Errorf("llama-server exited unexpectedly: %w", proc.ExitErr())
+		default:
+			if errors.Is(err, context.DeadlineExceeded) {
+				err = fmt.Errorf("server did not become ready within %s", d.startupTimeout)
+			}
+		}
+
 		d.process.Stop(ctx)
 		d.process = nil
 		d.resetState()
+
 		processErr := &llama.ProcessError{Op: llama.ProcessOpWait, Err: err}
 		if p.IsRouter() {
 			return fmt.Errorf("%w (requires llama-server b7350 or later)", processErr)
 		}
 		return processErr
 	}
+
+	d.startupMu.Lock()
+	d.cancelStartup = nil
+	d.startupMu.Unlock()
 
 	d.state.Store(StateRunning)
 	d.logger.Info("model ready", "endpoint", p.Endpoint())
@@ -431,6 +491,13 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 // Kill stops the currently running model.
 func (d *Daemon) Kill(ctx context.Context) error {
 	d.logger.Info("kill requested")
+
+	d.startupMu.Lock()
+	if d.cancelStartup != nil {
+		d.cancelStartup()
+	}
+	d.startupMu.Unlock()
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.stopLocked(ctx)

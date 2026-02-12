@@ -294,7 +294,17 @@ func handleLoadError(code, message string, id *identifier.Identifier) error {
 		return errModelNotFound(id.Raw)
 
 	case protocol.ErrCodeServerFailed:
-		return fmt.Errorf("failed to start server: %s", message)
+		// Strip internal ProcessError prefix (e.g., "wait llama-server: ")
+		msg := message
+		msg = strings.TrimPrefix(msg, "wait llama-server: ")
+		msg = strings.TrimPrefix(msg, "start llama-server: ")
+
+		paths, _ := getPaths()
+		hint := ""
+		if paths != nil {
+			hint = fmt.Sprintf("\nSee %s for details", paths.LlamaLog)
+		}
+		return fmt.Errorf("%s%s", msg, hint)
 
 	default:
 		return fmt.Errorf("%s", message)

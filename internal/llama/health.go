@@ -26,7 +26,11 @@ func WaitForReady(ctx context.Context, endpoint string) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			resp, err := client.Get(healthURL)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL, nil)
+			if err != nil {
+				return err
+			}
+			resp, err := client.Do(req)
 			if err != nil {
 				continue
 			}
