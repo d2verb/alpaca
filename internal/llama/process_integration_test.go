@@ -54,10 +54,8 @@ func TestProcess_StartAndStop_Graceful(t *testing.T) {
 	bin := buildFakeProc(t)
 	p := NewProcess(bin)
 
-	ctx := context.Background()
-
 	// Act
-	err := p.Start(ctx, []string{"-mode=sigterm"})
+	err := p.Start([]string{"-mode=sigterm"})
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
@@ -90,7 +88,7 @@ func TestProcess_StartAndStop_ForceKill(t *testing.T) {
 	p := NewProcess(bin)
 
 	// Use run mode which ignores SIGTERM
-	err := p.Start(context.Background(), []string{"-mode=run"})
+	err := p.Start([]string{"-mode=run"})
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}

@@ -83,6 +83,9 @@ func (s *Server) acceptLoop(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			default:
+				if errors.Is(err, net.ErrClosed) {
+					return
+				}
 				time.Sleep(100 * time.Millisecond)
 				continue
 			}
@@ -248,18 +251,8 @@ func (s *Server) handleListModels(ctx context.Context) *protocol.Response {
 		return protocol.NewErrorResponse(err.Error())
 	}
 
-	// Convert to map format for JSON
-	modelList := []map[string]any{}
-	for _, m := range models {
-		modelList = append(modelList, map[string]any{
-			"repo":  m.Repo,
-			"quant": m.Quant,
-			"size":  m.Size,
-		})
-	}
-
 	return protocol.NewOKResponse(map[string]any{
-		"models": modelList,
+		"models": models,
 	})
 }
 

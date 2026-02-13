@@ -22,23 +22,22 @@ func WaitForReady(ctx context.Context, endpoint string) error {
 	defer ticker.Stop()
 
 	for {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL, nil)
+		if err != nil {
+			return err
+		}
+		resp, err := client.Do(req)
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				return nil
+			}
+		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL, nil)
-			if err != nil {
-				return err
-			}
-			resp, err := client.Do(req)
-			if err != nil {
-				continue
-			}
-			resp.Body.Close()
-
-			if resp.StatusCode == http.StatusOK {
-				return nil
-			}
 		}
 	}
 }

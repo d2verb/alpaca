@@ -39,7 +39,7 @@ type modelManager interface {
 
 // llamaProcess manages llama-server process lifecycle.
 type llamaProcess interface {
-	Start(ctx context.Context, args []string) error
+	Start(args []string) error
 	Stop(ctx context.Context) error
 	SetLogWriter(w io.Writer)
 	Done() <-chan struct{}
@@ -335,6 +335,68 @@ func (d *Daemon) resolveRouterModels(ctx context.Context, p *preset.Preset) (*pr
 	return &resolved, nil
 }
 
+// loadPreset parses the input identifier and loads the corresponding preset.
+// It resolves HuggingFace model references to local file paths.
+func (d *Daemon) loadPreset(ctx context.Context, input string) (*preset.Preset, error) {
+	id, err := identifier.Parse(input)
+	if err != nil {
+		return nil, fmt.Errorf("parse identifier: %w", err)
+	}
+
+	var p *preset.Preset
+
+	switch id.Type {
+	case identifier.TypePresetName:
+		p, err = d.presets.Load(id.PresetName)
+		if err != nil {
+			return nil, fmt.Errorf("load preset: %w", err)
+		}
+
+	case identifier.TypePresetFilePath:
+		p, err = preset.LoadFile(id.FilePath)
+		if err != nil {
+			return nil, fmt.Errorf("load preset file: %w", err)
+		}
+
+	case identifier.TypeModelFilePath:
+		p = newDefaultPreset(id.FilePath, input)
+
+	case identifier.TypeHuggingFace:
+		p, err = d.resolveHFPreset(ctx, id.Repo, id.Quant)
+		if err != nil {
+			return nil, fmt.Errorf("resolve HuggingFace model: %w", err)
+		}
+
+	default:
+		return nil, fmt.Errorf("unknown identifier type")
+	}
+
+	p, err = d.resolveModel(ctx, p)
+	if err != nil {
+		return nil, fmt.Errorf("resolve model: %w", err)
+	}
+
+	return p, nil
+}
+
+// buildArgs builds the llama-server arguments for the preset.
+// For router mode, it writes the config.ini file and returns router args.
+func (d *Daemon) buildArgs(p *preset.Preset) ([]string, error) {
+	if p.IsRouter() {
+		d.logger.Info("loading router preset", "preset", p.Name, "models", len(p.Models))
+
+		content := p.GenerateConfigINI()
+		if err := atomicWriteFile(d.configPath, content); err != nil {
+			return nil, fmt.Errorf("write router config: %w", err)
+		}
+
+		return p.BuildRouterArgs(d.configPath), nil
+	}
+
+	d.logger.Info("loading model", "preset", p.Name, "model", p.Model)
+	return p.BuildArgs(), nil
+}
+
 // Run loads and runs a model (preset name, file path, or HuggingFace format).
 // Returns error if HuggingFace model is not downloaded (use CLI to pull first).
 func (d *Daemon) Run(ctx context.Context, input string) error {
@@ -357,73 +419,26 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 		}
 	}
 
-	// Parse identifier
-	id, err := identifier.Parse(input)
+	p, err := d.loadPreset(ctx, input)
 	if err != nil {
-		return fmt.Errorf("parse identifier: %w", err)
-	}
-
-	// Load preset based on identifier type
-	var p *preset.Preset
-
-	switch id.Type {
-	case identifier.TypePresetName:
-		p, err = d.presets.Load(id.PresetName)
-		if err != nil {
-			return fmt.Errorf("load preset: %w", err)
-		}
-
-	case identifier.TypePresetFilePath:
-		p, err = preset.LoadFile(id.FilePath)
-		if err != nil {
-			return fmt.Errorf("load preset file: %w", err)
-		}
-
-	case identifier.TypeModelFilePath:
-		p = newDefaultPreset(id.FilePath, input)
-
-	case identifier.TypeHuggingFace:
-		p, err = d.resolveHFPreset(ctx, id.Repo, id.Quant)
-		if err != nil {
-			return fmt.Errorf("resolve HuggingFace model: %w", err)
-		}
-
-	default:
-		return fmt.Errorf("unknown identifier type")
-	}
-
-	// Resolve HuggingFace model reference if present
-	p, err = d.resolveModel(ctx, p)
-	if err != nil {
-		return fmt.Errorf("resolve model: %w", err)
+		return err
 	}
 
 	d.state.Store(StateLoading)
 	d.preset.Store(p)
 
-	// Build args depending on mode
-	var args []string
-	if p.IsRouter() {
-		d.logger.Info("loading router preset", "preset", p.Name, "models", len(p.Models))
-
-		// Write config.ini for router mode
-		content := p.GenerateConfigINI()
-		if err := atomicWriteFile(d.configPath, content); err != nil {
-			d.resetState()
-			return fmt.Errorf("write router config: %w", err)
-		}
-
-		args = p.BuildRouterArgs(d.configPath)
-	} else {
-		d.logger.Info("loading model", "preset", p.Name, "model", p.Model)
-		args = p.BuildArgs()
+	args, err := d.buildArgs(p)
+	if err != nil {
+		d.resetState()
+		return err
 	}
 
 	// Start llama-server
 	proc := d.newProcess(llamaServerCommand)
 	proc.SetLogWriter(d.llamaLogWriter)
-	if err := proc.Start(ctx, args); err != nil {
+	if err := proc.Start(args); err != nil {
 		d.resetState()
+		d.cleanupRouterConfig(p)
 		if p.IsRouter() && !errors.Is(err, exec.ErrNotFound) {
 			return fmt.Errorf("%w (requires llama-server b7350 or later)", err)
 		}
@@ -468,9 +483,12 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 			}
 		}
 
-		d.process.Stop(ctx)
+		if stopErr := d.process.Stop(ctx); stopErr != nil {
+			d.logger.Warn("failed to stop process during cleanup", "error", stopErr)
+		}
 		d.process = nil
 		d.resetState()
+		d.cleanupRouterConfig(p)
 
 		processErr := &llama.ProcessError{Op: llama.ProcessOpWait, Err: err}
 		if p.IsRouter() {
@@ -512,22 +530,20 @@ func (d *Daemon) stopLocked(ctx context.Context) error {
 		return err
 	}
 
-	// Check if router mode before clearing state
-	isRouter := false
-	if p := d.preset.Load(); p != nil {
-		isRouter = p.IsRouter()
-	}
-
+	p := d.preset.Load()
 	d.process = nil
 	d.resetState()
-
-	// Best-effort cleanup of router config.ini
-	if isRouter && d.configPath != "" {
-		os.Remove(d.configPath) // ignore error
-	}
+	d.cleanupRouterConfig(p)
 
 	d.logger.Info("model stopped")
 	return nil
+}
+
+// cleanupRouterConfig removes the router config.ini file (best-effort).
+func (d *Daemon) cleanupRouterConfig(p *preset.Preset) {
+	if p != nil && p.IsRouter() && d.configPath != "" {
+		os.Remove(d.configPath) // ignore error
+	}
 }
 
 // resetState clears state and preset to idle state.
