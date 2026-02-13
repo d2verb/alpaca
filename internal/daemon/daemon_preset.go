@@ -207,6 +207,8 @@ func (d *Daemon) loadPreset(ctx context.Context, input string) (*preset.Preset, 
 		if err != nil {
 			return nil, fmt.Errorf("resolve HuggingFace model: %w", err)
 		}
+		// resolveHFPreset already returns a fully resolved local-file preset.
+		return p, nil
 
 	default:
 		return nil, fmt.Errorf("unknown identifier type")
