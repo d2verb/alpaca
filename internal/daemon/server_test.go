@@ -902,8 +902,7 @@ func TestHandleStatus_RouterModeWithMmproj(t *testing.T) {
 
 	// Directly set the preset on the daemon (skip Run to avoid needing httptest for models)
 	daemon := newTestDaemon(&stubPresetLoader{}, &stubModelManager{})
-	daemon.preset.Store(routerPreset)
-	daemon.state.Store(StateRunning)
+	daemon.setSnapshot(StateRunning, routerPreset)
 	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	// Act

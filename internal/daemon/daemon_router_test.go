@@ -287,12 +287,11 @@ func TestFetchModelStatuses_Success(t *testing.T) {
 	d := newTestDaemon(&stubPresetLoader{}, &stubModelManager{})
 	d.httpClient = srv.Client()
 	// Set a router preset pointing to the mock server
-	d.preset.Store(&preset.Preset{
+	d.setSnapshot(StateRunning, &preset.Preset{
 		Mode: "router",
 		Host: u.Hostname(),
 		Port: port,
 	})
-	d.state.Store(StateRunning)
 
 	// Act
 	statuses := d.FetchModelStatuses(context.Background())
@@ -312,11 +311,10 @@ func TestFetchModelStatuses_Success(t *testing.T) {
 func TestFetchModelStatuses_NonRouterReturnsNil(t *testing.T) {
 	// Arrange
 	d := newTestDaemon(&stubPresetLoader{}, &stubModelManager{})
-	d.preset.Store(&preset.Preset{
+	d.setSnapshot(StateRunning, &preset.Preset{
 		Mode:  "single",
 		Model: "f:/path/to/model.gguf",
 	})
-	d.state.Store(StateRunning)
 
 	// Act
 	statuses := d.FetchModelStatuses(context.Background())
@@ -356,12 +354,11 @@ func TestFetchModelStatuses_ServerErrorReturnsNil(t *testing.T) {
 
 	d := newTestDaemon(&stubPresetLoader{}, &stubModelManager{})
 	d.httpClient = srv.Client()
-	d.preset.Store(&preset.Preset{
+	d.setSnapshot(StateRunning, &preset.Preset{
 		Mode: "router",
 		Host: u.Hostname(),
 		Port: port,
 	})
-	d.state.Store(StateRunning)
 
 	// Act
 	statuses := d.FetchModelStatuses(context.Background())

@@ -144,11 +144,11 @@ func (s *Server) handleRequest(ctx context.Context, req *protocol.Request) *prot
 }
 
 func (s *Server) handleStatus(ctx context.Context) *protocol.Response {
-	state := s.daemon.State()
+	snap := s.daemon.StatusSnapshot()
 	data := map[string]any{
-		"state": string(state),
+		"state": string(snap.State),
 	}
-	if p := s.daemon.CurrentPreset(); p != nil {
+	if p := snap.Preset; p != nil {
 		data["preset"] = p.Name
 		data["endpoint"] = p.Endpoint()
 

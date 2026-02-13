@@ -61,15 +61,18 @@ const (
 // Daemon manages llama-server lifecycle.
 type Daemon struct {
 	// mu protects the process field and serializes Run/Kill operations.
-	// Note: Changed from RWMutex to Mutex because state and preset are now
-	// accessed atomically, eliminating the need for concurrent read locks.
+	// The lock is intentionally scoped to process lifecycle updates and run
+	// generation transitions; heavy operations (preset/model resolution, health
+	// checks) run outside this lock.
 	mu sync.Mutex
 
-	// state and preset are accessed atomically for lock-free reads.
-	// This allows State() and CurrentPreset() to return immediately
-	// even while Run() is waiting for llama-server to become ready.
-	state  atomic.Value                  // holds State
-	preset atomic.Pointer[preset.Preset] // holds *preset.Preset
+	// runGen is incremented on each Run/Kill request to invalidate older
+	// in-flight Run operations once control is yielded outside mu.
+	runGen uint64 // protected by mu
+
+	// snapshot is atomically replaced so status readers observe a consistent
+	// state+preset pair with a single load.
+	snapshot atomic.Pointer[daemonSnapshot]
 
 	process llamaProcess // protected by mu
 
@@ -82,6 +85,7 @@ type Daemon struct {
 	// startupMu protects cancelStartup.
 	// Separate from mu so Kill() can cancel startup without acquiring mu.
 	startupMu     sync.Mutex
+	startupGen    uint64
 	cancelStartup context.CancelFunc
 
 	startupTimeout time.Duration
@@ -90,6 +94,17 @@ type Daemon struct {
 	newProcess   func(path string) llamaProcess
 	waitForReady healthChecker
 	httpClient   *http.Client // for FetchModelStatuses
+}
+
+type daemonSnapshot struct {
+	state  State
+	preset *preset.Preset
+}
+
+// StatusSnapshot is a consistent daemon status view.
+type StatusSnapshot struct {
+	State  State
+	Preset *preset.Preset
 }
 
 // llamaServerCommand is the command to run llama-server.
@@ -123,20 +138,40 @@ func New(presets presetLoader, models modelManager, configPath string, daemonLog
 		httpClient:     &http.Client{},
 		startupTimeout: defaultStartupTimeout,
 	}
-	d.state.Store(StateIdle)
+	d.snapshot.Store(&daemonSnapshot{state: StateIdle})
 	return d
 }
 
 // State returns the current daemon state.
 // This method is lock-free and returns immediately.
 func (d *Daemon) State() State {
-	return d.state.Load().(State)
+	return d.StatusSnapshot().State
 }
 
 // CurrentPreset returns the currently loaded preset, if any.
 // This method is lock-free and returns immediately.
 func (d *Daemon) CurrentPreset() *preset.Preset {
-	return d.preset.Load()
+	return d.StatusSnapshot().Preset
+}
+
+// StatusSnapshot returns a consistent daemon status snapshot.
+// This method is lock-free and returns immediately.
+func (d *Daemon) StatusSnapshot() StatusSnapshot {
+	snap := d.snapshot.Load()
+	if snap == nil {
+		return StatusSnapshot{State: StateIdle}
+	}
+	return StatusSnapshot{
+		State:  snap.state,
+		Preset: snap.preset,
+	}
+}
+
+func (d *Daemon) setSnapshot(state State, p *preset.Preset) {
+	d.snapshot.Store(&daemonSnapshot{
+		state:  state,
+		preset: p,
+	})
 }
 
 // ListPresets returns all available preset names.
@@ -402,35 +437,58 @@ func (d *Daemon) buildArgs(p *preset.Preset) ([]string, error) {
 func (d *Daemon) Run(ctx context.Context, input string) error {
 	d.logger.Info("run requested", "input", input)
 
-	d.startupMu.Lock()
-	if d.cancelStartup != nil {
-		d.cancelStartup()
-	}
-	d.startupMu.Unlock()
+	d.cancelExistingStartup()
 
+	// Reserve generation and stop current process quickly under lock.
 	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.runGen++
+	myGen := d.runGen
 
-	// Stop current model if running
 	if d.process != nil {
 		d.logger.Info("stopping current model")
 		if err := d.stopLocked(ctx); err != nil {
+			d.mu.Unlock()
 			return fmt.Errorf("stop current model: %w", err)
 		}
 	}
+	d.mu.Unlock()
 
+	// Heavy operations run outside mu for better Kill()/Run() responsiveness.
 	p, err := d.loadPreset(ctx, input)
 	if err != nil {
 		return err
 	}
-
-	d.state.Store(StateLoading)
-	d.preset.Store(p)
+	d.mu.Lock()
+	if d.runGen != myGen {
+		d.mu.Unlock()
+		return context.Canceled
+	}
+	d.setSnapshot(StateLoading, p)
+	d.mu.Unlock()
 
 	args, err := d.buildArgs(p)
 	if err != nil {
-		d.resetState()
+		d.mu.Lock()
+		if d.runGen == myGen {
+			d.resetState()
+		}
+		d.mu.Unlock()
 		return err
+	}
+	d.mu.Lock()
+	stale := d.runGen != myGen
+	d.mu.Unlock()
+	if stale {
+		d.cleanupRouterConfig(p)
+		return context.Canceled
+	}
+
+	// Install process and startup cancel function only if this run is still current.
+	d.mu.Lock()
+	if d.runGen != myGen {
+		d.mu.Unlock()
+		d.cleanupRouterConfig(p)
+		return context.Canceled
 	}
 
 	// Start llama-server
@@ -438,6 +496,7 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 	proc.SetLogWriter(d.llamaLogWriter)
 	if err := proc.Start(args); err != nil {
 		d.resetState()
+		d.mu.Unlock()
 		d.cleanupRouterConfig(p)
 		if p.IsRouter() && !errors.Is(err, exec.ErrNotFound) {
 			return fmt.Errorf("%w (requires llama-server b7350 or later)", err)
@@ -448,6 +507,8 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 
 	// Build cancellable context with timeout for startup
 	startupCtx, startupCancel := context.WithCancel(ctx)
+	d.setStartupCancel(myGen, startupCancel)
+	d.mu.Unlock()
 	defer startupCancel()
 
 	timeoutCtx, timeoutCancel := context.WithTimeout(startupCtx, d.startupTimeout)
@@ -462,17 +523,19 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 		}
 	}()
 
-	// Allow Kill() to cancel startup
-	d.startupMu.Lock()
-	d.cancelStartup = startupCancel
-	d.startupMu.Unlock()
-
 	// Wait for llama-server to become ready
-	if err := d.waitForReady(timeoutCtx, p.Endpoint()); err != nil {
-		d.startupMu.Lock()
-		d.cancelStartup = nil
-		d.startupMu.Unlock()
+	err = d.waitForReady(timeoutCtx, p.Endpoint())
+	d.clearStartupCancel(myGen)
 
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	// Another Run/Kill superseded this operation.
+	if d.runGen != myGen || d.process != proc {
+		return context.Canceled
+	}
+
+	if err != nil {
 		// Determine cause and build user-friendly error message
 		select {
 		case <-proc.Done():
@@ -497,11 +560,7 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 		return processErr
 	}
 
-	d.startupMu.Lock()
-	d.cancelStartup = nil
-	d.startupMu.Unlock()
-
-	d.state.Store(StateRunning)
+	d.setSnapshot(StateRunning, p)
 	d.logger.Info("model ready", "endpoint", p.Endpoint())
 	return nil
 }
@@ -510,15 +569,17 @@ func (d *Daemon) Run(ctx context.Context, input string) error {
 func (d *Daemon) Kill(ctx context.Context) error {
 	d.logger.Info("kill requested")
 
-	d.startupMu.Lock()
-	if d.cancelStartup != nil {
-		d.cancelStartup()
-	}
-	d.startupMu.Unlock()
+	d.cancelExistingStartup()
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	return d.stopLocked(ctx)
+	d.runGen++
+
+	if err := d.stopLocked(ctx); err != nil {
+		return err
+	}
+	d.resetState()
+	return nil
 }
 
 func (d *Daemon) stopLocked(ctx context.Context) error {
@@ -530,7 +591,7 @@ func (d *Daemon) stopLocked(ctx context.Context) error {
 		return err
 	}
 
-	p := d.preset.Load()
+	p := d.CurrentPreset()
 	d.process = nil
 	d.resetState()
 	d.cleanupRouterConfig(p)
@@ -548,8 +609,31 @@ func (d *Daemon) cleanupRouterConfig(p *preset.Preset) {
 
 // resetState clears state and preset to idle state.
 func (d *Daemon) resetState() {
-	d.preset.Store(nil)
-	d.state.Store(StateIdle)
+	d.setSnapshot(StateIdle, nil)
+}
+
+func (d *Daemon) cancelExistingStartup() {
+	d.startupMu.Lock()
+	cancel := d.cancelStartup
+	d.startupMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
+func (d *Daemon) setStartupCancel(gen uint64, cancel context.CancelFunc) {
+	d.startupMu.Lock()
+	d.startupGen = gen
+	d.cancelStartup = cancel
+	d.startupMu.Unlock()
+}
+
+func (d *Daemon) clearStartupCancel(gen uint64) {
+	d.startupMu.Lock()
+	if d.startupGen == gen {
+		d.cancelStartup = nil
+	}
+	d.startupMu.Unlock()
 }
 
 // RouterModelStatus represents the status of a single model in router mode.
