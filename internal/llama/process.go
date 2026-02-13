@@ -41,7 +41,9 @@ func (p *Process) SetLogWriter(w io.Writer) {
 }
 
 // Start starts the llama-server process with the given arguments.
-func (p *Process) Start(ctx context.Context, args []string) error {
+// This is a non-blocking operation that forks the process and returns immediately.
+// Use Stop() to manage the process lifecycle.
+func (p *Process) Start(args []string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -49,7 +51,7 @@ func (p *Process) Start(ctx context.Context, args []string) error {
 		return fmt.Errorf("process already running")
 	}
 
-	p.cmd = exec.CommandContext(ctx, p.path, args...)
+	p.cmd = exec.Command(p.path, args...)
 
 	if p.logWriter != nil {
 		p.cmd.Stdout = p.logWriter

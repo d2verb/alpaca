@@ -62,14 +62,14 @@ func TestStartReturnsErrorWhenAlreadyRunning(t *testing.T) {
 	p := NewProcess("/bin/sleep")
 
 	// Start a real process
-	err := p.Start(context.Background(), []string{"60"})
+	err := p.Start([]string{"60"})
 	if err != nil {
 		t.Fatalf("first Start() failed: %v", err)
 	}
 	defer p.Stop(context.Background())
 
 	// Second start should fail
-	err = p.Start(context.Background(), []string{"60"})
+	err = p.Start([]string{"60"})
 	if err == nil {
 		t.Fatal("second Start() should return error, got nil")
 	}
@@ -109,7 +109,7 @@ func TestDoneClosesOnNormalExit(t *testing.T) {
 	p := NewProcess("/bin/sh")
 	p.SetLogWriter(&bytes.Buffer{})
 
-	err := p.Start(context.Background(), []string{"-c", "exit 0"})
+	err := p.Start([]string{"-c", "exit 0"})
 	if err != nil {
 		t.Fatalf("Start() failed: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestDoneClosesOnAbnormalExit(t *testing.T) {
 	p := NewProcess("/bin/sh")
 	p.SetLogWriter(&bytes.Buffer{})
 
-	err := p.Start(context.Background(), []string{"-c", "exit 1"})
+	err := p.Start([]string{"-c", "exit 1"})
 	if err != nil {
 		t.Fatalf("Start() failed: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestExitErrNilOnNormalExit(t *testing.T) {
 	p := NewProcess("/bin/sh")
 	p.SetLogWriter(&bytes.Buffer{})
 
-	err := p.Start(context.Background(), []string{"-c", "exit 0"})
+	err := p.Start([]string{"-c", "exit 0"})
 	if err != nil {
 		t.Fatalf("Start() failed: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestExitErrSetOnAbnormalExit(t *testing.T) {
 	p := NewProcess("/bin/sh")
 	p.SetLogWriter(&bytes.Buffer{})
 
-	err := p.Start(context.Background(), []string{"-c", "exit 1"})
+	err := p.Start([]string{"-c", "exit 1"})
 	if err != nil {
 		t.Fatalf("Start() failed: %v", err)
 	}
@@ -173,7 +173,7 @@ func TestStopOnAlreadyExitedProcess(t *testing.T) {
 	p := NewProcess("/bin/sh")
 	p.SetLogWriter(&bytes.Buffer{})
 
-	err := p.Start(context.Background(), []string{"-c", "exit 0"})
+	err := p.Start([]string{"-c", "exit 0"})
 	if err != nil {
 		t.Fatalf("Start() failed: %v", err)
 	}
@@ -189,7 +189,7 @@ func TestIsRunningTrueWhileProcessRuns(t *testing.T) {
 	p := NewProcess("/bin/sleep")
 	p.SetLogWriter(&bytes.Buffer{})
 
-	err := p.Start(context.Background(), []string{"60"})
+	err := p.Start([]string{"60"})
 	if err != nil {
 		t.Fatalf("Start() failed: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestIsRunningFalseAfterProcessExits(t *testing.T) {
 	p := NewProcess("/bin/sh")
 	p.SetLogWriter(&bytes.Buffer{})
 
-	err := p.Start(context.Background(), []string{"-c", "exit 0"})
+	err := p.Start([]string{"-c", "exit 0"})
 	if err != nil {
 		t.Fatalf("Start() failed: %v", err)
 	}
@@ -219,7 +219,7 @@ func TestStopGracefullyTerminatesRunningProcess(t *testing.T) {
 	p := NewProcess("/bin/sleep")
 	p.SetLogWriter(&bytes.Buffer{})
 
-	err := p.Start(context.Background(), []string{"60"})
+	err := p.Start([]string{"60"})
 	if err != nil {
 		t.Fatalf("Start() failed: %v", err)
 	}
@@ -241,7 +241,7 @@ func TestConcurrentDoneAndExitErrNoRace(t *testing.T) {
 	p := NewProcess("/bin/sh")
 	p.SetLogWriter(&bytes.Buffer{})
 
-	err := p.Start(context.Background(), []string{"-c", "exit 0"})
+	err := p.Start([]string{"-c", "exit 0"})
 	if err != nil {
 		t.Fatalf("Start() failed: %v", err)
 	}

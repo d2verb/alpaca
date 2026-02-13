@@ -587,22 +587,22 @@ func TestHandleListModels_Success(t *testing.T) {
 		t.Errorf("Status = %q, want %q", resp.Status, protocol.StatusOK)
 	}
 
-	modelList, ok := resp.Data["models"].([]map[string]any)
+	modelList, ok := resp.Data["models"].([]ModelInfo)
 	if !ok {
-		t.Fatal("models data should be []map[string]any")
+		t.Fatal("models data should be []ModelInfo")
 	}
 
 	if len(modelList) != 2 {
 		t.Errorf("len(models) = %d, want 2", len(modelList))
 	}
-	if modelList[0]["repo"] != "TheBloke/CodeLlama-7B-GGUF" {
-		t.Errorf("models[0].repo = %v, want %q", modelList[0]["repo"], "TheBloke/CodeLlama-7B-GGUF")
+	if modelList[0].Repo != "TheBloke/CodeLlama-7B-GGUF" {
+		t.Errorf("models[0].Repo = %v, want %q", modelList[0].Repo, "TheBloke/CodeLlama-7B-GGUF")
 	}
-	if modelList[0]["quant"] != "Q4_K_M" {
-		t.Errorf("models[0].quant = %v, want %q", modelList[0]["quant"], "Q4_K_M")
+	if modelList[0].Quant != "Q4_K_M" {
+		t.Errorf("models[0].Quant = %v, want %q", modelList[0].Quant, "Q4_K_M")
 	}
-	if modelList[0]["size"] != int64(4096000) {
-		t.Errorf("models[0].size = %v, want %d", modelList[0]["size"], 4096000)
+	if modelList[0].Size != 4096000 {
+		t.Errorf("models[0].Size = %v, want %d", modelList[0].Size, 4096000)
 	}
 }
 
@@ -902,8 +902,7 @@ func TestHandleStatus_RouterModeWithMmproj(t *testing.T) {
 
 	// Directly set the preset on the daemon (skip Run to avoid needing httptest for models)
 	daemon := newTestDaemon(&stubPresetLoader{}, &stubModelManager{})
-	daemon.preset.Store(routerPreset)
-	daemon.state.Store(StateRunning)
+	daemon.setSnapshot(StateRunning, routerPreset)
 	server := NewServer(daemon, "/tmp/test.sock", io.Discard)
 
 	// Act

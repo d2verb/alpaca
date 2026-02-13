@@ -83,7 +83,7 @@ type mockProcess struct {
 	exitError    error
 }
 
-func (m *mockProcess) Start(ctx context.Context, args []string) error {
+func (m *mockProcess) Start(args []string) error {
 	m.startCalled = true
 	m.receivedArgs = args
 	if m.startErr != nil {
