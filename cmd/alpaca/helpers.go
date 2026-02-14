@@ -153,6 +153,11 @@ func pullModel(repo, quant, modelsDir string) error {
 		return err
 	}
 
+	if result.AlreadyUpToDate {
+		ui.PrintSuccess("Model is already up to date.")
+		return nil
+	}
+
 	// Report mmproj failure
 	if result.MmprojFailed {
 		fmt.Fprintln(ui.Output) // End progress bar line
