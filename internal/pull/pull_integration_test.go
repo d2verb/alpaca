@@ -1120,6 +1120,65 @@ func TestPull_RedownloadsWhenFileCorrupted(t *testing.T) {
 	}
 }
 
+func TestPull_RegistersMetadataWhenFileExistsButMetadataMissing(t *testing.T) {
+	// Arrange: model file exists on disk with correct hash, but metadata is empty.
+	modelContent := []byte("fake-model-binary-content")
+	modelHash := computeSHA256(modelContent)
+
+	var downloadCount atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "/manifests/"):
+			resp := newManifestResponse("model-Q4_K_M.gguf", int64(len(modelContent)), modelHash)
+			json.NewEncoder(w).Encode(resp)
+
+		case strings.Contains(r.URL.Path, "/resolve/main/"):
+			downloadCount.Add(1)
+			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(modelContent)))
+			w.WriteHeader(http.StatusOK)
+			w.Write(modelContent)
+
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	tmpDir := t.TempDir()
+
+	// Pre-place the model file (simulating deleted metadata)
+	if err := os.WriteFile(filepath.Join(tmpDir, "model-Q4_K_M.gguf"), modelContent, 0644); err != nil {
+		t.Fatalf("failed to write model file: %v", err)
+	}
+
+	puller := newTestPuller(tmpDir, srv.URL)
+
+	// Act
+	result, err := puller.Pull(context.Background(), "test/model", "Q4_K_M")
+
+	// Assert - should NOT return AlreadyUpToDate because metadata is missing
+	if err != nil {
+		t.Fatalf("Pull() error = %v", err)
+	}
+	if result.AlreadyUpToDate {
+		t.Error("should not be AlreadyUpToDate when metadata is missing")
+	}
+
+	// Verify download actually happened
+	if downloadCount.Load() != 1 {
+		t.Errorf("download count = %d, want 1", downloadCount.Load())
+	}
+
+	// Verify metadata was saved
+	entry := puller.metadata.Find("test/model", "Q4_K_M")
+	if entry == nil {
+		t.Fatal("metadata entry should exist after pull")
+	}
+	if entry.Filename != "model-Q4_K_M.gguf" {
+		t.Errorf("metadata Filename = %q, want %q", entry.Filename, "model-Q4_K_M.gguf")
+	}
+}
+
 func TestGetFileInfo_WithoutMmproj(t *testing.T) {
 	// Arrange
 	expectedSize := int64(5030000000)

@@ -232,9 +232,14 @@ func (p *Puller) checkAlreadyUpToDate(repo, quant string, fileInfo ggufFileInfo)
 		return nil, false
 	}
 
-	// Check mmproj state matches between manifest and existing metadata
+	// Metadata entry must exist; otherwise we need the full flow to register it
 	existing := p.metadata.Find(repo, quant)
-	existingHasMmproj := existing != nil && existing.Mmproj != nil
+	if existing == nil {
+		return nil, false
+	}
+
+	// Check mmproj state matches between manifest and existing metadata
+	existingHasMmproj := existing.Mmproj != nil
 	manifestHasMmproj := fileInfo.MmprojFilename != ""
 
 	if existingHasMmproj != manifestHasMmproj {
