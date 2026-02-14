@@ -221,11 +221,7 @@ func (p *Puller) checkAlreadyUpToDate(repo, quant string, fileInfo ggufFileInfo)
 		return nil, false
 	}
 
-	// Verify main model file hash
-	if err := p.verifyFileHash(fileInfo.Filename, fileInfo.SHA256); err != nil {
-		return nil, false
-	}
-
+	// Cheap checks first: file existence, metadata, mmproj consistency
 	destPath := filepath.Join(p.modelsDir, fileInfo.Filename)
 	info, err := os.Stat(destPath)
 	if err != nil {
@@ -243,11 +239,14 @@ func (p *Puller) checkAlreadyUpToDate(repo, quant string, fileInfo ggufFileInfo)
 	manifestHasMmproj := fileInfo.MmprojFilename != ""
 
 	if existingHasMmproj != manifestHasMmproj {
-		// Mmproj added or removed upstream; need full re-pull for cleanup
 		return nil, false
 	}
 	if existingHasMmproj && existing.Mmproj.Filename != fileInfo.MmprojFilename {
-		// Mmproj filename changed upstream; need full re-pull for cleanup
+		return nil, false
+	}
+
+	// Expensive: verify main model file hash (reads entire file)
+	if err := p.verifyFileHash(fileInfo.Filename, fileInfo.SHA256); err != nil {
 		return nil, false
 	}
 
@@ -259,17 +258,18 @@ func (p *Puller) checkAlreadyUpToDate(repo, quant string, fileInfo ggufFileInfo)
 	}
 
 	if manifestHasMmproj {
-		// Manifest has mmproj: file must exist and hash must match
 		if fileInfo.MmprojSHA256 == "" {
 			return nil, false
 		}
+		mmprojPath := filepath.Join(p.modelsDir, fileInfo.MmprojFilename)
+		if _, statErr := os.Stat(mmprojPath); statErr != nil {
+			return nil, false
+		}
+		// Expensive: verify mmproj file hash
 		if err := p.verifyFileHash(fileInfo.MmprojFilename, fileInfo.MmprojSHA256); err != nil {
 			return nil, false
 		}
-		mmprojInfo, statErr := os.Stat(filepath.Join(p.modelsDir, fileInfo.MmprojFilename))
-		if statErr != nil {
-			return nil, false
-		}
+		mmprojInfo, _ := os.Stat(mmprojPath)
 		result.MmprojFilename = fileInfo.MmprojFilename
 		result.MmprojSize = mmprojInfo.Size()
 	}
