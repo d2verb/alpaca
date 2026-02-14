@@ -66,12 +66,13 @@ func (p *Puller) SetFileSavedFunc(fn FileSavedFunc) {
 
 // PullResult contains information about the downloaded file.
 type PullResult struct {
-	Path           string
-	Filename       string
-	Size           int64
-	MmprojFilename string // empty if no mmproj or download failed
-	MmprojSize     int64  // 0 if no mmproj
-	MmprojFailed   bool   // true if mmproj download was attempted but failed
+	Path            string
+	Filename        string
+	Size            int64
+	MmprojFilename  string // empty if no mmproj or download failed
+	MmprojSize      int64  // 0 if no mmproj
+	MmprojFailed    bool   // true if mmproj download was attempted but failed
+	AlreadyUpToDate bool   // true if model was already downloaded and hash matches
 }
 
 // FileInfo contains information about model and mmproj files from the manifest.
@@ -111,6 +112,11 @@ func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, err
 	// Validate filename (for clear error messages)
 	if !filepath.IsLocal(fileInfo.Filename) {
 		return nil, fmt.Errorf("invalid filename from API: %s", fileInfo.Filename)
+	}
+
+	// Check if model is already downloaded and up to date
+	if result, ok := p.checkAlreadyUpToDate(repo, quant, fileInfo); ok {
+		return result, nil
 	}
 
 	totalFiles := 1
@@ -205,6 +211,65 @@ func (p *Puller) Pull(ctx context.Context, repo, quant string) (*PullResult, err
 	}
 
 	return result, nil
+}
+
+// checkAlreadyUpToDate checks if the model and mmproj files already exist on
+// disk with matching SHA256 hashes. Returns the result and true only if
+// everything is fully up to date (including mmproj state changes).
+func (p *Puller) checkAlreadyUpToDate(repo, quant string, fileInfo ggufFileInfo) (*PullResult, bool) {
+	if fileInfo.SHA256 == "" {
+		return nil, false
+	}
+
+	// Verify main model file hash
+	if err := p.verifyFileHash(fileInfo.Filename, fileInfo.SHA256); err != nil {
+		return nil, false
+	}
+
+	destPath := filepath.Join(p.modelsDir, fileInfo.Filename)
+	info, err := os.Stat(destPath)
+	if err != nil {
+		return nil, false
+	}
+
+	// Check mmproj state matches between manifest and existing metadata
+	existing := p.metadata.Find(repo, quant)
+	existingHasMmproj := existing != nil && existing.Mmproj != nil
+	manifestHasMmproj := fileInfo.MmprojFilename != ""
+
+	if existingHasMmproj != manifestHasMmproj {
+		// Mmproj added or removed upstream; need full re-pull for cleanup
+		return nil, false
+	}
+	if existingHasMmproj && existing.Mmproj.Filename != fileInfo.MmprojFilename {
+		// Mmproj filename changed upstream; need full re-pull for cleanup
+		return nil, false
+	}
+
+	result := &PullResult{
+		Path:            destPath,
+		Filename:        fileInfo.Filename,
+		Size:            info.Size(),
+		AlreadyUpToDate: true,
+	}
+
+	if manifestHasMmproj {
+		// Manifest has mmproj: file must exist and hash must match
+		if fileInfo.MmprojSHA256 == "" {
+			return nil, false
+		}
+		if err := p.verifyFileHash(fileInfo.MmprojFilename, fileInfo.MmprojSHA256); err != nil {
+			return nil, false
+		}
+		mmprojInfo, statErr := os.Stat(filepath.Join(p.modelsDir, fileInfo.MmprojFilename))
+		if statErr != nil {
+			return nil, false
+		}
+		result.MmprojFilename = fileInfo.MmprojFilename
+		result.MmprojSize = mmprojInfo.Size()
+	}
+
+	return result, true
 }
 
 // GetFileInfo fetches info about the model and optional mmproj files without downloading.
