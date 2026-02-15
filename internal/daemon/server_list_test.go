@@ -33,7 +33,7 @@ func TestHandleListPresets_Success(t *testing.T) {
 	}
 
 	if len(presetList) != 3 {
-		t.Errorf("len(presets) = %d, want 3", len(presetList))
+		t.Fatalf("len(presets) = %d, want 3", len(presetList))
 	}
 	if presetList[0] != "codellama" {
 		t.Errorf("presets[0] = %q, want %q", presetList[0], "codellama")
@@ -87,7 +87,7 @@ func TestHandleListModels_Success(t *testing.T) {
 	}
 
 	if len(modelList) != 2 {
-		t.Errorf("len(models) = %d, want 2", len(modelList))
+		t.Fatalf("len(models) = %d, want 2", len(modelList))
 	}
 	if modelList[0].Repo != "TheBloke/CodeLlama-7B-GGUF" {
 		t.Errorf("models[0].Repo = %v, want %q", modelList[0].Repo, "TheBloke/CodeLlama-7B-GGUF")

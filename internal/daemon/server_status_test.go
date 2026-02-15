@@ -138,7 +138,7 @@ func TestHandleStatus_RouterMode(t *testing.T) {
 		t.Errorf("mode = %v, want %q", resp.Data["mode"], "router")
 	}
 
-	// No mode field for non-router presets is verified in TestHandleStatus_Running
+	// No mode field for non-router presets is verified in TestHandleStatus_SingleModeNoModeField
 }
 
 func TestHandleStatus_SingleModeNoModeField(t *testing.T) {

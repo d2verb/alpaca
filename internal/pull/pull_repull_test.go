@@ -270,6 +270,12 @@ func TestPull_RePull_SharedMmproj_NotDeleted(t *testing.T) {
 	// Verify both entries share the same mmproj
 	entryQ4 := puller.metadata.Find(repo, "Q4_K_M")
 	entryQ8 := puller.metadata.Find(repo, "Q8_0")
+	if entryQ4 == nil || entryQ4.Mmproj == nil {
+		t.Fatal("Q4_K_M metadata or Mmproj should not be nil after pull with mmproj")
+	}
+	if entryQ8 == nil || entryQ8.Mmproj == nil {
+		t.Fatal("Q8_0 metadata or Mmproj should not be nil after pull with mmproj")
+	}
 	if entryQ4.Mmproj.Filename != entryQ8.Mmproj.Filename {
 		t.Fatalf("entries should share same mmproj filename")
 	}

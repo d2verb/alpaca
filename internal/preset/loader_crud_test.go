@@ -81,7 +81,10 @@ model: "f:~/.alpaca/models/test.gguf"
 			t.Fatalf("Load() error = %v", err)
 		}
 
-		home, _ := os.UserHomeDir()
+		home, err := os.UserHomeDir()
+		if err != nil {
+			t.Fatalf("UserHomeDir() error = %v", err)
+		}
 		expected := "f:" + filepath.Join(home, ".alpaca/models/test.gguf")
 		if p.Model != expected {
 			t.Errorf("Model = %q, want %q", p.Model, expected)
